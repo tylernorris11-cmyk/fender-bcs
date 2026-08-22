@@ -5,7 +5,7 @@
   "description": "Fender Steel Business Control System \u2014 orders, production, stock, sales, CARES compliance",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && prisma db push --accept-data-loss && next build",
     "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
