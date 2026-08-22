@@ -1,0 +1,93 @@
+import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
+import type { AssetType } from '@prisma/client';
+import { requirePermission } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { getAlerts } from '@/lib/alerts';
+import { daysUntil, shortDate } from '@/lib/format';
+import { NAV, Shell } from '@/components/Shell';
+import { Empty, PageHeader, Pill, Stat, StatRow } from '@/components/ui';
+
+function DueDate({ label, due }: { label: string; due: Date | null }) {
+  if (!due) return null;
+  const days = daysUntil(due)!;
+  return (
+    <span className="flex items-center gap-1.5 whitespace-nowrap">
+      <span className="text-ink-faint">{label}</span>
+      {days < 0 ? <Pill tone="bad">{shortDate(due)} · overdue</Pill>
+        : days <= 21 ? <Pill tone="warn">{shortDate(due)} · {days}d</Pill>
+        : <span className="font-medium">{shortDate(due)}</span>}
+    </span>
+  );
+}
+
+export default async function AssetsPage({ searchParams }: { searchParams: { type?: AssetType; retired?: string; q?: string } }) {
+  const user = await requirePermission('assets.view');
+  const alerts = await getAlerts(user);
+
+  const retired = searchParams.retired === '1';
+  const type = searchParams.type;
+  const q = (searchParams.q ?? '').trim();
+
+  const assets = await db.asset.findMany({
+    where: {
+      retired,
+      ...(type ? { type } : {}),
+      ...(q ? { OR: [
+        { name: { contains: q, mode: 'insensitive' } },
+        { makeModel: { contains: q, mode: 'insensitive' } },
+        { category: { contains: q, mode: 'insensitive' } },
+        { depot: { contains: q, mode: 'insensitive' } },
+      ] } : {}),
+    },
+    orderBy: { ref: 'asc' },
+  });
+
+  const all = await db.asset.findMany({ where: { retired: false } });
+  const dates = (a: typeof all[number]) => [a.motDue, a.taxDue, a.weeklyCheckDue, a.puwerDue, a.lolerDue, a.serviceDue, a.calibrationDue];
+  const overdue = all.filter((a) => dates(a).some((d) => d && daysUntil(d)! < 0)).length;
+  const soon = all.filter((a) => dates(a).some((d) => d && daysUntil(d)! >= 0 && daysUntil(d)! <= 21)).length;
+
+  const title = retired ? 'Retired assets' : type === 'MACHINE' ? 'Machinery' : type === 'VEHICLE' ? 'Vehicles' : 'Vehicles & machinery';
+
+  return (
+    <Shell user={user} module="assets" nav={NAV.assets} current={retired ? '/assets?retired=1' : type === 'MACHINE' ? '/assets?type=MACHINE' : '/assets'} alerts={alerts.length}>
+      <PageHeader title={title} blurb="Tap a vehicle or machine to see its full record." />
+
+      <StatRow>
+        <Stat value={all.filter((a) => a.type === 'VEHICLE').length} label="Vehicles" href="/assets?type=VEHICLE" />
+        <Stat value={all.filter((a) => a.type === 'MACHINE').length} label="Machinery" href="/assets?type=MACHINE" />
+        <Stat value={overdue} label="Checks overdue" tone={overdue ? 'bad' : 'default'} />
+        <Stat value={soon} label="Due within 3 weeks" tone={soon ? 'warn' : 'default'} />
+      </StatRow>
+
+      <form className="mb-5">
+        {type && <input type="hidden" name="type" value={type} />}
+        <input name="q" defaultValue={q} className="input max-w-md" placeholder="Search reg, model, type or depot…" aria-label="Search assets" />
+      </form>
+
+      {assets.length === 0 ? <Empty title="Nothing here." /> : (
+        <section className="card overflow-hidden">
+          {assets.map((a) => (
+            <Link key={a.id} href={`/assets/${a.id}`} className="flex flex-wrap items-center gap-4 px-5 py-4 border-b border-hairline last:border-0 hover:bg-canvas transition-colors">
+              <div className="min-w-[190px]">
+                <p className="font-bold">{a.name}</p>
+                <p className="text-xs text-ink-faint">{a.ref} · {a.category} · {a.depot}</p>
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm flex-1">
+                <DueDate label="MOT" due={a.motDue} />
+                <DueDate label="Tax" due={a.taxDue} />
+                <DueDate label="Safety check" due={a.weeklyCheckDue} />
+                <DueDate label="PUWER" due={a.puwerDue} />
+                <DueDate label="LOLER" due={a.lolerDue} />
+                <DueDate label="Service" due={a.serviceDue} />
+                <DueDate label="Calibration" due={a.calibrationDue} />
+              </div>
+              <ChevronRight size={18} className="text-ink-faint" aria-hidden />
+            </Link>
+          ))}
+        </section>
+      )}
+    </Shell>
+  );
+}
