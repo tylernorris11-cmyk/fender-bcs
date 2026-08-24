@@ -13,6 +13,17 @@ export default async function SuppliersPage({ searchParams }: { searchParams: { 
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
   const company = getActiveCompany(user);
 
+  if (company !== 'FENDER') {
+    return (
+      <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/suppliers" alerts={alerts.length}>
+        <PageHeader title="Suppliers" />
+        <div className="banner-warn">
+          Compliance is a Fender Steel thing — BCS Products is not CARES-approved and none of this applies to it.
+        </div>
+      </Shell>
+    );
+  }
+
   const suppliers = await db.supplier.findMany({
     where: { company },
     orderBy: { name: 'asc' },

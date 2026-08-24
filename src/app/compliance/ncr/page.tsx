@@ -29,6 +29,17 @@ export default async function NcrPage({ searchParams }: { searchParams: { raise?
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
 
+  if (company !== 'FENDER') {
+    return (
+      <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/ncr" alerts={alerts.length}>
+        <PageHeader title="Non-conformances" />
+        <div className="banner-warn">
+          Compliance is a Fender Steel thing — BCS Products is not CARES-approved and none of this applies to it.
+        </div>
+      </Shell>
+    );
+  }
+
   const [ncrs, orders, customers, suppliers, batches] = await Promise.all([
     db.ncr.findMany({
       where: { company },

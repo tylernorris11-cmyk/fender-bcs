@@ -49,6 +49,18 @@ export default async function CompliancePage() {
   const user = await requirePermission('compliance.view');
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
+
+  if (company !== 'FENDER') {
+    return (
+      <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance" alerts={alerts.length}>
+        <PageHeader title="Compliance" />
+        <div className="banner-warn">
+          Compliance is a Fender Steel thing — BCS Products is not CARES-approved and none of this applies to it.
+        </div>
+      </Shell>
+    );
+  }
+
   const in90 = new Date(Date.now() + 90 * 86_400_000);
 
   const [inDate, expiring, openActions, batches, tracedBatches, openNcrs] = await Promise.all([

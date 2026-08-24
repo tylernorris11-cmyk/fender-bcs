@@ -32,7 +32,7 @@ export function Shell({
   const isBsSupplies = active === 'BS_SUPPLIES';
   const visible = nav.filter((n) => (!n.perm || can(user, n.perm)) && (!n.company || n.company === active));
   const switcherItems = [
-    ...MODULES.filter((m) => can(user, m.perm)).map((m) => ({ key: m.key, label: m.label, href: m.href })),
+    ...MODULES.filter((m) => can(user, m.perm) && (!('company' in m) || m.company === active)).map((m) => ({ key: m.key, label: m.label, href: m.href })),
     ...(can(user, 'setup.view') ? [{ key: 'setup', label: 'Set Up', href: '/setup/pricing' }] : []),
   ];
 

@@ -16,6 +16,17 @@ export default async function CertificatesPage({ searchParams }: { searchParams:
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
   const company = getActiveCompany(user);
 
+  if (company !== 'FENDER') {
+    return (
+      <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/certificates" alerts={alerts.length}>
+        <PageHeader title="Certificates" />
+        <div className="banner-warn">
+          Compliance is a Fender Steel thing — BCS Products is not CARES-approved and none of this applies to it.
+        </div>
+      </Shell>
+    );
+  }
+
   const [certificates, suppliers] = await Promise.all([
     db.certificate.findMany({
       where: { company },

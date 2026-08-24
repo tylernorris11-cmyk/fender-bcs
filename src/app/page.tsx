@@ -37,8 +37,8 @@ function greeting() {
 export default async function Launcher() {
   const user = await requireUser();
   const alerts = await getAlerts(user);
-  const tiles = MODULES.filter((m) => can(user, m.perm));
   const active = getActiveCompany(user);
+  const tiles = MODULES.filter((m) => can(user, m.perm) && (!('company' in m) || m.company === active));
   const isBsSupplies = active === 'BS_SUPPLIES';
 
   return (

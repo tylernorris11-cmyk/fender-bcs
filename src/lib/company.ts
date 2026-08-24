@@ -42,3 +42,13 @@ export function assertCompanyAccess(user: Companied, company: Company) {
     throw new Error('You do not have permission to do that.');
   }
 }
+
+/**
+ * CARES only applies to Fender's reinforcing steel — BCS Products is not
+ * CARES-approved, so none of the Compliance module applies to it.
+ */
+export function assertCaresApplies(user: { companies: Company[] }) {
+  if (getActiveCompany(user) === 'BS_SUPPLIES') {
+    throw new Error('CARES compliance does not apply to BCS Products.');
+  }
+}

@@ -3,11 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
-import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
+import { assertCaresApplies, assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { nextNcrRef } from '@/lib/orders';
 
 export async function raiseNcr(formData: FormData) {
   const user = await assertPermission('compliance.ncr');
+  assertCaresApplies(user);
   const ref = await nextNcrRef();
 
   const ncr = await db.ncr.create({
@@ -41,6 +42,7 @@ export async function raiseNcr(formData: FormData) {
 
 export async function closeNcr(formData: FormData) {
   const user = await assertPermission('compliance.ncr');
+  assertCaresApplies(user);
   const id = String(formData.get('ncrId'));
   const correctiveAction = String(formData.get('correctiveAction') ?? '').trim();
 
@@ -62,6 +64,7 @@ export async function closeNcr(formData: FormData) {
 
 export async function saveCertificate(formData: FormData) {
   const user = await assertPermission('compliance.edit');
+  assertCaresApplies(user);
   const id = String(formData.get('certificateId') ?? '');
 
   const data = {
@@ -92,6 +95,7 @@ export async function saveCertificate(formData: FormData) {
 
 export async function submitReturn(formData: FormData) {
   const user = await assertPermission('compliance.edit');
+  assertCaresApplies(user);
   const period = String(formData.get('period'));
   const tonnage = Number(formData.get('tonnage'));
   const company = getActiveCompany(user);
@@ -107,6 +111,7 @@ export async function submitReturn(formData: FormData) {
 
 export async function closeAuditAction(formData: FormData) {
   const user = await assertPermission('compliance.edit');
+  assertCaresApplies(user);
   const id = String(formData.get('actionId'));
   const evidence = String(formData.get('evidence') ?? '').trim();
   if (!evidence) throw new Error('Note the evidence — what changed and where it is recorded.');

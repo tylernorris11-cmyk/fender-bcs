@@ -24,6 +24,17 @@ export default async function ReturnsPage({ searchParams }: { searchParams: { so
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
 
+  if (company !== 'FENDER') {
+    return (
+      <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/returns" alerts={alerts.length}>
+        <PageHeader title="Returns & actions" />
+        <div className="banner-warn">
+          Compliance is a Fender Steel thing — BCS Products is not CARES-approved and none of this applies to it.
+        </div>
+      </Shell>
+    );
+  }
+
   const [returns, actions, delivered] = await Promise.all([
     db.quarterlyReturn.findMany({ where: { company }, orderBy: { period: 'desc' } }),
     db.auditAction.findMany({ where: { company }, orderBy: ACTION_SORTS[searchParams.sort ?? 'due'] ?? ACTION_SORTS.due }),

@@ -13,6 +13,7 @@ export default async function StockPage({ searchParams }: { searchParams: { cate
   const user = await requirePermission('stock.view');
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
+  const caresApplies = company === 'FENDER';
   const depot = searchParams.depot;
 
   const [products, locations] = await Promise.all([
@@ -29,6 +30,7 @@ export default async function StockPage({ searchParams }: { searchParams: { cate
 
   const liveBatches = products.reduce((s, p) => s + p.batches.length, 0);
   const missingCerts = products.reduce((s, p) => s + p.batches.filter((b) => !b.millCertUrl).length, 0);
+  const quarantinedCount = products.reduce((s, p) => s + p.batches.filter((b) => b.status === 'Quarantined').length, 0);
   const lowStock = products.filter((p) => {
     const available = p.batches.filter((b) => b.status === 'Available').reduce((s, b) => s + Number(b.qtyRemaining), 0);
     return Number(p.reorderAt) > 0 && available <= Number(p.reorderAt);
@@ -47,9 +49,9 @@ export default async function StockPage({ searchParams }: { searchParams: { cate
     <Shell user={user} module="stock" nav={NAV.stock} current="/stock" alerts={alerts.length}>
       <PageHeader
         title="Stock"
-        blurb="Tap a product to see its batches and certificates."
+        blurb={caresApplies ? 'Tap a product to see its batches and certificates.' : 'Tap a product to see its batches.'}
         actions={can(user, 'stock.goodsIn') && (
-          <Link href="/stock/goods-in" className="btn-primary"><Plus size={16} /> Book steel in</Link>
+          <Link href="/stock/goods-in" className="btn-primary"><Plus size={16} /> {caresApplies ? 'Book steel in' : 'Book stock in'}</Link>
         )}
       />
 
@@ -57,7 +59,11 @@ export default async function StockPage({ searchParams }: { searchParams: { cate
         <Stat value={products.length} label="Stock items" />
         <Stat value={liveBatches} label="Live batches" />
         <Stat value={lowStock} label="Low stock" tone={lowStock ? 'warn' : 'default'} />
-        <Stat value={missingCerts} label="Missing certificates" tone={missingCerts ? 'bad' : 'default'} />
+        {caresApplies ? (
+          <Stat value={missingCerts} label="Missing certificates" tone={missingCerts ? 'bad' : 'default'} />
+        ) : (
+          <Stat value={quarantinedCount} label="Quarantined" tone={quarantinedCount ? 'warn' : 'default'} />
+        )}
       </StatRow>
 
       <nav className="flex flex-wrap gap-2 mb-4" aria-label="Filter by depot">

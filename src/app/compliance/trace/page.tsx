@@ -19,6 +19,17 @@ export default async function TracePage({ searchParams }: { searchParams: { q?: 
   const q = (searchParams.q ?? '').trim();
   const company = getActiveCompany(user);
 
+  if (company !== 'FENDER') {
+    return (
+      <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/trace" alerts={alerts.length}>
+        <PageHeader title="Trace a batch" />
+        <div className="banner-warn">
+          Compliance is a Fender Steel thing — BCS Products is not CARES-approved and none of this applies to it.
+        </div>
+      </Shell>
+    );
+  }
+
   const batches = q
     ? await db.batch.findMany({
         where: {

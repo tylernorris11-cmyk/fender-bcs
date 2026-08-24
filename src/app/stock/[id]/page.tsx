@@ -24,6 +24,7 @@ export default async function StockItemPage({ params }: { params: { id: string }
   });
   if (!product) notFound();
   if (!user.companies.includes(product.company)) notFound();
+  const caresApplies = product.company === 'FENDER';
 
   const available = product.batches.filter((b) => b.status === 'Available').reduce((s, b) => s + Number(b.qtyRemaining), 0);
   const nextOut = product.batches.find((b) => b.status === 'Available' && Number(b.qtyRemaining) > 0);
@@ -47,20 +48,23 @@ export default async function StockItemPage({ params }: { params: { id: string }
           <div>
             <h2 className="text-lg font-bold">Batches — oldest used first</h2>
             <p className="text-sm text-ink-muted mt-1">
-              Deliveries out pick the oldest available batch, so the certificate that prints on the note is the one
-              covering the steel actually loaded.
+              {caresApplies
+                ? 'Deliveries out pick the oldest available batch, so the certificate that prints on the note is the one covering the steel actually loaded.'
+                : 'Deliveries out pick the oldest available batch first.'}
             </p>
           </div>
           <Pill tone="good">{fmtQty(available, product.unit)} available</Pill>
         </header>
 
         <Table head={<>
-          <th className="th">Batch / heat</th><th className="th">Certificate</th><th className="th">Supplier</th>
+          <th className="th">Batch / heat</th>
+          {caresApplies && <th className="th">Certificate</th>}
+          <th className="th">Supplier</th>
           <th className="th">Depot</th>
           <th className="th">Received</th><th className="th text-right">Remaining</th>
           {showCosts && <th className="th text-right">Cost</th>}
           {showCosts && <th className="th text-right">Total paid</th>}
-          <th className="th">Mill cert</th>
+          {caresApplies && <th className="th">Mill cert</th>}
           <th className="th sr-only">Actions</th>
         </>}>
           {product.batches.map((b) => (
@@ -74,18 +78,20 @@ export default async function StockItemPage({ params }: { params: { id: string }
                 </span>
                 {b.quarantineRef && <span className="block text-xs text-signal mt-0.5">{b.quarantineRef}</span>}
               </td>
-              <td className="td text-ink-muted">{b.certNumber || '—'}</td>
+              {caresApplies && <td className="td text-ink-muted">{b.certNumber || '—'}</td>}
               <td className="td">{b.supplier.name}</td>
               <td className="td text-ink-muted">{b.depot}</td>
               <td className="td text-ink-muted whitespace-nowrap">{shortDate(b.receivedAt)}</td>
               <td className="td text-right tabular-nums">{Number(b.qtyRemaining).toFixed(3)} / {Number(b.qtyReceived).toFixed(0)}</td>
               {showCosts && <td className="td text-right tabular-nums">{b.unitCost != null ? money(b.unitCost) : '—'}</td>}
               {showCosts && <td className="td text-right tabular-nums font-semibold">{b.unitCost != null ? money(Number(b.unitCost) * Number(b.qtyReceived)) : '—'}</td>}
-              <td className="td">
-                {b.millCertUrl
-                  ? <a href={b.millCertUrl} className="inline-flex items-center gap-1.5 text-brand-700 hover:underline"><FileText size={15} /> Open</a>
-                  : <Pill tone="bad">Not on file</Pill>}
-              </td>
+              {caresApplies && (
+                <td className="td">
+                  {b.millCertUrl
+                    ? <a href={b.millCertUrl} className="inline-flex items-center gap-1.5 text-brand-700 hover:underline"><FileText size={15} /> Open</a>
+                    : <Pill tone="bad">Not on file</Pill>}
+                </td>
+              )}
               <td className="td text-right">
                 {can(user, 'stock.adjust') && b.status !== 'Consumed' && (
                   <form action={setBatchStatus}>

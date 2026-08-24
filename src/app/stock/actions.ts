@@ -21,7 +21,7 @@ export async function receiveBatch(formData: FormData) {
   const qtyReceived = Number(formData.get('qty'));
   const millCertUrl = String(formData.get('millCertUrl') ?? '').trim();
 
-  if (!heatNumber) throw new Error('Enter the cast or heat number from the mill certificate.');
+  if (!heatNumber) throw new Error('Enter a batch or delivery reference.');
   if (!(qtyReceived > 0)) throw new Error('Enter how much arrived.');
 
   const [supplier, product] = await Promise.all([
@@ -29,10 +29,14 @@ export async function receiveBatch(formData: FormData) {
     db.product.findUniqueOrThrow({ where: { id: productId } }),
   ]);
 
+  // CARES-driven quarantine only applies to Fender's reinforcing steel — BCS
+  // Products isn't CARES-approved, so its goods-in never gets held up over a
+  // mill certificate or a supplier approval that doesn't apply to it.
+  const caresApplies = product.company === 'FENDER';
   const approved = supplier.certificates.some((c) => c.expiresOn > new Date());
   // Booking it in is still allowed — refusing would just mean it gets kept on
   // paper instead. But it lands quarantined and it shows on the alerts list.
-  const status = !approved || !millCertUrl ? 'Quarantined' : 'Available';
+  const status = caresApplies && (!approved || !millCertUrl) ? 'Quarantined' : 'Available';
   const unitCostRaw = formData.get('unitCost');
   const unitCost = can(user, 'finance.costs') && unitCostRaw ? Number(unitCostRaw) : null;
 

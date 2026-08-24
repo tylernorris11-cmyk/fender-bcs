@@ -64,7 +64,8 @@ export default async function DeliverySheet({ params }: { params: { id: string }
       <table className="w-full mb-6 border-collapse">
         <thead>
           <tr className="border-y border-black/20 text-left text-[11px] uppercase tracking-wide">
-            <th className="py-2">Description</th><th className="py-2">Cast / heat</th><th className="py-2">Mill cert</th>
+            <th className="py-2">Description</th>
+            {!isBsSupplies && <><th className="py-2">Cast / heat</th><th className="py-2">Mill cert</th></>}
             <th className="py-2 text-right">Qty</th><th className="py-2 text-right">Total</th>
           </tr>
         </thead>
@@ -72,8 +73,7 @@ export default async function DeliverySheet({ params }: { params: { id: string }
           {order.lines.map((l) => (
             <tr key={l.id} className="border-b border-black/10">
               <td className="py-2">{l.description}</td>
-              <td className="py-2">{l.batch?.heatNumber ?? '—'}</td>
-              <td className="py-2">{l.batch?.certNumber ?? '—'}</td>
+              {!isBsSupplies && <><td className="py-2">{l.batch?.heatNumber ?? '—'}</td><td className="py-2">{l.batch?.certNumber ?? '—'}</td></>}
               <td className="py-2 text-right">{qty(l.qty, l.unit)}</td>
               <td className="py-2 text-right">{money(l.lineTotal)}</td>
             </tr>
@@ -81,7 +81,7 @@ export default async function DeliverySheet({ params }: { params: { id: string }
           {order.barMarks.map((b) => (
             <tr key={b.id} className="border-b border-black/10">
               <td className="py-2">Cut &amp; bent {b.mark} — shape {b.shapeCode}, {b.diaMm} mm, {b.lengthMm} mm</td>
-              <td className="py-2">—</td><td className="py-2">On bending ticket</td>
+              {!isBsSupplies && <><td className="py-2">—</td><td className="py-2">On bending ticket</td></>}
               <td className="py-2 text-right">{b.bars} bars</td>
               <td className="py-2 text-right">{money(b.lineTotal)}</td>
             </tr>

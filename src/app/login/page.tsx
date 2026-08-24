@@ -33,8 +33,9 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
             The whole yard,<br />in one place.
           </h1>
           <p className="text-white/75 mt-5 text-lg leading-relaxed">
-            Orders, production, deliveries, customers, CARES compliance, stock and assets —
-            the business control system built for {isBsSupplies ? 'BCS Products' : 'Fender Steel'}.
+            {isBsSupplies
+              ? 'Orders, production, deliveries, customers, stock and assets — the business control system built for BCS Products.'
+              : 'Orders, production, deliveries, customers, CARES compliance, stock and assets — the business control system built for Fender Steel.'}
           </p>
         </div>
 

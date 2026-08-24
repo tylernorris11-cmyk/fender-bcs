@@ -69,32 +69,36 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
     });
   }
 
-  // A supplier we have taken steel from with no in-date CARES approval on file
-  // is the single worst finding an auditor can hand you.
-  for (const s of suppliers) {
-    if (s.batches.length === 0) continue;
-    const approval = s.certificates.find((c) => c.scheme === 'Supplier' && c.expiresOn > new Date());
-    if (!approval) {
+  // CARES only applies to Fender's reinforcing steel — BCS Products isn't
+  // CARES-approved, so neither of these findings mean anything for it.
+  if (company === 'FENDER') {
+    // A supplier we have taken steel from with no in-date CARES approval on
+    // file is the single worst finding an auditor can hand you.
+    for (const s of suppliers) {
+      if (s.batches.length === 0) continue;
+      const approval = s.certificates.find((c) => c.scheme === 'Supplier' && c.expiresOn > new Date());
+      if (!approval) {
+        out.push({
+          id: `supplier-${s.id}`,
+          severity: 'bad',
+          title: `${s.name} has no in-date CARES approval on file`,
+          detail: 'Add the certificate, or stop buying from them until it is verified.',
+          href: '/compliance/suppliers',
+          perm: 'compliance.view',
+        });
+      }
+    }
+
+    if (missingCert > 0) {
       out.push({
-        id: `supplier-${s.id}`,
+        id: 'batches-no-cert',
         severity: 'bad',
-        title: `${s.name} has no in-date CARES approval on file`,
-        detail: 'Add the certificate, or stop buying from them until it is verified.',
-        href: '/compliance/suppliers',
+        title: `${missingCert} live ${missingCert === 1 ? 'batch has' : 'batches have'} no mill certificate`,
+        detail: 'Traceability is broken until the certificate is attached. Quarantine the steel or chase the mill.',
+        href: '/compliance/trace',
         perm: 'compliance.view',
       });
     }
-  }
-
-  if (missingCert > 0) {
-    out.push({
-      id: 'batches-no-cert',
-      severity: 'bad',
-      title: `${missingCert} live ${missingCert === 1 ? 'batch has' : 'batches have'} no mill certificate`,
-      detail: 'Traceability is broken until the certificate is attached. Quarantine the steel or chase the mill.',
-      href: '/compliance/trace',
-      perm: 'compliance.view',
-    });
   }
 
   for (const b of quarantined) {
