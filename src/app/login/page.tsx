@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { getCurrentUser } from '@/lib/auth';
 import { COMPANY_COOKIE } from '@/lib/company';
-import { signIn } from './actions';
+import { signIn, setLoginBrand } from './actions';
 
 export default async function LoginPage({ searchParams }: { searchParams: { error?: string; next?: string } }) {
   if (await getCurrentUser()) redirect('/');
@@ -17,7 +17,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
       {/* ------------------------------------------------- brand panel */}
       <div className="relative bg-forest text-white overflow-hidden flex flex-col justify-between p-8 sm:p-12 min-h-[280px]">
         <div className="absolute inset-0 mesh-bg pointer-events-none" aria-hidden />
-        <div className="relative">
+        <div className="relative flex items-start justify-between gap-4">
           <div className="inline-block rounded-2xl bg-white/95 px-7 py-6 shadow-pop">
             <p className="text-3xl font-bold tracking-tight text-forest">
               {isBsSupplies ? <>BCS <span className="text-signal">Products</span></> : <>Fender<span className="text-signal">BCS</span></>}
@@ -25,6 +25,21 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
             <p className="text-[10px] uppercase tracking-[0.16em] text-brand-700 mt-1.5">
               {isBsSupplies ? 'Steel & building supplies' : 'Reinforcing steel specialists'}
             </p>
+          </div>
+
+          <div className="flex items-center rounded-xl bg-white/10 p-1 text-xs font-semibold shrink-0">
+            <form action={setLoginBrand}>
+              <input type="hidden" name="company" value="FENDER" />
+              <button type="submit" className={`rounded-lg px-3 py-1.5 transition-colors ${!isBsSupplies ? 'bg-white text-forest' : 'text-white/70 hover:text-white'}`}>
+                Fender Steel
+              </button>
+            </form>
+            <form action={setLoginBrand}>
+              <input type="hidden" name="company" value="BS_SUPPLIES" />
+              <button type="submit" className={`rounded-lg px-3 py-1.5 transition-colors ${isBsSupplies ? 'bg-white text-forest' : 'text-white/70 hover:text-white'}`}>
+                BCS Products
+              </button>
+            </form>
           </div>
         </div>
 
@@ -77,6 +92,9 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
 
           <p className="text-center text-sm text-ink-faint mt-4">
             Still stuck? Ask John or Claire to reset it for you.
+          </p>
+          <p className="text-center text-sm text-ink-faint mt-2">
+            New here? <Link href="/request-access" className="font-semibold text-brand-700 hover:underline">Request access</Link>
           </p>
         </div>
       </div>

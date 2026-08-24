@@ -1,8 +1,11 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import type { Company } from '@prisma/client';
 import { db } from '@/lib/db';
 import { setSessionCookie, verifyPassword } from '@/lib/auth';
+import { COMPANY_COOKIE } from '@/lib/company';
 
 /**
  * Crude in-memory throttle. Good enough to stop someone sitting in the car park
@@ -55,4 +58,24 @@ export async function signIn(formData: FormData) {
 
   // Only ever send people to a path inside this app.
   redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/');
+}
+
+/**
+ * Nobody is signed in yet, so this can't check against a user's real access —
+ * it only ever changes which brand the login screen itself shows. Every real
+ * read of the active company re-clamps against the signed-in user's own
+ * `companies` list once they're actually in.
+ */
+export async function setLoginBrand(formData: FormData) {
+  const company = String(formData.get('company') ?? '') as Company;
+  if (company === 'FENDER' || company === 'BS_SUPPLIES') {
+    cookies().set(COMPANY_COOKIE, company, {
+      httpOnly: false,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+  redirect('/login');
 }

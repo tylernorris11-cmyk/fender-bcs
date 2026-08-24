@@ -197,6 +197,7 @@ export const NAV: Record<string, NavItem[]> = {
   setup: [
     { label: 'Pricing', href: '/setup/pricing', perm: 'setup.pricing' },
     { label: 'Users & roles', href: '/setup/users', perm: 'setup.users' },
+    { label: 'Access requests', href: '/setup/access-requests', perm: 'setup.users' },
     { label: 'Drivers', href: '/setup/drivers', perm: 'setup.lists' },
     { label: 'Towns & cities', href: '/setup/towns', perm: 'setup.lists' },
     { label: 'Locations', href: '/setup/locations', perm: 'setup.lists' },

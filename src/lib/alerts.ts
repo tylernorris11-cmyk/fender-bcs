@@ -32,7 +32,7 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const [certs, openNcrs, quarantined, suppliers, assets, overCredit, pending, missingCert, checkedTodayIds] = await Promise.all([
+  const [certs, openNcrs, quarantined, suppliers, assets, overCredit, pending, missingCert, checkedTodayIds, pendingAccessRequests] = await Promise.all([
     db.certificate.findMany({ where: { company, expiresOn: { lte: in90 } }, orderBy: { expiresOn: 'asc' } }),
     db.ncr.findMany({ where: { company, status: 'OPEN' }, orderBy: { raisedAt: 'asc' } }),
     db.batch.findMany({ where: { company, status: 'Quarantined' }, include: { product: true, supplier: true } }),
@@ -42,7 +42,19 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
     db.order.count({ where: { company, stage: 'PENDING_APPROVAL', archived: false } }),
     db.batch.count({ where: { company, millCertUrl: '', status: { not: 'Rejected' } } }),
     db.assetCheck.findMany({ where: { performedAt: { gte: startOfToday } }, select: { assetId: true } }),
+    user.role === 'MASTER_ADMIN' ? db.accessRequest.count({ where: { status: 'PENDING' } }) : 0,
   ]);
+
+  if (pendingAccessRequests > 0) {
+    out.push({
+      id: 'access-requests-pending',
+      severity: 'info',
+      title: `${pendingAccessRequests} access ${pendingAccessRequests === 1 ? 'request is' : 'requests are'} waiting for approval`,
+      detail: 'From the login page — review who is asking and what they need.',
+      href: '/setup/access-requests',
+      perm: 'setup.users',
+    });
+  }
 
   const checkedToday = new Set(checkedTodayIds.map((c) => c.assetId));
   const notCheckedToday = assets.filter((a) => !checkedToday.has(a.id));

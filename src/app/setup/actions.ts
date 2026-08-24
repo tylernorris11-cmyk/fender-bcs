@@ -1,11 +1,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
 import { db } from '@/lib/db';
 import type { Company, Role } from '@prisma/client';
 import { assertPermission, hashPassword, logActivity, passwordProblem } from '@/lib/auth';
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { initialsOf } from '@/lib/format';
+import { sendEmail } from '@/lib/email';
 
 // ------------------------------------------------------------- pricing
 
@@ -257,4 +259,73 @@ export async function removeChecklistTemplate(formData: FormData) {
   assertCompanyAccess(user, existing.company);
   await db.checklistTemplate.delete({ where: { id } });
   revalidatePath('/setup/checklist');
+}
+
+// ------------------------------------------------------ access requests
+
+export async function approveAccessRequest(formData: FormData) {
+  const admin = await assertPermission('setup.users');
+  if (admin.role !== 'MASTER_ADMIN') throw new Error('Only a Master Administrator can approve access requests.');
+
+  const id = String(formData.get('requestId'));
+  const role = String(formData.get('role')) as Role;
+  const companies = formData.getAll('companies').map(String) as Company[];
+  if (companies.length === 0) throw new Error('Give them access to at least one company.');
+  assertCompaniesForRole(role, companies);
+
+  const request = await db.accessRequest.findUniqueOrThrow({ where: { id } });
+  if (request.status !== 'PENDING') throw new Error('This request has already been decided.');
+  if (await db.user.findUnique({ where: { email: request.email } })) {
+    throw new Error('An account with that email already exists.');
+  }
+
+  await db.user.create({
+    data: {
+      email: request.email, name: request.name, role, companies,
+      jobTitle: request.jobTitle,
+      passwordHash: request.passwordHash,
+      initials: initialsOf(request.name),
+      colour: '#16A085',
+      mustReset: false, // they chose this password themselves when they asked for access
+    },
+  });
+  await db.accessRequest.update({
+    where: { id }, data: { status: 'APPROVED', decidedAt: new Date(), decidedById: admin.id },
+  });
+  await logActivity('AccessRequest', id, 'Approved', `${request.email} as ${role}`, admin.id);
+
+  const h = headers();
+  const origin = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host')}`;
+  await sendEmail({
+    to: request.email,
+    subject: 'Your Fender BCS access has been approved',
+    text: `Hi ${request.name},\n\nYou're in — sign in at ${origin}/login with the email and password you gave when you asked for access.\n\n— Fender BCS`,
+  });
+
+  revalidatePath('/setup/access-requests');
+  revalidatePath('/setup/users');
+}
+
+export async function rejectAccessRequest(formData: FormData) {
+  const admin = await assertPermission('setup.users');
+  if (admin.role !== 'MASTER_ADMIN') throw new Error('Only a Master Administrator can decide access requests.');
+
+  const id = String(formData.get('requestId'));
+  const note = String(formData.get('note') ?? '').trim();
+
+  const request = await db.accessRequest.findUniqueOrThrow({ where: { id } });
+  if (request.status !== 'PENDING') throw new Error('This request has already been decided.');
+
+  await db.accessRequest.update({
+    where: { id }, data: { status: 'REJECTED', decidedAt: new Date(), decidedById: admin.id, note },
+  });
+  await logActivity('AccessRequest', id, 'Rejected', note.slice(0, 120), admin.id);
+
+  await sendEmail({
+    to: request.email,
+    subject: 'Your Fender BCS access request',
+    text: `Hi ${request.name},\n\nYour request for access wasn't approved${note ? `: ${note}` : '.'}\n\nIf you think this is a mistake, contact John or Claire.\n\n— Fender BCS`,
+  });
+
+  revalidatePath('/setup/access-requests');
 }

@@ -69,6 +69,7 @@ model User {
   assetChecks      AssetCheck[]
   notes            Note[]
   bugReports       BugReport[]
+  accessRequestsDecided AccessRequest[] @relation("decidedBy")
 }
 
 // ------------------------------------------------------------- customers
@@ -739,6 +740,33 @@ model BugReport {
   userId      String?
 
   user User? @relation(fields: [userId], references: [id])
+}
+
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// A self-service "let me in" request from the login page. The password is
+// hashed at submission time — the same as any other account — and reused
+// as-is if a Master Administrator approves it, so nobody re-types it.
+model AccessRequest {
+  id           String              @id @default(cuid())
+  name         String
+  email        String
+  passwordHash String
+  jobTitle     String              @default("")
+  company      Company
+  status       AccessRequestStatus @default(PENDING)
+  note         String              @default("") // reason given if rejected
+  requestedAt  DateTime            @default(now())
+  decidedAt    DateTime?
+  decidedById  String?
+
+  decidedBy User? @relation("decidedBy", fields: [decidedById], references: [id])
+
+  @@index([status])
 }
 
 model ActivityLog {
