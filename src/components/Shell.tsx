@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Bell, Bug, ChevronDown, Home, LogOut, Search } from 'lucide-react';
+import { Bell, Bug, Home, LogOut, Search } from 'lucide-react';
 import type { Company } from '@prisma/client';
 import { can, MODULES, ROLE_LABELS, type Permission, type SessionUser } from '@/lib/rbac';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
 import { Avatar } from './ui';
+import { ModuleSwitcher } from './ModuleSwitcher';
 
 // `company`, when set, only shows this nav item while that company's view is
 // active — for things like BCS Products' cost centres that don't exist on
@@ -29,6 +30,10 @@ export function Shell({
   const active = getActiveCompany(user);
   const isBsSupplies = active === 'BS_SUPPLIES';
   const visible = nav.filter((n) => (!n.perm || can(user, n.perm)) && (!n.company || n.company === active));
+  const switcherItems = [
+    ...MODULES.filter((m) => can(user, m.perm)).map((m) => ({ key: m.key, label: m.label, href: m.href })),
+    ...(can(user, 'setup.view') ? [{ key: 'setup', label: 'Set Up', href: '/setup/pricing' }] : []),
+  ];
 
   return (
     <div className="min-h-screen lg:flex">
@@ -97,9 +102,7 @@ export function Shell({
           <Link href="/" className="rounded-xl bg-white/10 hover:bg-white/15 text-white p-2.5 shrink-0" aria-label="Home">
             <Home size={18} />
           </Link>
-          <Link href="/" className="btn bg-white/10 hover:bg-white/15 text-white px-4 py-2 text-sm">
-            {MODULE_TITLE[module]} <ChevronDown size={16} />
-          </Link>
+          <ModuleSwitcher current={module} currentLabel={MODULE_TITLE[module]} items={switcherItems} />
 
           <form action="/search" className="hidden sm:flex flex-1 max-w-xl relative">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" aria-hidden />
