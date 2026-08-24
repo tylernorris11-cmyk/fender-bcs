@@ -25,11 +25,13 @@ async function main() {
   const password = process.env.SEED_PASSWORD ?? 'ChangeMe123!';
 
   // Order matters — children before parents.
+  await db.bugReport.deleteMany();
   await db.note.deleteMany();
   await db.assetCheckItem.deleteMany();
   await db.assetCheck.deleteMany();
   await db.purchaseOrderLine.deleteMany();
   await db.purchaseOrder.deleteMany();
+  await db.costCentre.deleteMany();
   await db.qcCheck.deleteMany();
   await db.productionEvent.deleteMany();
   await db.checklistItem.deleteMany();
@@ -220,10 +222,17 @@ async function main() {
     suppliers[s.name] = s.id;
   }
 
+  // BCS Products' own cost centres — not a Fender concept.
+  const costCentres: Record<string, string> = {};
+  for (const name of ['General', 'BS Supplies']) {
+    const c = await db.costCentre.create({ data: { company: 'BS_SUPPLIES', name } });
+    costCentres[name] = c.id;
+  }
+
   // ---------------------------------------------------- purchase orders
   const poSeeds: {
     number: string; supplier: string; status: 'DRAFT' | 'SENT' | 'CONFIRMED' | 'RECEIVED'; expected: string;
-    raisedBy: string; sentAt?: string; confirmedAt?: string; receivedAt?: string;
+    raisedBy: string; sentAt?: string; confirmedAt?: string; receivedAt?: string; costCentre?: string;
     lines: { code: string; desc: string; qty: number; unitCost: number }[];
   }[] = [
     {
@@ -244,7 +253,7 @@ async function main() {
     },
     {
       number: 'PO-BSS-0001', supplier: 'Northern Building Materials Ltd', status: 'SENT', expected: '2026-08-28',
-      raisedBy: 'John Davies', sentAt: '2026-08-21', lines: [
+      raisedBy: 'John Davies', sentAt: '2026-08-21', costCentre: 'BS Supplies', lines: [
         { code: 'BSS-TIMBER-4X2', desc: 'Timber studwork 4x2 (47x100mm) 4.8m', qty: 200, unitCost: 6.8 },
         { code: 'BSS-PLY-18MM', desc: 'WBP plywood 18mm 2440x1220', qty: 40, unitCost: 32.0 },
       ],
@@ -261,6 +270,7 @@ async function main() {
         status: po.status,
         expectedDate: d(po.expected),
         raisedById: users[po.raisedBy],
+        costCentreId: po.costCentre ? costCentres[po.costCentre] : null,
         sentAt: po.sentAt ? d(po.sentAt) : null,
         confirmedAt: po.confirmedAt ? d(po.confirmedAt) : null,
         receivedAt: po.receivedAt ? d(po.receivedAt) : null,
@@ -297,7 +307,7 @@ async function main() {
   await db.certificate.create({
     data: {
       company: 'BS_SUPPLIES', scheme: 'ISO 9001', title: 'ISO 9001:2015 quality management',
-      reference: 'QMS-BSS-0142', holder: 'BS Supplies', issuedOn: d('2025-03-01'), expiresOn: d('2028-02-29'),
+      reference: 'QMS-BSS-0142', holder: 'BCS Products', issuedOn: d('2025-03-01'), expiresOn: d('2028-02-29'),
     },
   });
 

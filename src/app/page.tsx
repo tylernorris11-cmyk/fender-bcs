@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import {
-  ArrowRight, Bell, CalendarDays, ClipboardCheck, ClipboardList, Factory, Layers,
+  ArrowRight, Bell, Bug, CalendarDays, ClipboardCheck, ClipboardList, Factory, Layers,
   LogOut, Search, Settings, ShieldCheck, ShoppingCart, Truck, Users,
 } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
@@ -46,7 +46,7 @@ export default async function Launcher() {
         <div className="absolute inset-0 mesh-bg pointer-events-none" aria-hidden />
         <div className="relative max-w-[1200px] mx-auto px-6 py-5 flex items-center gap-3">
           <span className="text-xl font-bold tracking-tight shrink-0">
-            {isBsSupplies ? <>BS<span className="text-white/60 font-medium"> Supplies</span></> : <>Fender<span className="text-white/60 font-medium">BCS</span></>}
+            {isBsSupplies ? <>BCS<span className="text-white/60 font-medium"> Products</span></> : <>Fender<span className="text-white/60 font-medium">BCS</span></>}
           </span>
 
           <form action="/search" className="hidden sm:flex flex-1 max-w-xl relative ml-4">
@@ -146,9 +146,12 @@ export default async function Launcher() {
 
         <footer className="text-center text-sm text-ink-muted mt-12 flex items-center justify-center gap-6 flex-wrap">
           <span>
-            {isBsSupplies ? 'BS Supplies · Scunthorpe' : 'Fender Steel Reinforcing Specialists'} ·{' '}
+            {isBsSupplies ? 'BCS Products · Scunthorpe' : 'Fender Steel Reinforcing Specialists'} ·{' '}
             <strong className="text-signal">Established 1981</strong>
           </span>
+          <Link href="/report-bug?from=/" className="inline-flex items-center gap-1.5 hover:text-ink">
+            <Bug size={14} /> Report a bug
+          </Link>
           <form action="/api/sign-out" method="post">
             <button className="inline-flex items-center gap-1.5 hover:text-ink"><LogOut size={14} /> Sign out</button>
           </form>

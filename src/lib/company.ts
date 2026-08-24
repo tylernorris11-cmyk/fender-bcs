@@ -6,7 +6,7 @@ export const COMPANY_COOKIE = 'fs_company';
 
 export const COMPANY_LABEL: Record<Company, string> = {
   FENDER: 'Fender Steel',
-  BS_SUPPLIES: 'BS Supplies',
+  BS_SUPPLIES: 'BCS Products',
 };
 
 export const COMPANY_TAGLINE: Record<Company, string> = {

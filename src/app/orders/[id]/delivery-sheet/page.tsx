@@ -30,7 +30,7 @@ export default async function DeliverySheet({ params }: { params: { id: string }
       <div className="flex justify-between items-start border-b-2 border-forest pb-4 mb-6">
         <div>
           <p className="text-2xl font-bold text-forest">
-            {isBsSupplies ? <>BS <span className="text-signal">Supplies</span></> : <>Fender<span className="text-signal">BCS</span></>}
+            {isBsSupplies ? <>BCS <span className="text-signal">Products</span></> : <>Fender<span className="text-signal">BCS</span></>}
           </p>
           <p className="text-[11px] uppercase tracking-widest text-brand-700">
             {isBsSupplies ? 'Steel & building supplies' : 'Reinforcing steel specialists'}

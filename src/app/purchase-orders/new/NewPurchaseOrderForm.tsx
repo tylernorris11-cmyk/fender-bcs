@@ -6,6 +6,7 @@ import { createPurchaseOrder } from '../actions';
 
 type Supplier = { id: string; name: string };
 type Product = { id: string; name: string; code: string; unit: string };
+type CostCentre = { id: string; name: string };
 type Line = { key: number; productId: string; description: string; qty: string; unitCost: string };
 
 const gbp = (n: number) => n.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 });
@@ -14,8 +15,8 @@ let seq = 0;
 const newLine = (): Line => ({ key: seq++, productId: '', description: '', qty: '', unitCost: '' });
 
 export function NewPurchaseOrderForm({
-  suppliers, products, showCosts,
-}: { suppliers: Supplier[]; products: Product[]; showCosts: boolean }) {
+  suppliers, products, costCentres, showCosts,
+}: { suppliers: Supplier[]; products: Product[]; costCentres: CostCentre[]; showCosts: boolean }) {
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? '');
   const [lines, setLines] = useState<Line[]>([newLine()]);
 
@@ -43,6 +44,15 @@ export function NewPurchaseOrderForm({
           <label className="label" htmlFor="expectedDate">Expected delivery date</label>
           <input id="expectedDate" name="expectedDate" type="date" className="input" />
         </div>
+        {costCentres.length > 0 && (
+          <div>
+            <label className="label" htmlFor="costCentreId">Cost centre</label>
+            <select id="costCentreId" name="costCentreId" defaultValue="" className="input">
+              <option value="">—</option>
+              {costCentres.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+        )}
       </section>
 
       <section className="card card-pad">

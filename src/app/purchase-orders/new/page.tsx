@@ -14,9 +14,10 @@ export default async function NewPurchaseOrderPage() {
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
 
-  const [suppliers, products] = await Promise.all([
+  const [suppliers, products, costCentres] = await Promise.all([
     db.supplier.findMany({ where: { company, blocked: false }, orderBy: { name: 'asc' } }),
     db.product.findMany({ where: { company, active: true }, orderBy: [{ category: 'asc' }, { name: 'asc' }] }),
+    db.costCentre.findMany({ where: { company, active: true }, orderBy: { name: 'asc' } }),
   ]);
 
   return (
@@ -30,6 +31,7 @@ export default async function NewPurchaseOrderPage() {
       <NewPurchaseOrderForm
         suppliers={suppliers.map((s) => ({ id: s.id, name: s.name }))}
         products={products.map((p) => ({ id: p.id, name: p.name, code: p.code, unit: p.unit }))}
+        costCentres={costCentres.map((c) => ({ id: c.id, name: c.name }))}
         showCosts={can(user, 'finance.costs')}
       />
     </Shell>

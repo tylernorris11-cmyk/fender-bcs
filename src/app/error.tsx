@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { AlertTriangle, Bug, RotateCcw } from 'lucide-react';
 
 /**
  * Catches anything thrown by a page, a server action, or a data fetch.
@@ -10,6 +11,12 @@ import { AlertTriangle, RotateCcw } from 'lucide-react';
  * actually reaches them instead of Next's default overlay or a blank page.
  */
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const pathname = usePathname();
+  const reportParams = new URLSearchParams({
+    from: pathname,
+    description: `Crashed with: "${error.message || 'unknown error'}"${error.digest ? ` (ref ${error.digest})` : ''}\n\nWhat I was doing:\n`,
+  });
+
   return (
     <div className="min-h-screen grid place-items-center p-6">
       <div className="card card-pad max-w-md text-center">
@@ -25,6 +32,9 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
           <button onClick={reset} className="btn-primary flex-1"><RotateCcw size={16} /> Try again</button>
           <Link href="/" className="btn-secondary flex-1">Back to the control centre</Link>
         </div>
+        <Link href={`/report-bug?${reportParams.toString()}`} className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink mt-4">
+          <Bug size={14} /> Report this
+        </Link>
       </div>
     </div>
   );

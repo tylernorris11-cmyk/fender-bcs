@@ -65,6 +65,7 @@ model User {
   purchaseOrdersRaised PurchaseOrder[] @relation("poRaisedBy")
   assetChecks      AssetCheck[]
   notes            Note[]
+  bugReports       BugReport[]
 }
 
 // ------------------------------------------------------------- customers
@@ -330,6 +331,7 @@ model PurchaseOrder {
   expectedDate DateTime?
   notes        String              @default("")
   raisedById   String?
+  costCentreId String?
   sentAt       DateTime?
   confirmedAt  DateTime?
   receivedAt   DateTime?
@@ -337,9 +339,10 @@ model PurchaseOrder {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 
-  supplier Supplier @relation(fields: [supplierId], references: [id])
-  raisedBy User?    @relation("poRaisedBy", fields: [raisedById], references: [id])
-  lines    PurchaseOrderLine[]
+  supplier   Supplier    @relation(fields: [supplierId], references: [id])
+  raisedBy   User?       @relation("poRaisedBy", fields: [raisedById], references: [id])
+  costCentre CostCentre? @relation(fields: [costCentreId], references: [id])
+  lines      PurchaseOrderLine[]
 
   @@index([status, expectedDate])
   @@index([company])
@@ -678,6 +681,19 @@ model Location {
   active Boolean @default(true)
 }
 
+// Which internal budget a purchase order's spend is tracked against — a
+// BCS Products thing today, not used on the Fender side.
+model CostCentre {
+  id      String  @id @default(cuid())
+  company Company @default(FENDER)
+  name    String
+  active  Boolean @default(true)
+
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([company, name])
+}
+
 // Freeform notes — used today for the Checks area (anything worth logging
 // that isn't tied to a specific machine/lorry check).
 model Note {
@@ -702,6 +718,22 @@ model Driver {
 model Setting {
   key   String @id
   value String
+}
+
+// "Report a bug" — always saved here first so nothing is lost even if the
+// outgoing email fails or RESEND_API_KEY isn't configured yet.
+model BugReport {
+  id          String   @id @default(cuid())
+  description String
+  page        String   @default("") // which screen they were on
+  company     Company? // which company's view was active, if relevant
+  userName    String   @default("")
+  userEmail   String   @default("")
+  emailSent   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  userId      String?
+
+  user User? @relation(fields: [userId], references: [id])
 }
 
 model ActivityLog {

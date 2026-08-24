@@ -40,6 +40,7 @@ export async function createPurchaseOrder(formData: FormData) {
       expectedDate: expectedDateRaw ? new Date(expectedDateRaw) : null,
       notes: String(formData.get('notes') ?? ''),
       raisedById: user.id,
+      costCentreId: String(formData.get('costCentreId') ?? '') || null,
       lines: {
         create: lineRows.map((r, i) => {
           const product = products.find((p) => p.id === r.productId);

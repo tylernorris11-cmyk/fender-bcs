@@ -51,8 +51,10 @@ export default async function PurchaseOrdersPage({
     : searchParams.sort === 'expectedDate' ? { expectedDate: dir }
     : { createdAt: 'desc' };
 
+  const showCostCentre = company === 'BS_SUPPLIES';
+
   const [purchaseOrders, counts] = await Promise.all([
-    db.purchaseOrder.findMany({ where, include: { supplier: true, raisedBy: true, lines: true }, orderBy, take: 200 }),
+    db.purchaseOrder.findMany({ where, include: { supplier: true, raisedBy: true, lines: true, costCentre: true }, orderBy, take: 200 }),
     db.purchaseOrder.groupBy({ by: ['status'], where: { company }, _count: true }),
   ]);
 
@@ -110,6 +112,7 @@ export default async function PurchaseOrdersPage({
                 <SortTh label="PO" field="number" basePath="/purchase-orders" searchParams={searchParams} />
                 <SortTh label="Supplier" field="supplier" basePath="/purchase-orders" searchParams={searchParams} />
                 <SortTh label="Status" field="status" basePath="/purchase-orders" searchParams={searchParams} />
+                {showCostCentre && <th className="th">Cost centre</th>}
                 {showCosts && <th className="th text-right">Value</th>}
                 <SortTh label="Expected" field="expectedDate" basePath="/purchase-orders" searchParams={searchParams} />
                 <th className="th">Raised by</th>
@@ -123,6 +126,7 @@ export default async function PurchaseOrdersPage({
                 </td>
                 <td className="td">{po.supplier.name}</td>
                 <td className="td"><Pill tone={STATUS_TONE[po.status]}>{PO_STATUS_LABEL[po.status]}</Pill></td>
+                {showCostCentre && <td className="td text-ink-muted">{po.costCentre?.name ?? '—'}</td>}
                 {showCosts && <td className="td text-right font-semibold tabular-nums">{money(poTotal(po))}</td>}
                 <td className="td text-ink-muted whitespace-nowrap">{shortDate(po.expectedDate)}</td>
                 <td className="td">

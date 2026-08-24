@@ -22,7 +22,7 @@ export default async function PurchaseOrderPage({ params }: { params: { id: stri
 
   const po = await db.purchaseOrder.findUnique({
     where: { id: params.id },
-    include: { supplier: true, raisedBy: true, lines: { orderBy: { sortOrder: 'asc' }, include: { product: true } } },
+    include: { supplier: true, raisedBy: true, costCentre: true, lines: { orderBy: { sortOrder: 'asc' }, include: { product: true } } },
   });
   if (!po) notFound();
   if (!user.companies.includes(po.company)) notFound();
@@ -107,6 +107,7 @@ export default async function PurchaseOrderPage({ params }: { params: { id: stri
           <h2 className="text-lg font-bold mb-3">Delivery</h2>
           <dl className="text-sm space-y-2">
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Expected</dt><dd className="font-semibold">{shortDate(po.expectedDate)}</dd></div>
+            {po.costCentre && <div className="flex justify-between gap-4"><dt className="text-ink-muted">Cost centre</dt><dd className="font-semibold">{po.costCentre.name}</dd></div>}
             {po.notes && <div><dt className="text-ink-muted">Notes</dt><dd className="mt-0.5">{po.notes}</dd></div>}
           </dl>
         </section>

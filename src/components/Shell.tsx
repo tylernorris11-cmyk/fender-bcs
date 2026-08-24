@@ -1,11 +1,15 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Bell, ChevronDown, LogOut, Search } from 'lucide-react';
+import { Bell, Bug, ChevronDown, LogOut, Search } from 'lucide-react';
+import type { Company } from '@prisma/client';
 import { can, MODULES, ROLE_LABELS, type Permission, type SessionUser } from '@/lib/rbac';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
 import { Avatar } from './ui';
 
-export type NavItem = { label: string; href: string; perm?: Permission };
+// `company`, when set, only shows this nav item while that company's view is
+// active — for things like BCS Products' cost centres that don't exist on
+// the Fender side at all.
+export type NavItem = { label: string; href: string; perm?: Permission; company?: Company };
 
 const MODULE_TITLE: Record<string, string> = {
   orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Planning',
@@ -22,9 +26,9 @@ export function Shell({
   alerts?: number;
   children: ReactNode;
 }) {
-  const visible = nav.filter((n) => !n.perm || can(user, n.perm));
   const active = getActiveCompany(user);
   const isBsSupplies = active === 'BS_SUPPLIES';
+  const visible = nav.filter((n) => (!n.perm || can(user, n.perm)) && (!n.company || n.company === active));
 
   return (
     <div className="min-h-screen lg:flex">
@@ -34,7 +38,7 @@ export function Shell({
         <div className="relative flex lg:block items-center justify-between p-4 lg:p-0">
           <Link href="/" className="block lg:px-5 lg:pt-6 lg:pb-4">
             <span className="text-xl font-bold tracking-tight">
-              {isBsSupplies ? <>BS<span className="text-white/60 font-medium"> Supplies</span></> : <>Fender<span className="text-white/60 font-medium">BCS</span></>}
+              {isBsSupplies ? <>BCS<span className="text-white/60 font-medium"> Products</span></> : <>Fender<span className="text-white/60 font-medium">BCS</span></>}
             </span>
             <span className="hidden lg:block text-[10px] uppercase tracking-[0.18em] text-white/45 mt-1">
               {isBsSupplies ? 'Steel & building supplies' : 'Reinforcing steel specialists'}
@@ -75,7 +79,10 @@ export function Shell({
         </nav>
 
         <div className="hidden lg:block absolute bottom-0 left-0 right-0 p-5 text-sm">
-          <p className="text-white/45 leading-tight mb-3">{isBsSupplies ? 'BS Supplies' : 'Fender Steel'}<br />Control Centre</p>
+          <p className="text-white/45 leading-tight mb-3">{isBsSupplies ? 'BCS Products' : 'Fender Steel'}<br />Control Centre</p>
+          <Link href={`/report-bug?from=${encodeURIComponent(current)}`} className="flex items-center gap-2 text-white/85 hover:text-white mb-3">
+            <Bug size={16} /> Report a bug
+          </Link>
           <form action="/api/sign-out" method="post">
             <button type="submit" className="flex items-center gap-2 text-white/85 hover:text-white">
               <LogOut size={16} /> Sign out
@@ -195,8 +202,10 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'Drivers', href: '/setup/drivers', perm: 'setup.lists' },
     { label: 'Towns & cities', href: '/setup/towns', perm: 'setup.lists' },
     { label: 'Locations', href: '/setup/locations', perm: 'setup.lists' },
+    { label: 'Cost centres', href: '/setup/cost-centres', perm: 'setup.lists', company: 'BS_SUPPLIES' },
     { label: 'Order checklist', href: '/setup/checklist', perm: 'setup.lists' },
     { label: 'Backups', href: '/setup/backups', perm: 'setup.backups' },
+    { label: 'Bug reports', href: '/setup/bugs', perm: 'setup.bugs' },
   ],
 };
 

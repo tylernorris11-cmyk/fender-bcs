@@ -51,6 +51,7 @@ export type Permission =
   | 'setup.users'
   | 'setup.lists'
   | 'setup.backups'
+  | 'setup.bugs' // read the "report a bug" inbox
   // Commercially sensitive
   | 'finance.costs' // purchase costs and margin — CEO only
   | 'finance.debtors';
@@ -66,7 +67,7 @@ const ALL: Permission[] = [
   'purchaseOrders.view', 'purchaseOrders.create', 'purchaseOrders.edit',
   'checks.view', 'checks.create',
   'planning.view', 'planning.edit',
-  'setup.view', 'setup.pricing', 'setup.users', 'setup.lists', 'setup.backups',
+  'setup.view', 'setup.pricing', 'setup.users', 'setup.lists', 'setup.backups', 'setup.bugs',
   'finance.costs', 'finance.debtors',
 ];
 

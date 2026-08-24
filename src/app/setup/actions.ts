@@ -160,6 +160,27 @@ export async function toggleLocation(formData: FormData) {
   revalidatePath('/setup/locations');
 }
 
+export async function addCostCentre(formData: FormData) {
+  const user = await assertPermission('setup.lists');
+  const name = String(formData.get('name') ?? '').trim();
+  if (!name) return;
+  const company = getActiveCompany(user);
+  await db.costCentre.upsert({
+    where: { company_name: { company, name } },
+    update: { active: true },
+    create: { company, name },
+  });
+  revalidatePath('/setup/cost-centres');
+}
+
+export async function toggleCostCentre(formData: FormData) {
+  await assertPermission('setup.lists');
+  const id = String(formData.get('costCentreId'));
+  const costCentre = await db.costCentre.findUniqueOrThrow({ where: { id } });
+  await db.costCentre.update({ where: { id }, data: { active: !costCentre.active } });
+  revalidatePath('/setup/cost-centres');
+}
+
 export async function addDriver(formData: FormData) {
   await assertPermission('setup.lists');
   await db.driver.create({
