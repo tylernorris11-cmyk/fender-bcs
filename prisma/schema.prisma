@@ -51,6 +51,8 @@ model User {
   mustReset    Boolean  @default(false)
   lastLoginAt  DateTime?
   createdAt    DateTime @default(now())
+  resetTokenHash    String?   // sha256 of the token emailed for "forgot password" — never the plain token
+  resetTokenExpires DateTime?
   companies    Company[] @default([FENDER]) // which companies this account may view
 
   ordersRaised     Order[]          @relation("raisedBy")

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { getCurrentUser } from '@/lib/auth';
@@ -63,7 +64,10 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
             </div>
 
             <div>
-              <label className="label" htmlFor="password">Password</label>
+              <div className="flex items-baseline justify-between">
+                <label className="label" htmlFor="password">Password</label>
+                <Link href="/forgot-password" className="text-xs font-semibold text-brand-700 hover:underline">Forgot it?</Link>
+              </div>
               <input id="password" name="password" type="password" autoComplete="current-password" required className="input" />
             </div>
 
@@ -71,7 +75,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
           </form>
 
           <p className="text-center text-sm text-ink-faint mt-4">
-            Locked out? Ask John or Claire to reset your password.
+            Still stuck? Ask John or Claire to reset it for you.
           </p>
         </div>
       </div>

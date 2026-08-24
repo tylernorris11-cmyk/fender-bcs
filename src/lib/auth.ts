@@ -40,6 +40,43 @@ export function passwordProblem(plain: string): string | null {
   return null;
 }
 
+// ---------------------------------------------------------- password resets
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // one hour
+
+function hashResetToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+/** Generates a one-time reset link token and stores only its hash — the plain token exists solely in the emailed link. */
+export async function createResetToken(userId: string): Promise<string> {
+  const token = crypto.randomBytes(32).toString('hex');
+  await db.user.update({
+    where: { id: userId },
+    data: { resetTokenHash: hashResetToken(token), resetTokenExpires: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
+  });
+  return token;
+}
+
+/** Looks up the account for an unexpired reset token, without consuming it. */
+export async function findByResetToken(token: string) {
+  if (!token) return null;
+  const user = await db.user.findFirst({ where: { resetTokenHash: hashResetToken(token), active: true } });
+  if (!user || !user.resetTokenExpires || user.resetTokenExpires < new Date()) return null;
+  return user;
+}
+
+/** Sets a new password from a reset link and burns the token so it can't be reused. */
+export async function resetPasswordWithToken(token: string, newPassword: string): Promise<{ id: string } | null> {
+  const user = await findByResetToken(token);
+  if (!user) return null;
+  await db.user.update({
+    where: { id: user.id },
+    data: { passwordHash: hashPassword(newPassword), mustReset: false, resetTokenHash: null, resetTokenExpires: null },
+  });
+  return { id: user.id };
+}
+
 // -------------------------------------------------------------- sessions
 
 function sign(payload: string): string {
