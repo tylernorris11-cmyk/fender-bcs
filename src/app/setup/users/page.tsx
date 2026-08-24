@@ -5,8 +5,11 @@ import { getAlerts } from '@/lib/alerts';
 import { PERMISSIONS, ROLE_BLURBS, ROLE_LABELS } from '@/lib/rbac';
 import { shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
+import { COMPANY_LABEL } from '@/lib/company';
 import { Avatar, PageHeader, Pill, SortTh, Table } from '@/components/ui';
-import { createUser, resetPassword, toggleUserActive, updateUserRole } from '../actions';
+import { createUser, resetPassword, toggleUserActive, updateUserCompanies, updateUserRole } from '../actions';
+
+const COMPANIES = ['FENDER', 'BS_SUPPLIES'] as const;
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[];
 
@@ -31,6 +34,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
           <SortTh label="Person" field="name" basePath="/setup/users" searchParams={searchParams} />
           <SortTh label="Role" field="role" basePath="/setup/users" searchParams={searchParams} />
           <SortTh label="Last signed in" field="lastLogin" basePath="/setup/users" searchParams={searchParams} />
+          <th className="th">Company access</th>
           <th className="th">Status</th><th className="th sr-only">Reset password</th>
         </>}>
           {users.map((u) => (
@@ -54,6 +58,18 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
                 </form>
               </td>
               <td className="td text-ink-muted whitespace-nowrap">{u.lastLoginAt ? shortDate(u.lastLoginAt) : 'Never'}</td>
+              <td className="td">
+                <form action={updateUserCompanies} className="flex flex-col gap-1">
+                  <input type="hidden" name="userId" value={u.id} />
+                  {COMPANIES.map((c) => (
+                    <label key={c} className="flex items-center gap-1.5 text-xs">
+                      <input type="checkbox" name="companies" value={c} defaultChecked={u.companies.includes(c)} className="h-3.5 w-3.5 accent-brand" />
+                      {COMPANY_LABEL[c]}
+                    </label>
+                  ))}
+                  <button className="btn-secondary btn-sm mt-1 self-start">Save</button>
+                </form>
+              </td>
               <td className="td">
                 <form action={toggleUserActive} className="flex items-center gap-2">
                   <input type="hidden" name="userId" value={u.id} />

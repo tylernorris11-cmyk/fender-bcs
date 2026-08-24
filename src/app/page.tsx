@@ -7,6 +7,7 @@ import { requireUser } from '@/lib/auth';
 import { can, MODULES, ROLE_LABELS } from '@/lib/rbac';
 import { getAlerts } from '@/lib/alerts';
 import { longDate } from '@/lib/format';
+import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
 import { Avatar } from '@/components/ui';
 
 const ICONS = {
@@ -36,6 +37,8 @@ export default async function Launcher() {
   const user = await requireUser();
   const alerts = await getAlerts(user);
   const tiles = MODULES.filter((m) => can(user, m.perm));
+  const active = getActiveCompany(user);
+  const isBsSupplies = active === 'BS_SUPPLIES';
 
   return (
     <div className="min-h-screen">
@@ -43,7 +46,7 @@ export default async function Launcher() {
         <div className="absolute inset-0 mesh-bg pointer-events-none" aria-hidden />
         <div className="relative max-w-[1200px] mx-auto px-6 py-5 flex items-center gap-3">
           <span className="text-xl font-bold tracking-tight shrink-0">
-            Fender<span className="text-white/60 font-medium">BCS</span>
+            {isBsSupplies ? <>BS<span className="text-white/60 font-medium"> Supplies</span></> : <>Fender<span className="text-white/60 font-medium">BCS</span></>}
           </span>
 
           <form action="/search" className="hidden sm:flex flex-1 max-w-xl relative ml-4">
@@ -58,6 +61,22 @@ export default async function Launcher() {
           </form>
 
           <div className="ml-auto flex items-center gap-3">
+            {user.companies.length > 1 && (
+              <div className="hidden md:flex items-center rounded-xl bg-white/10 p-1 text-xs font-semibold">
+                {user.companies.map((c) => (
+                  <form key={c} action="/api/company" method="post">
+                    <input type="hidden" name="company" value={c} />
+                    <input type="hidden" name="back" value="/" />
+                    <button
+                      type="submit"
+                      className={`rounded-lg px-3 py-1.5 transition-colors ${c === active ? 'bg-white text-forest' : 'text-white/70 hover:text-white'}`}
+                    >
+                      {COMPANY_LABEL[c]}
+                    </button>
+                  </form>
+                ))}
+              </div>
+            )}
             <Link href="/alerts" className="relative rounded-xl bg-white/10 hover:bg-white/15 p-2.5" aria-label={`Alerts, ${alerts.length} needing attention`}>
               <Bell size={18} />
               {alerts.length > 0 && (
@@ -86,7 +105,7 @@ export default async function Launcher() {
         <div className="flex flex-wrap items-start justify-between gap-4 mb-9">
           <div>
             <h1 className="text-4xl font-bold tracking-tight">{greeting()}, {user.name.split(' ')[0]}</h1>
-            <p className="text-ink-muted mt-1.5">Welcome back to the Fender Steel control centre</p>
+            <p className="text-ink-muted mt-1.5">Welcome back to the {COMPANY_LABEL[active]} control centre</p>
           </div>
           <div className="card px-5 py-3.5 flex items-center gap-3 text-sm font-medium">
             <CalendarDays size={18} className="text-brand" aria-hidden />
@@ -126,7 +145,10 @@ export default async function Launcher() {
         </div>
 
         <footer className="text-center text-sm text-ink-muted mt-12 flex items-center justify-center gap-6 flex-wrap">
-          <span>Fender Steel Reinforcing Specialists · <strong className="text-signal">Established 1981</strong></span>
+          <span>
+            {isBsSupplies ? 'BS Supplies · Scunthorpe' : 'Fender Steel Reinforcing Specialists'} ·{' '}
+            <strong className="text-signal">Established 1981</strong>
+          </span>
           <form action="/api/sign-out" method="post">
             <button className="inline-flex items-center gap-1.5 hover:text-ink"><LogOut size={14} /> Sign out</button>
           </form>

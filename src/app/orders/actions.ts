@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import type { OrderStage } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
+import { assertCompanyAccess } from '@/lib/company';
 import { applyChecklistTemplate, creditCheck, nextOrderNumber, NEXT_STAGE, pickOldestFirst } from '@/lib/orders';
 import { barWeightKg, shapeName } from '@/lib/bs8666';
 
@@ -24,6 +25,7 @@ export async function createOrder(formData: FormData) {
 
   const customerId = String(formData.get('customerId') ?? '');
   if (!customerId) throw new Error('Choose a customer before saving.');
+  const customer = await db.customer.findUniqueOrThrow({ where: { id: customerId } });
 
   const deliveryDateRaw = String(formData.get('deliveryDate') ?? '');
   const number = await nextOrderNumber();
@@ -38,6 +40,7 @@ export async function createOrder(formData: FormData) {
   const order = await db.order.create({
     data: {
       number,
+      company: customer.company,
       customerId,
       stage: 'DRAFT',
       deliveryDate: deliveryDateRaw ? new Date(deliveryDateRaw) : null,
@@ -92,7 +95,7 @@ export async function createOrder(formData: FormData) {
     },
   });
 
-  await applyChecklistTemplate(order.id);
+  await applyChecklistTemplate(order.id, customer.company);
   await logActivity('Order', order.id, 'Created', `Raised as ${number}`, user.id);
 
   revalidatePath('/orders');
@@ -109,6 +112,7 @@ export async function advanceStage(formData: FormData) {
   const step = NEXT_STAGE[order.stage];
   if (!step) throw new Error('This order has nowhere left to go.');
   const user = await assertPermission(step.perm);
+  assertCompanyAccess(user, order.company);
 
   // Approving is the credit gate. Everything downstream assumes it was checked.
   if (step.to === 'APPROVED') {
@@ -156,6 +160,8 @@ export async function advanceStage(formData: FormData) {
 export async function setStage(formData: FormData) {
   const user = await assertPermission('orders.approve');
   const orderId = String(formData.get('orderId'));
+  const existing = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: { company: true } });
+  assertCompanyAccess(user, existing.company);
   const stage = String(formData.get('stage')) as OrderStage;
   await db.order.update({ where: { id: orderId }, data: { stage } });
   await logActivity('Order', orderId, 'Stage changed by hand', `Set to ${stage}`, user.id);
@@ -165,7 +171,8 @@ export async function setStage(formData: FormData) {
 export async function toggleChecklistItem(formData: FormData) {
   const user = await assertPermission('orders.progress');
   const id = String(formData.get('itemId'));
-  const item = await db.checklistItem.findUniqueOrThrow({ where: { id } });
+  const item = await db.checklistItem.findUniqueOrThrow({ where: { id }, include: { order: { select: { company: true } } } });
+  assertCompanyAccess(user, item.order.company);
   await db.checklistItem.update({
     where: { id },
     data: item.done
@@ -176,8 +183,10 @@ export async function toggleChecklistItem(formData: FormData) {
 }
 
 export async function addChecklistItem(formData: FormData) {
-  await assertPermission('orders.progress');
+  const user = await assertPermission('orders.progress');
   const orderId = String(formData.get('orderId'));
+  const order = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: { company: true } });
+  assertCompanyAccess(user, order.company);
   const label = String(formData.get('label') ?? '').trim();
   if (!label) return;
   const count = await db.checklistItem.count({ where: { orderId } });
@@ -186,8 +195,10 @@ export async function addChecklistItem(formData: FormData) {
 }
 
 export async function removeChecklistItem(formData: FormData) {
-  await assertPermission('orders.progress');
+  const user = await assertPermission('orders.progress');
   const id = String(formData.get('itemId'));
+  const existing = await db.checklistItem.findUniqueOrThrow({ where: { id }, include: { order: { select: { company: true } } } });
+  assertCompanyAccess(user, existing.order.company);
   const item = await db.checklistItem.delete({ where: { id } });
   revalidatePath(`/orders/${item.orderId}`);
 }
@@ -195,6 +206,8 @@ export async function removeChecklistItem(formData: FormData) {
 export async function markPaid(formData: FormData) {
   const user = await assertPermission('orders.markPaid');
   const orderId = String(formData.get('orderId'));
+  const existing = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: { company: true } });
+  assertCompanyAccess(user, existing.company);
   const undo = formData.get('undo') === '1';
   await db.order.update({
     where: { id: orderId },
@@ -209,6 +222,7 @@ export async function archiveOrder(formData: FormData) {
   const user = await assertPermission('orders.archive');
   const orderId = String(formData.get('orderId'));
   const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
+  assertCompanyAccess(user, order.company);
   await db.order.update({ where: { id: orderId }, data: { archived: !order.archived } });
   await logActivity('Order', orderId, order.archived ? 'Restored' : 'Archived', '', user.id);
   revalidatePath('/orders');
@@ -216,8 +230,10 @@ export async function archiveOrder(formData: FormData) {
 }
 
 export async function updateDelivery(formData: FormData) {
-  await assertPermission('orders.edit');
+  const user = await assertPermission('orders.edit');
   const orderId = String(formData.get('orderId'));
+  const existing = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: { company: true } });
+  assertCompanyAccess(user, existing.company);
   const date = String(formData.get('deliveryDate') ?? '');
   await db.order.update({
     where: { id: orderId },

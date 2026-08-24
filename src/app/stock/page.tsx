@@ -4,19 +4,25 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { qty as fmtQty } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortSelect, Stat, StatRow } from '@/components/ui';
 
-export default async function StockPage({ searchParams }: { searchParams: { category?: string; sort?: string } }) {
+export default async function StockPage({ searchParams }: { searchParams: { category?: string; sort?: string; depot?: string } }) {
   const user = await requirePermission('stock.view');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
+  const depot = searchParams.depot;
 
-  const products = await db.product.findMany({
-    where: { active: true, ...(searchParams.category ? { category: searchParams.category } : {}) },
-    orderBy: [{ category: 'asc' }, { name: 'asc' }],
-    include: { batches: { where: { status: { in: ['Available', 'Quarantined'] } } } },
-  });
+  const [products, locations] = await Promise.all([
+    db.product.findMany({
+      where: { company, active: true, ...(searchParams.category ? { category: searchParams.category } : {}) },
+      orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      include: { batches: { where: { status: { in: ['Available', 'Quarantined'] }, ...(depot ? { depot } : {}) } } },
+    }),
+    db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+  ]);
 
   const availableOf = (p: (typeof products)[number]) =>
     p.batches.filter((b) => b.status === 'Available').reduce((s, b) => s + Number(b.qtyRemaining), 0);
@@ -54,8 +60,21 @@ export default async function StockPage({ searchParams }: { searchParams: { cate
         <Stat value={missingCerts} label="Missing certificates" tone={missingCerts ? 'bad' : 'default'} />
       </StatRow>
 
+      <nav className="flex flex-wrap gap-2 mb-4" aria-label="Filter by depot">
+        <Link href="/stock" className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${!depot ? 'bg-brand text-white border-brand' : 'bg-white border-hairline hover:bg-canvas'}`}>
+          Both depots
+        </Link>
+        {locations.map((l) => (
+          <Link key={l.id} href={`/stock?depot=${encodeURIComponent(l.name)}`}
+            className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${depot === l.name ? 'bg-brand text-white border-brand' : 'bg-white border-hairline hover:bg-canvas'}`}>
+            {l.name}
+          </Link>
+        ))}
+      </nav>
+
       <form className="mb-4 flex justify-end gap-2">
         {searchParams.category && <input type="hidden" name="category" value={searchParams.category} />}
+        {depot && <input type="hidden" name="depot" value={depot} />}
         <SortSelect
           value={searchParams.sort}
           label="Sort within category"

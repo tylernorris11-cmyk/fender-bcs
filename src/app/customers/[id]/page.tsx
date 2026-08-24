@@ -25,8 +25,9 @@ export default async function CustomerPage({ params }: { params: { id: string } 
     },
   });
   if (!customer) notFound();
+  if (!user.companies.includes(customer.company)) notFound();
 
-  const used = (await creditBalances()).get(customer.id) ?? 0;
+  const used = (await creditBalances(customer.company)).get(customer.id) ?? 0;
   const limit = Number(customer.creditLimit);
 
   return (

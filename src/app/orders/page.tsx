@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { getAlerts, creditBalances } from '@/lib/alerts';
 import { orderTotals } from '@/lib/orders';
 import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { money, shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, Empty, PageHeader, Pill, SortTh, StagePill, Stat, StatRow, Table } from '@/components/ui';
@@ -28,12 +29,14 @@ export default async function OrdersPage({
 }: { searchParams: { stage?: string; q?: string; archived?: string; sort?: string; dir?: string } }) {
   const user = await requirePermission('orders.view');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
 
   const showArchived = searchParams.archived === '1';
   const q = (searchParams.q ?? '').trim();
   const stage = searchParams.stage as OrderStage | undefined;
 
   const where: Prisma.OrderWhereInput = {
+    company,
     ...(showArchived ? {} : { archived: false }),
     ...(stage ? { stage } : {}),
     ...(q
@@ -65,8 +68,8 @@ export default async function OrdersPage({
       orderBy,
       take: 200,
     }),
-    db.order.groupBy({ by: ['stage'], where: { archived: false }, _count: true }),
-    creditBalances(),
+    db.order.groupBy({ by: ['stage'], where: { company, archived: false }, _count: true }),
+    creditBalances(company),
   ]);
 
   // weight/total aren't real columns — they're summed from lines/barMarks — so
@@ -83,7 +86,7 @@ export default async function OrdersPage({
   const countOf = (s: OrderStage) => counts.find((c) => c.stage === s)?._count ?? 0;
   const total = counts.reduce((sum, c) => sum + c._count, 0);
   const overLimit = new Set(
-    (await db.customer.findMany({ select: { id: true, creditLimit: true } }))
+    (await db.customer.findMany({ where: { company }, select: { id: true, creditLimit: true } }))
       .filter((c) => Number(c.creditLimit) > 0 && (balances.get(c.id) ?? 0) > Number(c.creditLimit))
       .map((c) => c.id),
   );

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { getActiveCompany } from '@/lib/company';
 import { shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, SortSelect, StagePill, Stat, StatRow } from '@/components/ui';
@@ -11,7 +12,7 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
   const alerts = await getAlerts(user);
 
   const orders = await db.order.findMany({
-    where: { archived: false, stage: { in: ['APPROVED', 'IN_PRODUCTION', 'READY_FOR_DELIVERY'] } },
+    where: { company: getActiveCompany(user), archived: false, stage: { in: ['APPROVED', 'IN_PRODUCTION', 'READY_FOR_DELIVERY'] } },
     include: { customer: true, barMarks: { include: { qcChecks: true } }, lines: true, production: { include: { user: true }, orderBy: { at: 'desc' }, take: 1 } },
     orderBy:
       searchParams.sort === 'number' ? [{ number: 'asc' }]

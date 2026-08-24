@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
+import { assertCompanyAccess } from '@/lib/company';
 import { nextPoNumber, PO_NEXT_STATUS } from '@/lib/purchaseOrders';
 
 /** Read the repeating line rows out of the new-purchase-order form. */
@@ -22,6 +23,7 @@ export async function createPurchaseOrder(formData: FormData) {
 
   const supplierId = String(formData.get('supplierId') ?? '');
   if (!supplierId) throw new Error('Choose a supplier before saving.');
+  const supplier = await db.supplier.findUniqueOrThrow({ where: { id: supplierId } });
 
   const expectedDateRaw = String(formData.get('expectedDate') ?? '');
   const number = await nextPoNumber();
@@ -32,6 +34,7 @@ export async function createPurchaseOrder(formData: FormData) {
   const po = await db.purchaseOrder.create({
     data: {
       number,
+      company: supplier.company,
       supplierId,
       status: 'DRAFT',
       expectedDate: expectedDateRaw ? new Date(expectedDateRaw) : null,
@@ -69,6 +72,7 @@ export async function advancePurchaseOrderStatus(formData: FormData) {
   const step = PO_NEXT_STATUS[po.status];
   if (!step) throw new Error('This purchase order has nowhere left to go.');
   const user = await assertPermission('purchaseOrders.edit');
+  assertCompanyAccess(user, po.company);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = { status: step.to };
@@ -86,6 +90,8 @@ export async function advancePurchaseOrderStatus(formData: FormData) {
 export async function cancelPurchaseOrder(formData: FormData) {
   const user = await assertPermission('purchaseOrders.edit');
   const poId = String(formData.get('purchaseOrderId'));
+  const existing = await db.purchaseOrder.findUniqueOrThrow({ where: { id: poId }, select: { company: true } });
+  assertCompanyAccess(user, existing.company);
   await db.purchaseOrder.update({ where: { id: poId }, data: { status: 'CANCELLED', cancelledAt: new Date() } });
   await logActivity('PurchaseOrder', poId, 'Cancelled', '', user.id);
   revalidatePath(`/purchase-orders/${poId}`);

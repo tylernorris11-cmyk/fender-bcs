@@ -25,6 +25,7 @@ export default async function PurchaseOrderPage({ params }: { params: { id: stri
     include: { supplier: true, raisedBy: true, lines: { orderBy: { sortOrder: 'asc' }, include: { product: true } } },
   });
   if (!po) notFound();
+  if (!user.companies.includes(po.company)) notFound();
 
   const history = await db.activityLog.findMany({
     where: { entity: 'PurchaseOrder', entityId: po.id }, include: { user: true }, orderBy: { at: 'desc' }, take: 40,

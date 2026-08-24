@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortSelect } from '@/components/ui';
@@ -26,16 +27,18 @@ const NCR_SORTS: Record<string, Prisma.NcrOrderByWithRelationInput[]> = {
 export default async function NcrPage({ searchParams }: { searchParams: { raise?: string; sort?: string } }) {
   const user = await requirePermission('compliance.view');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
 
   const [ncrs, orders, customers, suppliers, batches] = await Promise.all([
     db.ncr.findMany({
+      where: { company },
       include: { order: true, customer: true, batch: true, supplier: true, raisedBy: true },
       orderBy: NCR_SORTS[searchParams.sort ?? 'open'] ?? NCR_SORTS.open,
     }),
-    db.order.findMany({ where: { archived: false }, orderBy: { createdAt: 'desc' }, take: 60, select: { id: true, number: true } }),
-    db.customer.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
-    db.supplier.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
-    db.batch.findMany({ where: { status: { in: ['Available', 'Quarantined'] } }, select: { id: true, heatNumber: true }, orderBy: { receivedAt: 'desc' } }),
+    db.order.findMany({ where: { company, archived: false }, orderBy: { createdAt: 'desc' }, take: 60, select: { id: true, number: true } }),
+    db.customer.findMany({ where: { company }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    db.supplier.findMany({ where: { company }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    db.batch.findMany({ where: { company, status: { in: ['Available', 'Quarantined'] } }, select: { id: true, heatNumber: true }, orderBy: { receivedAt: 'desc' } }),
   ]);
 
   const open = ncrs.filter((n) => n.status === 'OPEN');

@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { daysUntil, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortSelect, Table } from '@/components/ui';
@@ -21,12 +22,13 @@ const ACTION_SORTS: Record<string, Prisma.AuditActionOrderByWithRelationInput[]>
 export default async function ReturnsPage({ searchParams }: { searchParams: { sort?: string } }) {
   const user = await requirePermission('compliance.view');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
 
   const [returns, actions, delivered] = await Promise.all([
-    db.quarterlyReturn.findMany({ orderBy: { period: 'desc' } }),
-    db.auditAction.findMany({ orderBy: ACTION_SORTS[searchParams.sort ?? 'due'] ?? ACTION_SORTS.due }),
+    db.quarterlyReturn.findMany({ where: { company }, orderBy: { period: 'desc' } }),
+    db.auditAction.findMany({ where: { company }, orderBy: ACTION_SORTS[searchParams.sort ?? 'due'] ?? ACTION_SORTS.due }),
     db.order.findMany({
-      where: { stage: { in: ['DELIVERED', 'COMPLETED'] } },
+      where: { company, stage: { in: ['DELIVERED', 'COMPLETED'] } },
       select: { deliveredAt: true, completedAt: true, createdAt: true, lines: { select: { weightKg: true } }, barMarks: { select: { weightKg: true } } },
     }),
   ]);

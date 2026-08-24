@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { creditBalances, getAlerts } from '@/lib/alerts';
+import { getActiveCompany } from '@/lib/company';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
 import { NewOrderForm } from './NewOrderForm';
@@ -10,16 +11,17 @@ import { NewOrderForm } from './NewOrderForm';
 export default async function NewOrderPage() {
   const user = await requirePermission('orders.create');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
 
   const [customers, products, towns, balances] = await Promise.all([
-    db.customer.findMany({ where: { status: { not: 'Closed' } }, orderBy: { name: 'asc' } }),
+    db.customer.findMany({ where: { company, status: { not: 'Closed' } }, orderBy: { name: 'asc' } }),
     db.product.findMany({
-      where: { active: true },
+      where: { company, active: true },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
       include: { prices: { where: { minQty: 0 }, orderBy: { effectiveFrom: 'desc' }, take: 1 } },
     }),
     db.town.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
-    creditBalances(),
+    creditBalances(company),
   ]);
 
   const cutBent = products.find((p) => p.code === 'CB-SERVICE');

@@ -2,6 +2,7 @@ import { Trash2 } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
 import { addChecklistTemplate, removeChecklistTemplate } from '../actions';
@@ -9,11 +10,15 @@ import { addChecklistTemplate, removeChecklistTemplate } from '../actions';
 export default async function ChecklistSetupPage() {
   const user = await requirePermission('setup.lists');
   const alerts = await getAlerts(user);
-  const items = await db.checklistTemplate.findMany({ orderBy: { sortOrder: 'asc' } });
+  const company = getActiveCompany(user);
+  const items = await db.checklistTemplate.findMany({ where: { company }, orderBy: { sortOrder: 'asc' } });
 
   return (
     <Shell user={user} module="setup" nav={NAV.setup} current="/setup/checklist" alerts={alerts.length}>
-      <PageHeader title="Order checklist" blurb="Applied to every new order. This is the in-process and final inspection record an auditor asks to see." />
+      <PageHeader
+        title="Order checklist"
+        blurb={`Applied to every new ${COMPANY_LABEL[company]} order. This is the in-process and final inspection record an auditor asks to see.`}
+      />
 
       <section className="card card-pad max-w-2xl">
         <ol className="divide-y divide-hairline mb-5">

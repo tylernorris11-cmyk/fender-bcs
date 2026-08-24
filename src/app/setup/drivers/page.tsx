@@ -10,9 +10,12 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
   const user = await requirePermission('setup.lists');
   const alerts = await getAlerts(user);
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
-  const drivers = await db.driver.findMany({
-    orderBy: searchParams.sort === 'depot' ? { depot: dir } : { name: searchParams.sort === 'name' ? dir : 'asc' },
-  });
+  const [drivers, locations] = await Promise.all([
+    db.driver.findMany({
+      orderBy: searchParams.sort === 'depot' ? { depot: dir } : { name: searchParams.sort === 'name' ? dir : 'asc' },
+    }),
+    db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+  ]);
 
   return (
     <Shell user={user} module="setup" nav={NAV.setup} current="/setup/drivers" alerts={alerts.length}>
@@ -52,7 +55,12 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
           <div><label className="label" htmlFor="name">Name</label><input id="name" name="name" required className="input" /></div>
           <div><label className="label" htmlFor="phone">Phone</label><input id="phone" name="phone" className="input" /></div>
           <div><label className="label" htmlFor="licence">Licence number</label><input id="licence" name="licence" className="input" /></div>
-          <div><label className="label" htmlFor="depot">Depot</label><input id="depot" name="depot" defaultValue="Scunthorpe" className="input" /></div>
+          <div>
+            <label className="label" htmlFor="depot">Depot</label>
+            <select id="depot" name="depot" defaultValue={locations[0]?.name ?? 'Scunthorpe'} className="input">
+              {locations.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
+            </select>
+          </div>
           <div><label className="label" htmlFor="cpcExpiry">CPC expiry</label><input id="cpcExpiry" name="cpcExpiry" type="date" className="input" /></div>
           <div className="flex items-end"><button className="btn-primary">Add driver</button></div>
         </form>

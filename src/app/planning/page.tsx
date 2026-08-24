@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { COMPANY_LABEL } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
@@ -53,27 +54,33 @@ export default async function PlanningPage({
   const entries: Entry[] = [];
 
   for (const o of orders) {
+    // Both companies share this board because they share lorries — but a
+    // viewer without access to the OTHER company only gets the logistics
+    // (day, town), never the customer or order detail.
+    const visible = user.companies.includes(o.company);
     entries.push({
       id: `order-${o.id}`,
       date: o.deliveryDate!,
       time: clock(o.deliveryDate) === '00:00' ? '' : clock(o.deliveryDate),
-      title: `Deliver ${o.number} — ${o.customer.name}`,
-      detail: `${o.customer.contactName} · ${o.town}`,
+      title: visible ? `Deliver ${o.number} — ${o.customer.name}` : `${COMPANY_LABEL[o.company]} delivery`,
+      detail: visible ? `${o.customer.contactName} · ${o.town}` : (o.town || ''),
       group: 'Deliveries',
-      href: `/orders/${o.id}`,
+      href: visible ? `/orders/${o.id}` : undefined,
       town: o.town,
     });
   }
 
   for (const e of events) {
+    const orderCompany = e.order?.company;
+    const visible = !orderCompany || user.companies.includes(orderCompany);
     entries.push({
       id: `event-${e.id}`,
       date: e.startsAt,
       time: e.allDay ? '' : clock(e.startsAt),
-      title: e.title,
-      detail: e.detail || e.assignedTo,
+      title: visible ? e.title : `${COMPANY_LABEL[orderCompany!]} delivery`,
+      detail: visible ? (e.detail || e.assignedTo) : (e.town || ''),
       group: e.type === 'INSPECTION' || e.type === 'SERVICE' ? 'Vehicles & machinery' : e.type === 'DELIVERY' ? 'Deliveries' : 'Other',
-      href: e.orderId ? `/orders/${e.orderId}` : e.assetId ? `/assets/${e.assetId}` : undefined,
+      href: visible ? (e.orderId ? `/orders/${e.orderId}` : e.assetId ? `/assets/${e.assetId}` : undefined) : undefined,
       town: e.town,
     });
   }

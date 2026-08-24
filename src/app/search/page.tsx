@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, StagePill } from '@/components/ui';
@@ -12,35 +13,36 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
   const alerts = await getAlerts(user);
   const q = (searchParams.q ?? '').trim();
   const like = { contains: q, mode: 'insensitive' as const };
+  const company = getActiveCompany(user);
 
   const [orders, customers, batches, assets, suppliers, certificates, ncrs, products, purchaseOrders] = q
     ? await Promise.all([
         can(user, 'orders.view')
-          ? db.order.findMany({ where: { OR: [{ number: like }, { poNumber: like }, { customer: { name: like } }] }, include: { customer: true }, take: 15 })
+          ? db.order.findMany({ where: { company, OR: [{ number: like }, { poNumber: like }, { customer: { name: like } }] }, include: { customer: true }, take: 15 })
           : [],
         can(user, 'customers.view')
-          ? db.customer.findMany({ where: { OR: [{ name: like }, { contactName: like }, { town: like }, { code: like }] }, take: 15 })
+          ? db.customer.findMany({ where: { company, OR: [{ name: like }, { contactName: like }, { town: like }, { code: like }] }, take: 15 })
           : [],
         can(user, 'stock.view')
-          ? db.batch.findMany({ where: { OR: [{ heatNumber: like }, { certNumber: like }] }, include: { product: true, supplier: true }, take: 15 })
+          ? db.batch.findMany({ where: { company, OR: [{ heatNumber: like }, { certNumber: like }] }, include: { product: true, supplier: true }, take: 15 })
           : [],
         can(user, 'assets.view')
           ? db.asset.findMany({ where: { OR: [{ ref: like }, { name: like }, { category: like }] }, take: 15 })
           : [],
         can(user, 'compliance.view')
-          ? db.supplier.findMany({ where: { name: like }, take: 15 })
+          ? db.supplier.findMany({ where: { company, name: like }, take: 15 })
           : [],
         can(user, 'compliance.view')
-          ? db.certificate.findMany({ where: { OR: [{ title: like }, { reference: like }] }, include: { supplier: true }, take: 15 })
+          ? db.certificate.findMany({ where: { company, OR: [{ title: like }, { reference: like }] }, include: { supplier: true }, take: 15 })
           : [],
         can(user, 'compliance.view')
-          ? db.ncr.findMany({ where: { OR: [{ ref: like }, { description: like }] }, take: 15 })
+          ? db.ncr.findMany({ where: { company, OR: [{ ref: like }, { description: like }] }, take: 15 })
           : [],
         can(user, 'stock.view')
-          ? db.product.findMany({ where: { OR: [{ code: like }, { name: like }] }, take: 15 })
+          ? db.product.findMany({ where: { company, OR: [{ code: like }, { name: like }] }, take: 15 })
           : [],
         can(user, 'purchaseOrders.view')
-          ? db.purchaseOrder.findMany({ where: { number: like }, include: { supplier: true }, take: 15 })
+          ? db.purchaseOrder.findMany({ where: { company, number: like }, include: { supplier: true }, take: 15 })
           : [],
       ])
     : [[], [], [], [], [], [], [], [], []];

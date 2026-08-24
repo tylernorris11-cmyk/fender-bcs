@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { can } from '@/lib/rbac';
+import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
 
 async function nextCustomerCode() {
   const last = await db.customer.findFirst({ orderBy: { code: 'desc' }, select: { code: true } });
@@ -38,7 +39,7 @@ export async function createCustomer(formData: FormData) {
   const creditLimit = can(user, 'customers.credit') ? Number(formData.get('creditLimit') ?? 0) : 0;
 
   const customer = await db.customer.create({
-    data: { ...data, code: await nextCustomerCode(), creditLimit },
+    data: { ...data, code: await nextCustomerCode(), creditLimit, company: getActiveCompany(user) },
   });
   await logActivity('Customer', customer.id, 'Account opened', data.name, user.id);
   revalidatePath('/customers');
@@ -48,6 +49,8 @@ export async function createCustomer(formData: FormData) {
 export async function updateCustomer(formData: FormData) {
   const user = await assertPermission('customers.edit');
   const id = String(formData.get('customerId'));
+  const existing = await db.customer.findUniqueOrThrow({ where: { id }, select: { company: true } });
+  assertCompanyAccess(user, existing.company);
   const data = readForm(formData);
 
   const patch: Record<string, unknown> = { ...data };

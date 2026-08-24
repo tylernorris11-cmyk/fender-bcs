@@ -25,6 +25,7 @@ async function main() {
   const password = process.env.SEED_PASSWORD ?? 'ChangeMe123!';
 
   // Order matters — children before parents.
+  await db.note.deleteMany();
   await db.assetCheckItem.deleteMany();
   await db.assetCheck.deleteMany();
   await db.purchaseOrderLine.deleteMany();
@@ -54,6 +55,7 @@ async function main() {
   await db.checklistTemplate.deleteMany();
   await db.activityLog.deleteMany();
   await db.town.deleteMany();
+  await db.location.deleteMany();
   await db.driver.deleteMany();
   await db.user.deleteMany();
 
@@ -76,6 +78,9 @@ async function main() {
     users[p.name] = u.id;
   }
 
+  // John Davies runs both businesses — everyone else defaults to Fender only.
+  await db.user.update({ where: { id: users['John Davies'] }, data: { companies: ['FENDER', 'BS_SUPPLIES'] } });
+
   // -------------------------------------------------------------- towns
   const towns = [
     ['Scunthorpe', 'Lincolnshire'], ['Sunderland', 'Tyne & Wear'], ['Leeds', 'West Yorkshire'],
@@ -84,10 +89,14 @@ async function main() {
   ];
   await db.town.createMany({ data: towns.map(([name, region]) => ({ name, region })) });
 
+  // Our own two branches — shared by both companies, since it's the same
+  // yard and the same lorries either way.
+  await db.location.createMany({ data: [{ name: 'Scunthorpe' }, { name: 'Houghton le Spring' }] });
+
   await db.driver.createMany({
     data: [
       { name: 'Dave Wilson', phone: '07700 900112', licence: 'WILSO905123DW9AB', depot: 'Scunthorpe', cpcExpiry: d('2027-03-14') },
-      { name: 'Ken Foster', phone: '07700 900318', licence: 'FOSTE802441KF7CD', depot: 'Sunderland', cpcExpiry: d('2026-11-02') },
+      { name: 'Ken Foster', phone: '07700 900318', licence: 'FOSTE802441KF7CD', depot: 'Houghton le Spring', cpcExpiry: d('2026-11-02') },
     ],
   });
 
@@ -109,6 +118,22 @@ async function main() {
       data: {
         code, name, contactName, phone, email, address, town, postcode,
         creditLimit, accountManagerId: users[manager], customerSince: d(since),
+      },
+    });
+    customers[name] = c.id;
+  }
+
+  // BS Supplies' own book — separate customers, invisible to Fender-only accounts.
+  const bsCustomerData = [
+    ['BSS-0001', 'Wearmouth Builders Merchants', 'Alan Reid', '0191 567 2210', 'alan@wearmouthbm.co.uk', 'Riverside Trading Estate, Sunderland SR5 2TQ', 'Sunderland', 'SR5 2TQ', 40000, '2025-02-10'],
+    ['BSS-0002', 'Doncaster Timber & Building Supplies', 'Michelle Young', '01302 556 214', 'michelle@doncastertimber.co.uk', 'Wheatley Hall Road, Doncaster DN2 4NB', 'Doncaster', 'DN2 4NB', 25000, '2025-09-01'],
+  ] as const;
+
+  for (const [code, name, contactName, phone, email, address, town, postcode, creditLimit, since] of bsCustomerData) {
+    const c = await db.customer.create({
+      data: {
+        company: 'BS_SUPPLIES', code, name, contactName, phone, email, address, town, postcode,
+        creditLimit, accountManagerId: users['John Davies'], customerSince: d(since),
       },
     });
     customers[name] = c.id;
@@ -151,6 +176,23 @@ async function main() {
     });
   }
 
+  // BS Supplies' own catalogue — general building materials, not reinforcement.
+  const bsProductData: [string, string, string, string, number, number, number][] = [
+    // code, name, category, unit, kgPerUnit, price, reorderAt
+    ['BSS-TIMBER-4X2', 'Timber studwork 4x2 (47x100mm) 4.8m', 'Timber', 'each', 9, 8.5, 500],
+    ['BSS-PLY-18MM', 'WBP plywood 18mm 2440x1220', 'Sheet materials', 'each', 28, 42.0, 50],
+    ['BSS-CEMENT-25KG', 'General purpose cement 25kg bag', 'Cement & aggregates', 'each', 25, 6.2, 200],
+  ];
+  for (const [code, name, category, unit, kgPerUnit, price, reorderAt] of bsProductData) {
+    const p = await db.product.create({
+      data: { company: 'BS_SUPPLIES', code, name, category, unit, kgPerUnit, reorderAt },
+    });
+    products[code] = p.id;
+    await db.price.create({
+      data: { productId: p.id, unitPrice: price, minQty: 0, effectiveFrom: d('2026-07-26'), setByName: 'John Davies' },
+    });
+  }
+
   // Purchase costs — admin-only, never shown next to selling prices.
   await db.purchaseCost.createMany({
     data: [
@@ -169,6 +211,13 @@ async function main() {
   ]) {
     const s = await db.supplier.create({ data: { name, approvedFor } });
     suppliers[name] = s.id;
+  }
+
+  {
+    const s = await db.supplier.create({
+      data: { company: 'BS_SUPPLIES', name: 'Northern Building Materials Ltd', approvedFor: 'General building materials — timber, sheet goods, cement' },
+    });
+    suppliers[s.name] = s.id;
   }
 
   // ---------------------------------------------------- purchase orders
@@ -193,12 +242,21 @@ async function main() {
       raisedBy: 'John Davies', sentAt: '2026-07-24', confirmedAt: '2026-07-25', receivedAt: '2026-08-01',
       lines: [{ code: 'RB16-500B', desc: 'Rebar 16mm B500B', qty: 26, unitCost: 684 }],
     },
+    {
+      number: 'PO-BSS-0001', supplier: 'Northern Building Materials Ltd', status: 'SENT', expected: '2026-08-28',
+      raisedBy: 'John Davies', sentAt: '2026-08-21', lines: [
+        { code: 'BSS-TIMBER-4X2', desc: 'Timber studwork 4x2 (47x100mm) 4.8m', qty: 200, unitCost: 6.8 },
+        { code: 'BSS-PLY-18MM', desc: 'WBP plywood 18mm 2440x1220', qty: 40, unitCost: 32.0 },
+      ],
+    },
   ];
 
   for (const po of poSeeds) {
+    const supplier = await db.supplier.findUniqueOrThrow({ where: { id: suppliers[po.supplier] } });
     await db.purchaseOrder.create({
       data: {
         number: po.number,
+        company: supplier.company,
         supplierId: suppliers[po.supplier],
         status: po.status,
         expectedDate: d(po.expected),
@@ -236,28 +294,37 @@ async function main() {
     ],
   });
 
+  await db.certificate.create({
+    data: {
+      company: 'BS_SUPPLIES', scheme: 'ISO 9001', title: 'ISO 9001:2015 quality management',
+      reference: 'QMS-BSS-0142', holder: 'BS Supplies', issuedOn: d('2025-03-01'), expiresOn: d('2028-02-29'),
+    },
+  });
+
   // ------------------------------------------------------------ batches
-  const batchData: [string, string, string, string, string, number, number, string][] = [
-    // heat, productCode, supplier, certNumber, received, received qty, remaining, status
+  const batchData: [string, string, string, string, string, number, number, string, number?, string?][] = [
+    // heat, productCode, supplier, certNumber, received, received qty, remaining, status, unitCost?, depot?
     ['H260501', 'RB10-500B', 'British Steel (Scunthorpe)', 'CERT-26-1501', '2026-06-14', 24, 18.5, 'Available'],
     ['H260502', 'RB10-500B', 'Celsa Steel UK', 'CERT-26-1502', '2026-07-22', 22, 20.0, 'Available'],
-    ['H260503', 'RB12-500B', 'British Steel (Scunthorpe)', 'CERT-26-1503', '2026-06-30', 28, 6.2, 'Available'],
-    ['H260504', 'RB12-500B', 'Celsa Steel UK', 'CERT-26-1504', '2026-08-01', 30, 30.0, 'Available'],
-    ['H260505', 'RB16-500B', 'British Steel (Scunthorpe)', 'CERT-26-1505', '2026-06-19', 26, 21.4, 'Available'],
+    ['H260503', 'RB12-500B', 'British Steel (Scunthorpe)', 'CERT-26-1503', '2026-06-30', 28, 6.2, 'Available', 690],
+    ['H260504', 'RB12-500B', 'Celsa Steel UK', 'CERT-26-1504', '2026-08-01', 30, 30.0, 'Available', 693],
+    ['H260505', 'RB16-500B', 'British Steel (Scunthorpe)', 'CERT-26-1505', '2026-06-19', 26, 21.4, 'Available', 684],
     ['H260506', 'RB16-500B', 'British Steel (Scunthorpe)', 'CERT-26-1506', '2026-07-19', 24, 24.0, 'Available'],
     ['H260507', 'RB20-500B', 'Celsa Steel UK', 'CERT-26-1507', '2026-07-03', 16, 14.8, 'Available'],
     ['H260508', 'RB25-500B', 'British Steel (Scunthorpe)', 'CERT-26-1508', '2026-05-28', 12, 11.2, 'Available'],
-    ['H260509', 'RB32-500B', 'British Steel (Scunthorpe)', 'CERT-26-1509', '2026-06-05', 8, 7.6, 'Available'],
+    ['H260509', 'RB32-500B', 'British Steel (Scunthorpe)', 'CERT-26-1509', '2026-06-05', 8, 7.6, 'Available', 712, 'Houghton le Spring'],
     ['H260512', 'RB16-500B', 'ROM Ltd', '', '2026-08-04', 24, 24.0, 'Quarantined'],
   ];
 
   const batches: Record<string, string> = {};
-  for (const [heatNumber, code, supplier, certNumber, received, qtyReceived, qtyRemaining, status] of batchData) {
+  for (const [heatNumber, code, supplier, certNumber, received, qtyReceived, qtyRemaining, status, unitCost, depot] of batchData) {
     const b = await db.batch.create({
       data: {
         heatNumber, productId: products[code], supplierId: suppliers[supplier], certNumber,
         millCertUrl: certNumber ? `https://example.invalid/certs/MTC_${heatNumber}.pdf` : '',
         receivedAt: d(received), qtyReceived, qtyRemaining, status,
+        unitCost: unitCost ?? null,
+        depot: depot ?? 'Scunthorpe',
         location: status === 'Quarantined' ? 'Yard B2' : 'Yard A',
         deliveryNote: `DN-${heatNumber.slice(-4)}`,
         quarantineRef: status === 'Quarantined' ? 'Mill certificate not received' : '',
@@ -283,6 +350,18 @@ async function main() {
     });
   }
 
+  // BS Supplies' own stock — separate batches against its own supplier.
+  for (const [code, qty] of [['BSS-TIMBER-4X2', 600], ['BSS-PLY-18MM', 120], ['BSS-CEMENT-25KG', 800]] as const) {
+    await db.batch.create({
+      data: {
+        company: 'BS_SUPPLIES', heatNumber: `LOT-${code}`, productId: products[code],
+        supplierId: suppliers['Northern Building Materials Ltd'],
+        certNumber: 'N/A', millCertUrl: '', receivedAt: d('2026-08-05'),
+        qtyReceived: qty, qtyRemaining: qty, status: 'Available', location: 'Warehouse', depot: 'Houghton le Spring',
+      },
+    });
+  }
+
   // -------------------------------------------------- checklist template
   const checklist = [
     'Order details checked against customer PO',
@@ -294,6 +373,11 @@ async function main() {
   ];
   await db.checklistTemplate.createMany({
     data: checklist.map((label, sortOrder) => ({ label, sortOrder })),
+  });
+
+  const bsChecklist = ['Order checked against customer PO', 'Stock picked and loaded', 'Delivery note signed'];
+  await db.checklistTemplate.createMany({
+    data: bsChecklist.map((label, sortOrder) => ({ label, sortOrder, company: 'BS_SUPPLIES' })),
   });
 
   // ------------------------------------------------------------- orders
@@ -373,6 +457,7 @@ async function main() {
     const order = await db.order.create({
       data: {
         number: s.number,
+        company: customer.company,
         customerId: customer.id,
         stage: s.stage,
         paymentStatus: s.payment ?? 'UNPAID',
@@ -438,6 +523,56 @@ async function main() {
     });
   }
 
+  // BS Supplies' own orders — simple standard-product orders, no bending schedule.
+  const bsOrderSeeds: { number: string; customer: string; stage: any; delivery: string; created: string; lines: LineSeed[]; checklistDone: number }[] = [
+    {
+      number: 'BS-26-0001', customer: 'Wearmouth Builders Merchants', stage: 'READY_FOR_DELIVERY',
+      delivery: '2026-08-27', created: '2026-08-20', checklistDone: 2,
+      lines: [['BSS-TIMBER-4X2', 80, 8.5], ['BSS-PLY-18MM', 20, 42.0]],
+    },
+    {
+      number: 'BS-26-0002', customer: 'Doncaster Timber & Building Supplies', stage: 'PENDING_APPROVAL',
+      delivery: '2026-09-02', created: '2026-08-22', checklistDone: 0,
+      lines: [['BSS-CEMENT-25KG', 100, 6.2]],
+    },
+  ];
+
+  for (const s of bsOrderSeeds) {
+    const customer = await db.customer.findUniqueOrThrow({ where: { id: customers[s.customer] } });
+    const order = await db.order.create({
+      data: {
+        number: s.number, company: 'BS_SUPPLIES', customerId: customer.id, stage: s.stage,
+        deliveryDate: d(s.delivery), town: customer.town, address: customer.address,
+        raisedById: users['John Davies'], createdAt: d(s.created),
+        approvedAt: ['DRAFT', 'PENDING_APPROVAL'].includes(s.stage) ? null : d(s.created),
+        approvedBy: ['DRAFT', 'PENDING_APPROVAL'].includes(s.stage) ? '' : 'John Davies',
+      },
+    });
+
+    let sort = 0;
+    for (const [code, qty, unitPrice] of s.lines) {
+      const product = await db.product.findUniqueOrThrow({ where: { id: products[code] } });
+      await db.orderLine.create({
+        data: {
+          orderId: order.id, productId: product.id, description: product.name,
+          qty, unit: product.unit, unitPrice, lineTotal: +(qty * unitPrice).toFixed(2),
+          weightKg: +(qty * Number(product.kgPerUnit)).toFixed(3), sortOrder: sort++,
+        },
+      });
+    }
+
+    for (const [i, label] of bsChecklist.entries()) {
+      const done = i < s.checklistDone;
+      await db.checklistItem.create({
+        data: { orderId: order.id, label, done, sortOrder: i, doneById: done ? users['John Davies'] : null, doneAt: done ? d(s.created) : null },
+      });
+    }
+
+    await db.activityLog.create({
+      data: { entity: 'Order', entityId: order.id, action: 'Created', detail: `Raised as ${s.number}`, userId: users['John Davies'], at: d(s.created) },
+    });
+  }
+
   // --------------------------------------------------------------- NCRs
   await db.ncr.create({
     data: {
@@ -495,11 +630,11 @@ async function main() {
   const assetSeeds: AssetSeed[] = [
     { ref: 'VH-001', type: 'VEHICLE', name: 'FJ23 YLK', category: 'HGV', makeModel: 'DAF CF 370 8x4 crane lorry', year: 2023, depot: 'Scunthorpe', motDue: '2026-09-17', taxDue: '2026-10-04', weeklyCheckDue: '2026-08-21', liftingEquipment: true, lolerDue: '2026-09-30' },
     { ref: 'VH-002', type: 'VEHICLE', name: 'WN24 LZZ', category: 'Van', makeModel: 'Ford Transit 350', year: 2024, depot: 'Scunthorpe', motDue: '2027-03-08', taxDue: '2026-11-14' },
-    { ref: 'VH-003', type: 'VEHICLE', name: 'PN22 ZTJ', category: 'HGV', makeModel: 'Scania P280 6x2 flatbed', year: 2022, depot: 'Sunderland', motDue: '2026-08-06', taxDue: '2026-12-08', weeklyCheckDue: '2026-10-09' },
+    { ref: 'VH-003', type: 'VEHICLE', name: 'PN22 ZTJ', category: 'HGV', makeModel: 'Scania P280 6x2 flatbed', year: 2022, depot: 'Houghton le Spring', motDue: '2026-08-06', taxDue: '2026-12-08', weeklyCheckDue: '2026-10-09' },
     { ref: 'VH-004', type: 'VEHICLE', name: 'FL19 KRU', category: 'Pickup', makeModel: 'Isuzu D-Max', year: 2019, depot: 'Scunthorpe', motDue: '2026-12-28', taxDue: '2026-08-30' },
     { ref: 'MC-001', type: 'MACHINE', name: 'Schnell Bend 42', category: 'Bar bender', makeModel: 'Schnell Bend 42', year: 2018, serialNumber: 'SCH-BB42-99812', depot: 'Scunthorpe', hours: 9420, puwerDue: '2026-09-03', serviceDue: '2026-10-19', calibrationDue: '2026-10-01' },
     { ref: 'MC-002', type: 'MACHINE', name: 'Schnell Cut 50', category: 'Shear line', makeModel: 'Schnell Cut 50', year: 2019, serialNumber: 'SCH-CT50-44127', depot: 'Scunthorpe', hours: 7880, puwerDue: '2026-09-03', serviceDue: '2026-11-02', calibrationDue: '2026-09-14' },
-    { ref: 'MC-003', type: 'MACHINE', name: 'MEP Format 16', category: 'Link bender', makeModel: 'MEP Format 16', year: 2021, serialNumber: 'MEP-F16-20881', depot: 'Sunderland', hours: 4310, puwerDue: '2026-10-11', serviceDue: '2026-12-05', calibrationDue: '2026-11-20' },
+    { ref: 'MC-003', type: 'MACHINE', name: 'MEP Format 16', category: 'Link bender', makeModel: 'MEP Format 16', year: 2021, serialNumber: 'MEP-F16-20881', depot: 'Houghton le Spring', hours: 4310, puwerDue: '2026-10-11', serviceDue: '2026-12-05', calibrationDue: '2026-11-20' },
     { ref: 'MC-004', type: 'MACHINE', name: 'Combilift C4000', category: 'Forklift', makeModel: 'Combilift C4000', year: 2020, serialNumber: 'CBL-40-33219', depot: 'Scunthorpe', hours: 6120, liftingEquipment: true, lolerDue: '2026-08-27', serviceDue: '2026-09-22' },
     { ref: 'MC-005', type: 'MACHINE', name: 'Gantry crane — Bay 2', category: 'Overhead crane', makeModel: 'Street 10t gantry', year: 2016, serialNumber: 'STR-G10-11204', depot: 'Scunthorpe', liftingEquipment: true, lolerDue: '2026-11-08', puwerDue: '2026-11-08' },
   ];

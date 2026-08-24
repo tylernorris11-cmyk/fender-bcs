@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
-import { clock, qty as fmtQty, shortDate } from '@/lib/format';
+import { money, clock, qty as fmtQty, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, Table } from '@/components/ui';
 import { setBatchStatus } from '../actions';
@@ -13,6 +13,7 @@ import { setBatchStatus } from '../actions';
 export default async function StockItemPage({ params }: { params: { id: string } }) {
   const user = await requirePermission('stock.view');
   const alerts = await getAlerts(user);
+  const showCosts = can(user, 'finance.costs');
 
   const product = await db.product.findUnique({
     where: { id: params.id },
@@ -22,6 +23,7 @@ export default async function StockItemPage({ params }: { params: { id: string }
     },
   });
   if (!product) notFound();
+  if (!user.companies.includes(product.company)) notFound();
 
   const available = product.batches.filter((b) => b.status === 'Available').reduce((s, b) => s + Number(b.qtyRemaining), 0);
   const nextOut = product.batches.find((b) => b.status === 'Available' && Number(b.qtyRemaining) > 0);
@@ -54,7 +56,11 @@ export default async function StockItemPage({ params }: { params: { id: string }
 
         <Table head={<>
           <th className="th">Batch / heat</th><th className="th">Certificate</th><th className="th">Supplier</th>
-          <th className="th">Received</th><th className="th text-right">Remaining</th><th className="th">Mill cert</th>
+          <th className="th">Depot</th>
+          <th className="th">Received</th><th className="th text-right">Remaining</th>
+          {showCosts && <th className="th text-right">Cost</th>}
+          {showCosts && <th className="th text-right">Total paid</th>}
+          <th className="th">Mill cert</th>
           <th className="th sr-only">Actions</th>
         </>}>
           {product.batches.map((b) => (
@@ -70,8 +76,11 @@ export default async function StockItemPage({ params }: { params: { id: string }
               </td>
               <td className="td text-ink-muted">{b.certNumber || '—'}</td>
               <td className="td">{b.supplier.name}</td>
+              <td className="td text-ink-muted">{b.depot}</td>
               <td className="td text-ink-muted whitespace-nowrap">{shortDate(b.receivedAt)}</td>
               <td className="td text-right tabular-nums">{Number(b.qtyRemaining).toFixed(3)} / {Number(b.qtyReceived).toFixed(0)}</td>
+              {showCosts && <td className="td text-right tabular-nums">{b.unitCost != null ? money(b.unitCost) : '—'}</td>}
+              {showCosts && <td className="td text-right tabular-nums font-semibold">{b.unitCost != null ? money(Number(b.unitCost) * Number(b.qtyReceived)) : '—'}</td>}
               <td className="td">
                 {b.millCertUrl
                   ? <a href={b.millCertUrl} className="inline-flex items-center gap-1.5 text-brand-700 hover:underline"><FileText size={15} /> Open</a>
@@ -89,7 +98,7 @@ export default async function StockItemPage({ params }: { params: { id: string }
               </td>
             </tr>
           ))}
-          {product.batches.length === 0 && <tr><td colSpan={7} className="td text-ink-muted">Nothing booked in against this product yet.</td></tr>}
+          {product.batches.length === 0 && <tr><td colSpan={showCosts ? 9 : 7} className="td text-ink-muted">Nothing booked in against this product yet.</td></tr>}
         </Table>
       </section>
 

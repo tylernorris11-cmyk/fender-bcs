@@ -87,7 +87,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, role: true, jobTitle: true, initials: true, colour: true, active: true },
+    select: { id: true, name: true, email: true, role: true, jobTitle: true, initials: true, colour: true, active: true, companies: true },
   });
   if (!user || !user.active) return null;
   const { active: _active, ...session } = user;

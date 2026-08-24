@@ -29,6 +29,7 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
     },
   });
   if (!order) notFound();
+  if (!user.companies.includes(order.company)) notFound();
 
   const [history, credit] = await Promise.all([
     db.activityLog.findMany({ where: { entity: 'Order', entityId: order.id }, include: { user: true }, orderBy: { at: 'desc' }, take: 40 }),

@@ -2,6 +2,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
+import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
 import { daysUntil, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortTh, Table } from '@/components/ui';
@@ -13,9 +14,11 @@ export default async function CertificatesPage({ searchParams }: { searchParams:
   const user = await requirePermission('compliance.view');
   const alerts = await getAlerts(user);
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
+  const company = getActiveCompany(user);
 
   const [certificates, suppliers] = await Promise.all([
     db.certificate.findMany({
+      where: { company },
       include: { supplier: true },
       orderBy:
         searchParams.sort === 'title' ? { title: dir }
@@ -23,7 +26,7 @@ export default async function CertificatesPage({ searchParams }: { searchParams:
         : searchParams.sort === 'issued' ? { issuedOn: dir }
         : { expiresOn: searchParams.sort === 'expires' ? dir : 'asc' },
     }),
-    db.supplier.findMany({ orderBy: { name: 'asc' } }),
+    db.supplier.findMany({ where: { company }, orderBy: { name: 'asc' } }),
   ]);
 
   return (
@@ -81,7 +84,7 @@ export default async function CertificatesPage({ searchParams }: { searchParams:
             </div>
             <div>
               <label className="label" htmlFor="holder">Held by</label>
-              <input id="holder" name="holder" defaultValue="Fender Steel" className="input" />
+              <input id="holder" name="holder" defaultValue={COMPANY_LABEL[company]} className="input" />
             </div>
             <div>
               <label className="label" htmlFor="supplierId">Supplier (if a supplier approval)</label>

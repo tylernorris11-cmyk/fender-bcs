@@ -2,6 +2,7 @@ import { AlertTriangle } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { getActiveCompany } from '@/lib/company';
 import { daysUntil, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortTh, Table } from '@/components/ui';
@@ -10,8 +11,10 @@ export default async function SuppliersPage({ searchParams }: { searchParams: { 
   const user = await requirePermission('compliance.view');
   const alerts = await getAlerts(user);
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
+  const company = getActiveCompany(user);
 
   const suppliers = await db.supplier.findMany({
+    where: { company },
     orderBy: { name: 'asc' },
     include: { certificates: { where: { scheme: 'Supplier' }, orderBy: { expiresOn: 'desc' } }, batches: true },
   });

@@ -4,25 +4,28 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { creditBalances, getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { money, money0 } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, Meter, PageHeader, SortTh, Stat, StatRow, Table } from '@/components/ui';
 
 export default async function CustomersPage({ searchParams }: { searchParams: { q?: string; sort?: string; dir?: string } }) {
   const user = await requirePermission('customers.view');
-  const [alerts, balances] = await Promise.all([getAlerts(user), creditBalances()]);
+  const company = getActiveCompany(user);
+  const [alerts, balances] = await Promise.all([getAlerts(user), creditBalances(company)]);
   const q = (searchParams.q ?? '').trim();
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
 
   const customers = await db.customer.findMany({
-    where: q
-      ? { OR: [
+    where: {
+      company,
+      ...(q ? { OR: [
           { name: { contains: q, mode: 'insensitive' } },
           { contactName: { contains: q, mode: 'insensitive' } },
           { town: { contains: q, mode: 'insensitive' } },
           { code: { contains: q, mode: 'insensitive' } },
-        ] }
-      : undefined,
+        ] } : {}),
+    },
     orderBy:
       searchParams.sort === 'town' ? { town: dir }
       : searchParams.sort === 'limit' ? { creditLimit: dir }

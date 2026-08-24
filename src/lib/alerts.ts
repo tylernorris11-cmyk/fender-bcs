@@ -1,7 +1,9 @@
 import 'server-only';
+import type { Company } from '@prisma/client';
 import { db } from './db';
 import { daysUntil } from './format';
 import { can, type SessionUser } from './rbac';
+import { getActiveCompany } from './company';
 
 export type Alert = {
   id: string;
@@ -16,9 +18,14 @@ export type Alert = {
  * One place that answers "what would embarrass us at an unannounced audit, or
  * put a lorry on the road it shouldn't be on". Everything here is derived, so
  * an alert clears itself the moment the underlying record is fixed.
+ *
+ * Scoped to whichever company the user currently has active — Assets/Checks
+ * are shared across both companies (same yard, same fleet) so those two
+ * checks are not company-filtered.
  */
 export async function getAlerts(user: SessionUser): Promise<Alert[]> {
   const out: Alert[] = [];
+  const company = getActiveCompany(user);
   const in90 = new Date(Date.now() + 90 * 86_400_000);
   const in21 = new Date(Date.now() + 21 * 86_400_000);
 
@@ -26,14 +33,14 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
   startOfToday.setHours(0, 0, 0, 0);
 
   const [certs, openNcrs, quarantined, suppliers, assets, overCredit, pending, missingCert, checkedTodayIds] = await Promise.all([
-    db.certificate.findMany({ where: { expiresOn: { lte: in90 } }, orderBy: { expiresOn: 'asc' } }),
-    db.ncr.findMany({ where: { status: 'OPEN' }, orderBy: { raisedAt: 'asc' } }),
-    db.batch.findMany({ where: { status: 'Quarantined' }, include: { product: true, supplier: true } }),
-    db.supplier.findMany({ where: { blocked: false }, include: { certificates: true, batches: { take: 1 } } }),
+    db.certificate.findMany({ where: { company, expiresOn: { lte: in90 } }, orderBy: { expiresOn: 'asc' } }),
+    db.ncr.findMany({ where: { company, status: 'OPEN' }, orderBy: { raisedAt: 'asc' } }),
+    db.batch.findMany({ where: { company, status: 'Quarantined' }, include: { product: true, supplier: true } }),
+    db.supplier.findMany({ where: { company, blocked: false }, include: { certificates: true, batches: { take: 1 } } }),
     db.asset.findMany({ where: { retired: false } }),
-    db.customer.findMany({ include: { orders: { where: { paymentStatus: 'UNPAID', stage: { notIn: ['CANCELLED'] } } } } }),
-    db.order.count({ where: { stage: 'PENDING_APPROVAL', archived: false } }),
-    db.batch.count({ where: { millCertUrl: '', status: { not: 'Rejected' } } }),
+    db.customer.findMany({ where: { company }, include: { orders: { where: { paymentStatus: 'UNPAID', stage: { notIn: ['CANCELLED'] } } } } }),
+    db.order.count({ where: { company, stage: 'PENDING_APPROVAL', archived: false } }),
+    db.batch.count({ where: { company, millCertUrl: '', status: { not: 'Rejected' } } }),
     db.assetCheck.findMany({ where: { performedAt: { gte: startOfToday } }, select: { assetId: true } }),
   ]);
 
@@ -133,7 +140,7 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
     }
   }
 
-  const balances = await creditBalances();
+  const balances = await creditBalances(company);
   for (const c of overCredit) {
     const used = balances.get(c.id) ?? 0;
     const limit = Number(c.creditLimit);
@@ -166,9 +173,9 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
 }
 
 /** Unpaid value per customer — the number the credit limit is checked against. */
-export async function creditBalances(): Promise<Map<string, number>> {
+export async function creditBalances(company: Company): Promise<Map<string, number>> {
   const rows = await db.order.findMany({
-    where: { paymentStatus: 'UNPAID', archived: false, stage: { notIn: ['CANCELLED', 'DRAFT'] } },
+    where: { company, paymentStatus: 'UNPAID', archived: false, stage: { notIn: ['CANCELLED', 'DRAFT'] } },
     select: { customerId: true, lines: { select: { lineTotal: true } }, barMarks: { select: { lineTotal: true } } },
   });
   const map = new Map<string, number>();

@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { getActiveCompany } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortTh, Table } from '@/components/ui';
@@ -18,6 +19,7 @@ export default async function MovementsPage({ searchParams }: { searchParams: { 
     : { at: dir === 'asc' ? 'asc' : 'desc' };
 
   const movements = await db.stockMovement.findMany({
+    where: { product: { company: getActiveCompany(user) } },
     include: { product: true, batch: true, user: true },
     orderBy,
     take: 300,

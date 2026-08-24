@@ -5,22 +5,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Deep bottle green of the sidebar / top bar
+        // Deep bottle green of the sidebar / top bar for Fender Steel, or
+        // charcoal black for BS Supplies — CSS-variable backed (see
+        // globals.css :root / [data-brand="bs-supplies"]) so the whole app
+        // repaints on the company switch with no per-component changes.
         forest: {
-          DEFAULT: '#0D4A42',
-          900: '#06322C',
-          800: '#0A3E37',
-          700: '#0D4A42',
-          600: '#125C52',
+          DEFAULT: 'rgb(var(--color-forest) / <alpha-value>)',
+          900: 'rgb(var(--color-forest-900) / <alpha-value>)',
+          800: 'rgb(var(--color-forest-800) / <alpha-value>)',
+          700: 'rgb(var(--color-forest-700) / <alpha-value>)',
+          600: 'rgb(var(--color-forest-600) / <alpha-value>)',
         },
-        // Primary action green
+        // Primary action colour — green for Fender Steel, orange for BS Supplies
         brand: {
-          DEFAULT: '#16A085',
-          600: '#16A085',
-          700: '#128F76',
-          500: '#2CB79C',
-          100: '#DCF2EC',
-          50: '#EFF9F6',
+          DEFAULT: 'rgb(var(--color-brand) / <alpha-value>)',
+          600: 'rgb(var(--color-brand-600) / <alpha-value>)',
+          700: 'rgb(var(--color-brand-700) / <alpha-value>)',
+          500: 'rgb(var(--color-brand-500) / <alpha-value>)',
+          100: 'rgb(var(--color-brand-100) / <alpha-value>)',
+          50: 'rgb(var(--color-brand-50) / <alpha-value>)',
         },
         canvas: '#F4F6F5',
         hairline: '#E4E9E7',

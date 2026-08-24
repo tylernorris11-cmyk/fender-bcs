@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { money, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Table } from '@/components/ui';
@@ -15,6 +16,7 @@ export default async function PricingPage({ searchParams }: { searchParams: { q?
 
   const products = await db.product.findMany({
     where: {
+      company: getActiveCompany(user),
       active: true,
       ...(q ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { code: { contains: q, mode: 'insensitive' } }] } : {}),
     },

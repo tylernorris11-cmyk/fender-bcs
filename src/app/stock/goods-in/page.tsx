@@ -3,6 +3,8 @@ import { ArrowLeft } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
 import { receiveBatch } from '../actions';
@@ -10,10 +12,13 @@ import { receiveBatch } from '../actions';
 export default async function GoodsInPage({ searchParams }: { searchParams: { product?: string } }) {
   const user = await requirePermission('stock.goodsIn');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
+  const showCosts = can(user, 'finance.costs');
 
-  const [products, suppliers] = await Promise.all([
-    db.product.findMany({ where: { active: true }, orderBy: [{ category: 'asc' }, { name: 'asc' }] }),
-    db.supplier.findMany({ where: { blocked: false }, orderBy: { name: 'asc' }, include: { certificates: { where: { scheme: 'Supplier' } } } }),
+  const [products, suppliers, locations] = await Promise.all([
+    db.product.findMany({ where: { company, active: true }, orderBy: [{ category: 'asc' }, { name: 'asc' }] }),
+    db.supplier.findMany({ where: { company, blocked: false }, orderBy: { name: 'asc' }, include: { certificates: { where: { scheme: 'Supplier' } } } }),
+    db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
   ]);
 
   return (
@@ -72,6 +77,13 @@ export default async function GoodsInPage({ searchParams }: { searchParams: { pr
         </div>
 
         <div>
+          <label className="label" htmlFor="depot">Depot</label>
+          <select id="depot" name="depot" defaultValue={locations[0]?.name ?? 'Scunthorpe'} className="input">
+            {locations.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
+          </select>
+        </div>
+
+        <div>
           <label className="label" htmlFor="location">Yard location</label>
           <input id="location" name="location" className="input" placeholder="Yard B2" />
         </div>
@@ -80,6 +92,14 @@ export default async function GoodsInPage({ searchParams }: { searchParams: { pr
           <label className="label" htmlFor="receivedAt">Date received</label>
           <input id="receivedAt" name="receivedAt" type="date" className="input" />
         </div>
+
+        {showCosts && (
+          <div>
+            <label className="label" htmlFor="unitCost">Unit cost paid (£)</label>
+            <input id="unitCost" name="unitCost" type="number" step="0.01" min="0" className="input" placeholder="690.00" />
+            <p className="hint">What we actually paid per tonne — only visible to finance.</p>
+          </div>
+        )}
 
         <div className="sm:col-span-2 flex gap-3">
           <button className="btn-primary">Book it in</button>

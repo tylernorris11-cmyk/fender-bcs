@@ -40,11 +40,11 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
         <section className="card card-pad">
           <h2 className="text-lg font-bold mb-1">Checklist</h2>
           <p className="text-sm text-ink-muted mb-4">
-            Everything starts ticked OK — untick anything that needs attention and add a note.
+            Nothing is ticked yet — go through each one and confirm it&apos;s OK. Leave anything you can&apos;t confirm unticked and add a note.
           </p>
           <ul className="space-y-2">
             {items.map((label, i) => {
-              const ok = oks[label] ?? true;
+              const ok = oks[label] ?? false;
               return (
                 <li key={label} className="flex flex-wrap items-center gap-3 bg-canvas rounded-xl p-3">
                   <input type="hidden" name={`item[${i}][label]`} value={label} />
@@ -53,12 +53,12 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
                     type="button"
                     onClick={() => setOks((p) => ({ ...p, [label]: !ok }))}
                     className={`h-6 w-6 shrink-0 rounded-md border-2 grid place-items-center font-bold text-xs transition-colors ${
-                      ok ? 'bg-brand border-brand text-white' : 'bg-white border-signal text-signal'
+                      ok ? 'bg-brand border-brand text-white' : 'bg-white border-hairline text-ink-faint'
                     }`}
                     aria-pressed={ok}
-                    aria-label={`${label}: ${ok ? 'OK' : 'Needs attention'}`}
+                    aria-label={`${label}: ${ok ? 'OK' : 'Not confirmed'}`}
                   >
-                    {ok ? '✓' : '!'}
+                    {ok ? '✓' : ''}
                   </button>
                   <span className="flex-1 text-sm font-medium">{label}</span>
                   {!ok && (
@@ -66,7 +66,7 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
                       name={`item[${i}][note]`}
                       value={notes[label] ?? ''}
                       onChange={(e) => setNotes((p) => ({ ...p, [label]: e.target.value }))}
-                      className="input flex-1 min-w-[200px]" placeholder="What's wrong?"
+                      className="input flex-1 min-w-[200px]" placeholder="Note (optional)"
                     />
                   )}
                 </li>

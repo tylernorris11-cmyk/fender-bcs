@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
 import { NewPurchaseOrderForm } from './NewPurchaseOrderForm';
@@ -11,10 +12,11 @@ import { NewPurchaseOrderForm } from './NewPurchaseOrderForm';
 export default async function NewPurchaseOrderPage() {
   const user = await requirePermission('purchaseOrders.create');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
 
   const [suppliers, products] = await Promise.all([
-    db.supplier.findMany({ where: { blocked: false }, orderBy: { name: 'asc' } }),
-    db.product.findMany({ where: { active: true }, orderBy: [{ category: 'asc' }, { name: 'asc' }] }),
+    db.supplier.findMany({ where: { company, blocked: false }, orderBy: { name: 'asc' } }),
+    db.product.findMany({ where: { company, active: true }, orderBy: [{ category: 'asc' }, { name: 'asc' }] }),
   ]);
 
   return (

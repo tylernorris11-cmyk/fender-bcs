@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
-import type { Role } from '@prisma/client';
+import type { Company, Role } from '@prisma/client';
 import { assertPermission, hashPassword, logActivity, passwordProblem } from '@/lib/auth';
+import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { initialsOf } from '@/lib/format';
 
 // ------------------------------------------------------------- pricing
@@ -66,6 +67,17 @@ export async function updateUserRole(formData: FormData) {
 
   await db.user.update({ where: { id: userId }, data: { role } });
   await logActivity('User', userId, 'Role changed', role, admin.id);
+  revalidatePath('/setup/users');
+}
+
+export async function updateUserCompanies(formData: FormData) {
+  const admin = await assertPermission('setup.users');
+  const userId = String(formData.get('userId'));
+  const companies = formData.getAll('companies').map(String) as Company[];
+  if (companies.length === 0) throw new Error('Give them access to at least one company.');
+
+  await db.user.update({ where: { id: userId }, data: { companies } });
+  await logActivity('User', userId, 'Company access changed', companies.join(', '), admin.id);
   revalidatePath('/setup/users');
 }
 
@@ -132,6 +144,22 @@ export async function toggleTown(formData: FormData) {
   revalidatePath('/setup/towns');
 }
 
+export async function addLocation(formData: FormData) {
+  await assertPermission('setup.lists');
+  const name = String(formData.get('name') ?? '').trim();
+  if (!name) return;
+  await db.location.upsert({ where: { name }, update: { active: true }, create: { name } });
+  revalidatePath('/setup/locations');
+}
+
+export async function toggleLocation(formData: FormData) {
+  await assertPermission('setup.lists');
+  const id = String(formData.get('locationId'));
+  const location = await db.location.findUniqueOrThrow({ where: { id } });
+  await db.location.update({ where: { id }, data: { active: !location.active } });
+  revalidatePath('/setup/locations');
+}
+
 export async function addDriver(formData: FormData) {
   await assertPermission('setup.lists');
   await db.driver.create({
@@ -147,16 +175,20 @@ export async function addDriver(formData: FormData) {
 }
 
 export async function addChecklistTemplate(formData: FormData) {
-  await assertPermission('setup.lists');
+  const user = await assertPermission('setup.lists');
   const label = String(formData.get('label') ?? '').trim();
   if (!label) return;
-  const count = await db.checklistTemplate.count();
-  await db.checklistTemplate.create({ data: { label, sortOrder: count } });
+  const company = getActiveCompany(user);
+  const count = await db.checklistTemplate.count({ where: { company } });
+  await db.checklistTemplate.create({ data: { label, company, sortOrder: count } });
   revalidatePath('/setup/checklist');
 }
 
 export async function removeChecklistTemplate(formData: FormData) {
-  await assertPermission('setup.lists');
-  await db.checklistTemplate.delete({ where: { id: String(formData.get('templateId')) } });
+  const user = await assertPermission('setup.lists');
+  const id = String(formData.get('templateId'));
+  const existing = await db.checklistTemplate.findUniqueOrThrow({ where: { id }, select: { company: true } });
+  assertCompanyAccess(user, existing.company);
+  await db.checklistTemplate.delete({ where: { id } });
   revalidatePath('/setup/checklist');
 }

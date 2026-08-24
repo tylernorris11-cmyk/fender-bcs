@@ -3,6 +3,7 @@ import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { getActiveCompany } from '@/lib/company';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Stat, StatRow } from '@/components/ui';
 
@@ -47,18 +48,19 @@ const EXPECTATIONS = [
 export default async function CompliancePage() {
   const user = await requirePermission('compliance.view');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
   const in90 = new Date(Date.now() + 90 * 86_400_000);
 
   const [inDate, expiring, openActions, batches, tracedBatches, openNcrs] = await Promise.all([
-    db.certificate.count({ where: { expiresOn: { gt: in90 } } }),
-    db.certificate.count({ where: { expiresOn: { lte: in90, gt: new Date() } } }),
-    db.auditAction.count({ where: { closedAt: null } }),
-    db.batch.count({ where: { status: { in: ['Available', 'Quarantined'] } } }),
-    db.batch.count({ where: { status: { in: ['Available', 'Quarantined'] }, millCertUrl: { not: '' }, heatNumber: { not: '' } } }),
-    db.ncr.count({ where: { status: 'OPEN' } }),
+    db.certificate.count({ where: { company, expiresOn: { gt: in90 } } }),
+    db.certificate.count({ where: { company, expiresOn: { lte: in90, gt: new Date() } } }),
+    db.auditAction.count({ where: { company, closedAt: null } }),
+    db.batch.count({ where: { company, status: { in: ['Available', 'Quarantined'] } } }),
+    db.batch.count({ where: { company, status: { in: ['Available', 'Quarantined'] }, millCertUrl: { not: '' }, heatNumber: { not: '' } } }),
+    db.ncr.count({ where: { company, status: 'OPEN' } }),
   ]);
 
-  const expired = await db.certificate.count({ where: { expiresOn: { lte: new Date() } } });
+  const expired = await db.certificate.count({ where: { company, expiresOn: { lte: new Date() } } });
   const ready = expired === 0 && tracedBatches === batches && alerts.filter((a) => a.severity === 'bad').length === 0;
 
   return (

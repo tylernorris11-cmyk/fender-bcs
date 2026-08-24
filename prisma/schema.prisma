@@ -12,6 +12,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ------------------------------------------------------------- companies
+// Two businesses share this system: Fender Steel and its sister company BS
+// Supplies (run out of the Scunthorpe branch). Orders, Customers, Products,
+// Suppliers, compliance records and Production are private per company —
+// only Planning (both companies run the same lorries) and physical/shared
+// infrastructure (Assets, Drivers, Locations, Checks, the login system
+// itself) are common to both. A user only sees a company's data if it's in
+// their own `companies` list — see src/lib/company.ts.
+enum Company {
+  FENDER
+  BS_SUPPLIES
+}
+
 // ---------------------------------------------------------------- people
 
 enum Role {
@@ -37,6 +50,7 @@ model User {
   mustReset    Boolean  @default(false)
   lastLoginAt  DateTime?
   createdAt    DateTime @default(now())
+  companies    Company[] @default([FENDER]) // which companies this account may view
 
   ordersRaised     Order[]          @relation("raisedBy")
   accountsManaged  Customer[]       @relation("accountManager")
@@ -50,12 +64,14 @@ model User {
   productionEvents ProductionEvent[]
   purchaseOrdersRaised PurchaseOrder[] @relation("poRaisedBy")
   assetChecks      AssetCheck[]
+  notes            Note[]
 }
 
 // ------------------------------------------------------------- customers
 
 model Customer {
   id               String   @id @default(cuid())
+  company          Company  @default(FENDER)
   code             String   @unique // CUST-0001
   name             String
   contactName      String   @default("")
@@ -75,6 +91,8 @@ model Customer {
   orders         Order[]
   ncrs           Ncr[]
   documents      CustomerDocument[]
+
+  @@index([company])
 }
 
 model CustomerDocument {
@@ -91,6 +109,7 @@ model CustomerDocument {
 
 model Product {
   id          String  @id @default(cuid())
+  company     Company @default(FENDER)
   code        String  @unique // RB12-500B
   name        String
   category    String // Reinforcing bar | Mesh fabric | Cut & bent | Dowels | ...
@@ -106,6 +125,8 @@ model Product {
   orderLines OrderLine[]
   movements  StockMovement[]
   purchaseOrderLines PurchaseOrderLine[]
+
+  @@index([company])
 }
 
 // Selling prices only. Purchase cost is deliberately absent from this table —
@@ -136,6 +157,7 @@ model PurchaseCost {
 
 model Supplier {
   id          String   @id @default(cuid())
+  company     Company  @default(FENDER)
   name        String   @unique
   country     String   @default("United Kingdom")
   contactName String   @default("")
@@ -150,11 +172,14 @@ model Supplier {
   certificates Certificate[]
   ncrs         Ncr[]
   purchaseOrders PurchaseOrder[]
+
+  @@index([company])
 }
 
 // A batch is one cast/heat of steel received against one mill certificate.
 model Batch {
   id            String   @id @default(cuid())
+  company       Company  @default(FENDER)
   heatNumber    String // cast / heat number stamped by the mill
   productId     String
   supplierId    String
@@ -163,7 +188,9 @@ model Batch {
   receivedAt    DateTime @default(now())
   qtyReceived   Decimal  @db.Decimal(12, 3)
   qtyRemaining  Decimal  @db.Decimal(12, 3)
-  location      String   @default("")
+  unitCost      Decimal? @db.Decimal(12, 2) // what we paid — finance.costs only
+  depot         String   @default("Scunthorpe") // which branch this delivery is at
+  location      String   @default("") // where within that branch, e.g. "Yard B2"
   deliveryNote  String   @default("")
   status        String   @default("Available") // Available | Quarantined | Consumed | Rejected
   quarantineRef String   @default("")
@@ -228,6 +255,7 @@ enum PaymentStatus {
 
 model Order {
   id            String        @id @default(cuid())
+  company       Company       @default(FENDER)
   number        String        @unique // FS-26-05301
   customerId    String
   stage         OrderStage    @default(DRAFT)
@@ -258,6 +286,7 @@ model Order {
   production ProductionEvent[]
 
   @@index([stage, deliveryDate])
+  @@index([company])
 }
 
 model OrderLine {
@@ -294,6 +323,7 @@ enum PurchaseOrderStatus {
 
 model PurchaseOrder {
   id           String              @id @default(cuid())
+  company      Company             @default(FENDER)
   number       String              @unique // PO-26-0001
   supplierId   String
   status       PurchaseOrderStatus @default(DRAFT)
@@ -312,6 +342,7 @@ model PurchaseOrder {
   lines    PurchaseOrderLine[]
 
   @@index([status, expectedDate])
+  @@index([company])
 }
 
 // Purchase cost fields here follow the same guardrail as PurchaseCost above —
@@ -372,11 +403,15 @@ model ChecklistItem {
 }
 
 // The default checklist applied to every new order — editable in Set Up.
+// Each company keeps its own list.
 model ChecklistTemplate {
   id        String  @id @default(cuid())
+  company   Company @default(FENDER)
   label     String
   sortOrder Int     @default(0)
   active    Boolean @default(true)
+
+  @@index([company])
 }
 
 // ------------------------------------------------------------ production
@@ -417,6 +452,7 @@ model QcCheck {
 
 model Certificate {
   id         String   @id @default(cuid())
+  company    Company  @default(FENDER)
   scheme     String // CARES SRC | Supplier | ISO 9001 | ISO 14001 | ISO 45001 | Calibration
   title      String
   reference  String   @default("")
@@ -430,6 +466,7 @@ model Certificate {
   supplier Supplier? @relation(fields: [supplierId], references: [id])
 
   @@index([expiresOn])
+  @@index([company])
 }
 
 enum NcrType {
@@ -445,6 +482,7 @@ enum NcrStatus {
 
 model Ncr {
   id               String    @id @default(cuid())
+  company          Company   @default(FENDER)
   ref              String    @unique // NCR-26-013
   type             NcrType
   status           NcrStatus @default(OPEN)
@@ -465,10 +503,13 @@ model Ncr {
   batch    Batch?    @relation(fields: [batchId], references: [id])
   supplier Supplier? @relation(fields: [supplierId], references: [id])
   raisedBy User?     @relation(fields: [raisedById], references: [id])
+
+  @@index([company])
 }
 
 model AuditAction {
   id          String    @id @default(cuid())
+  company     Company   @default(FENDER)
   ref         String    @unique
   source      String    @default("CARES audit") // CARES audit | Internal audit | Management review
   description String
@@ -476,17 +517,22 @@ model AuditAction {
   dueOn       DateTime?
   closedAt    DateTime?
   evidence    String    @default("")
+
+  @@index([company])
 }
 
-// Quarterly tonnage return to CARES.
+// Quarterly tonnage return to CARES. Each company files its own.
 model QuarterlyReturn {
   id          String    @id @default(cuid())
-  period      String    @unique // 2026-Q2
+  company     Company   @default(FENDER)
+  period      String    // 2026-Q2
   tonnage     Decimal   @db.Decimal(12, 3)
   preparedBy  String    @default("")
   submittedAt DateTime?
   reference   String    @default("")
   notes       String    @default("")
+
+  @@unique([period, company])
 }
 
 // -------------------------------------------------------------- assets
@@ -621,6 +667,26 @@ model Town {
   name   String  @unique
   region String  @default("")
   active Boolean @default(true)
+}
+
+// Our own depots/branches — shared by both companies. Drives the Asset/
+// Driver/Batch `depot` fields (plain strings, not a hard foreign key, kept
+// consistent by only ever offering this list in the relevant forms).
+model Location {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  active Boolean @default(true)
+}
+
+// Freeform notes — used today for the Checks area (anything worth logging
+// that isn't tied to a specific machine/lorry check).
+model Note {
+  id     String   @id @default(cuid())
+  body   String
+  userId String?
+  at     DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
 }
 
 model Driver {

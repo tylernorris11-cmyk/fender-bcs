@@ -1,9 +1,15 @@
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { getCurrentUser } from '@/lib/auth';
+import { COMPANY_COOKIE } from '@/lib/company';
 import { signIn } from './actions';
 
 export default async function LoginPage({ searchParams }: { searchParams: { error?: string; next?: string } }) {
   if (await getCurrentUser()) redirect('/');
+
+  // No signed-in user yet to check access against, so this is purely
+  // cosmetic — whichever brand this browser last looked at.
+  const isBsSupplies = cookies().get(COMPANY_COOKIE)?.value === 'BS_SUPPLIES';
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[minmax(0,52%)_1fr]">
@@ -13,10 +19,10 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
         <div className="relative">
           <div className="inline-block rounded-2xl bg-white/95 px-7 py-6 shadow-pop">
             <p className="text-3xl font-bold tracking-tight text-forest">
-              Fender<span className="text-signal">BCS</span>
+              {isBsSupplies ? <>BS <span className="text-signal">Supplies</span></> : <>Fender<span className="text-signal">BCS</span></>}
             </p>
             <p className="text-[10px] uppercase tracking-[0.16em] text-brand-700 mt-1.5">
-              Reinforcing steel specialists
+              {isBsSupplies ? 'Steel & building supplies' : 'Reinforcing steel specialists'}
             </p>
           </div>
         </div>
@@ -27,12 +33,12 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
           </h1>
           <p className="text-white/75 mt-5 text-lg leading-relaxed">
             Orders, production, deliveries, customers, CARES compliance, stock and assets —
-            the business control system built for Fender Steel.
+            the business control system built for {isBsSupplies ? 'BS Supplies' : 'Fender Steel'}.
           </p>
         </div>
 
         <p className="relative text-sm text-white/55 mt-12 lg:mt-0">
-          Reinforcing steel specialists · Scunthorpe &amp; Sunderland ·{' '}
+          {isBsSupplies ? 'Steel & building supplies · Scunthorpe' : 'Reinforcing steel specialists · Scunthorpe & Houghton le Spring'} ·{' '}
           <strong className="text-white/85 font-semibold">Established 1981</strong>
         </p>
       </div>

@@ -1,13 +1,15 @@
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { orderTotals } from '@/lib/orders';
+import { getActiveCompany } from '@/lib/company';
 
 const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
 export async function GET() {
-  await requirePermission('orders.export');
+  const user = await requirePermission('orders.export');
 
   const orders = await db.order.findMany({
+    where: { company: getActiveCompany(user) },
     include: { customer: true, raisedBy: true, lines: true, barMarks: true },
     orderBy: { createdAt: 'desc' },
   });

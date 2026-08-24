@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Bell, ChevronDown, LogOut, Search } from 'lucide-react';
 import { can, MODULES, ROLE_LABELS, type Permission, type SessionUser } from '@/lib/rbac';
+import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
 import { Avatar } from './ui';
 
 export type NavItem = { label: string; href: string; perm?: Permission };
@@ -22,6 +23,8 @@ export function Shell({
   children: ReactNode;
 }) {
   const visible = nav.filter((n) => !n.perm || can(user, n.perm));
+  const active = getActiveCompany(user);
+  const isBsSupplies = active === 'BS_SUPPLIES';
 
   return (
     <div className="min-h-screen lg:flex">
@@ -31,10 +34,10 @@ export function Shell({
         <div className="relative flex lg:block items-center justify-between p-4 lg:p-0">
           <Link href="/" className="block lg:px-5 lg:pt-6 lg:pb-4">
             <span className="text-xl font-bold tracking-tight">
-              Fender<span className="text-white/60 font-medium">BCS</span>
+              {isBsSupplies ? <>BS<span className="text-white/60 font-medium"> Supplies</span></> : <>Fender<span className="text-white/60 font-medium">BCS</span></>}
             </span>
             <span className="hidden lg:block text-[10px] uppercase tracking-[0.18em] text-white/45 mt-1">
-              Reinforcing steel specialists
+              {isBsSupplies ? 'Steel & building supplies' : 'Reinforcing steel specialists'}
             </span>
           </Link>
 
@@ -72,7 +75,7 @@ export function Shell({
         </nav>
 
         <div className="hidden lg:block absolute bottom-0 left-0 right-0 p-5 text-sm">
-          <p className="text-white/45 leading-tight mb-3">Fender Steel<br />Control Centre</p>
+          <p className="text-white/45 leading-tight mb-3">{isBsSupplies ? 'BS Supplies' : 'Fender Steel'}<br />Control Centre</p>
           <form action="/api/sign-out" method="post">
             <button type="submit" className="flex items-center gap-2 text-white/85 hover:text-white">
               <LogOut size={16} /> Sign out
@@ -100,6 +103,22 @@ export function Shell({
           </form>
 
           <div className="ml-auto flex items-center gap-3">
+            {user.companies.length > 1 && (
+              <div className="hidden md:flex items-center rounded-xl bg-white/10 p-1 text-xs font-semibold">
+                {user.companies.map((c) => (
+                  <form key={c} action="/api/company" method="post">
+                    <input type="hidden" name="company" value={c} />
+                    <input type="hidden" name="back" value={current} />
+                    <button
+                      type="submit"
+                      className={`rounded-lg px-3 py-1.5 transition-colors ${c === active ? 'bg-white text-forest' : 'text-white/70 hover:text-white'}`}
+                    >
+                      {COMPANY_LABEL[c]}
+                    </button>
+                  </form>
+                ))}
+              </div>
+            )}
             <Link href="/alerts" className="relative rounded-xl bg-white/10 hover:bg-white/15 p-2.5" aria-label={`Alerts, ${alerts} needing attention`}>
               <Bell size={18} />
               {alerts > 0 && (
@@ -168,12 +187,14 @@ export const NAV: Record<string, NavItem[]> = {
   checks: [
     { label: 'Check history', href: '/checks' },
     { label: 'Run a check', href: '/checks/new', perm: 'checks.create' },
+    { label: 'Notes', href: '/checks/notes' },
   ],
   setup: [
     { label: 'Pricing', href: '/setup/pricing', perm: 'setup.pricing' },
     { label: 'Users & roles', href: '/setup/users', perm: 'setup.users' },
     { label: 'Drivers', href: '/setup/drivers', perm: 'setup.lists' },
     { label: 'Towns & cities', href: '/setup/towns', perm: 'setup.lists' },
+    { label: 'Locations', href: '/setup/locations', perm: 'setup.lists' },
     { label: 'Order checklist', href: '/setup/checklist', perm: 'setup.lists' },
     { label: 'Backups', href: '/setup/backups', perm: 'setup.backups' },
   ],

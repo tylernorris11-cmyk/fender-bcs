@@ -1,5 +1,5 @@
 import 'server-only';
-import type { OrderStage } from '@prisma/client';
+import type { Company, OrderStage } from '@prisma/client';
 import { db } from './db';
 import { creditBalances } from './alerts';
 
@@ -62,7 +62,7 @@ export const NEXT_STAGE: Partial<Record<OrderStage, { to: OrderStage; label: str
  */
 export async function creditCheck(customerId: string, addingNet = 0) {
   const customer = await db.customer.findUniqueOrThrow({ where: { id: customerId } });
-  const used = (await creditBalances()).get(customerId) ?? 0;
+  const used = (await creditBalances(customer.company)).get(customerId) ?? 0;
   const limit = Number(customer.creditLimit);
   return {
     customer,
@@ -74,9 +74,9 @@ export async function creditCheck(customerId: string, addingNet = 0) {
   };
 }
 
-/** Attach the standard checklist to a new order. */
-export async function applyChecklistTemplate(orderId: string) {
-  const template = await db.checklistTemplate.findMany({ where: { active: true }, orderBy: { sortOrder: 'asc' } });
+/** Attach the standard checklist to a new order. Each company keeps its own list. */
+export async function applyChecklistTemplate(orderId: string, company: Company) {
+  const template = await db.checklistTemplate.findMany({ where: { company, active: true }, orderBy: { sortOrder: 'asc' } });
   if (template.length === 0) return;
   await db.checklistItem.createMany({
     data: template.map((t) => ({ orderId, label: t.label, sortOrder: t.sortOrder })),

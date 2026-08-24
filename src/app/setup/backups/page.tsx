@@ -15,9 +15,14 @@ const EXPORTS = [
 export default async function BackupsPage() {
   const user = await requirePermission('setup.backups');
   const alerts = await getAlerts(user);
+  const companies = user.companies;
 
   const [orders, batches, movements, ncrs, customers] = await Promise.all([
-    db.order.count(), db.batch.count(), db.stockMovement.count(), db.ncr.count(), db.customer.count(),
+    db.order.count({ where: { company: { in: companies } } }),
+    db.batch.count({ where: { company: { in: companies } } }),
+    db.stockMovement.count({ where: { product: { company: { in: companies } } } }),
+    db.ncr.count({ where: { company: { in: companies } } }),
+    db.customer.count({ where: { company: { in: companies } } }),
   ]);
 
   return (

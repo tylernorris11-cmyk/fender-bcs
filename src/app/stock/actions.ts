@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
+import { can } from '@/lib/rbac';
+import { assertCompanyAccess } from '@/lib/company';
 
 /**
  * Booking steel in. This is where traceability starts: no batch exists without
@@ -22,19 +24,24 @@ export async function receiveBatch(formData: FormData) {
   if (!heatNumber) throw new Error('Enter the cast or heat number from the mill certificate.');
   if (!(qtyReceived > 0)) throw new Error('Enter how much arrived.');
 
-  const supplier = await db.supplier.findUniqueOrThrow({
-    where: { id: supplierId },
-    include: { certificates: { where: { scheme: 'Supplier' } } },
-  });
+  const [supplier, product] = await Promise.all([
+    db.supplier.findUniqueOrThrow({ where: { id: supplierId }, include: { certificates: { where: { scheme: 'Supplier' } } } }),
+    db.product.findUniqueOrThrow({ where: { id: productId } }),
+  ]);
 
   const approved = supplier.certificates.some((c) => c.expiresOn > new Date());
   // Booking it in is still allowed — refusing would just mean it gets kept on
   // paper instead. But it lands quarantined and it shows on the alerts list.
   const status = !approved || !millCertUrl ? 'Quarantined' : 'Available';
+  const unitCostRaw = formData.get('unitCost');
+  const unitCost = can(user, 'finance.costs') && unitCostRaw ? Number(unitCostRaw) : null;
 
   const batch = await db.batch.create({
     data: {
       heatNumber, productId, supplierId, qtyReceived, qtyRemaining: qtyReceived, millCertUrl, status,
+      company: product.company,
+      unitCost,
+      depot: String(formData.get('depot') ?? 'Scunthorpe'),
       certNumber: String(formData.get('certNumber') ?? ''),
       location: String(formData.get('location') ?? ''),
       deliveryNote: String(formData.get('deliveryNote') ?? ''),
@@ -62,6 +69,7 @@ export async function adjustStock(formData: FormData) {
   if (!reason.trim()) throw new Error('Say why — this is the record an auditor reads.');
 
   const batch = await db.batch.findUniqueOrThrow({ where: { id: batchId } });
+  assertCompanyAccess(user, batch.company);
   const delta = type === 'RETURNED' ? qty : -qty;
 
   await db.batch.update({ where: { id: batchId }, data: { qtyRemaining: { increment: delta } } });
@@ -77,6 +85,9 @@ export async function setBatchStatus(formData: FormData) {
   const batchId = String(formData.get('batchId'));
   const status = String(formData.get('status'));
   const reason = String(formData.get('reason') ?? '');
+
+  const existing = await db.batch.findUniqueOrThrow({ where: { id: batchId }, select: { company: true } });
+  assertCompanyAccess(user, existing.company);
 
   const batch = await db.batch.update({
     where: { id: batchId },

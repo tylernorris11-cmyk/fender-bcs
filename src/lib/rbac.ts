@@ -1,4 +1,4 @@
-import type { Role } from '@prisma/client';
+import type { Company, Role } from '@prisma/client';
 
 /**
  * Every gated capability in the system. Add a permission here, grant it below,
@@ -139,7 +139,10 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
   ],
 };
 
-export type SessionUser = { id: string; name: string; email: string; role: Role; jobTitle: string; initials: string; colour: string };
+export type SessionUser = {
+  id: string; name: string; email: string; role: Role; jobTitle: string; initials: string; colour: string;
+  companies: Company[];
+};
 
 export function can(user: Pick<SessionUser, 'role'> | null | undefined, perm: Permission): boolean {
   if (!user) return false;

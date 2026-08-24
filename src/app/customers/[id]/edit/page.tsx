@@ -18,6 +18,7 @@ export default async function EditCustomerPage({ params }: { params: { id: strin
     db.town.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
   ]);
   if (!customer) notFound();
+  if (!user.companies.includes(customer.company)) notFound();
 
   return (
     <Shell user={user} module="customers" nav={NAV.customers} current="/customers" alerts={alerts.length}>

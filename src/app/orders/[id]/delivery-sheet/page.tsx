@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { orderTotals } from '@/lib/orders';
 import { money, qty, shortDate, tonnes } from '@/lib/format';
+import { COMPANY_LABEL } from '@/lib/company';
 
 /**
  * The paper that goes on the lorry. Every rebar line prints its cast/heat number
@@ -10,7 +11,7 @@ import { money, qty, shortDate, tonnes } from '@/lib/format';
  * to site to be traceable to the cast, the supplier and the manufacturer.
  */
 export default async function DeliverySheet({ params }: { params: { id: string } }) {
-  await requirePermission('orders.view');
+  const user = await requirePermission('orders.view');
   const order = await db.order.findUnique({
     where: { id: params.id },
     include: {
@@ -20,15 +21,23 @@ export default async function DeliverySheet({ params }: { params: { id: string }
     },
   });
   if (!order) notFound();
+  if (!user.companies.includes(order.company)) notFound();
+  const isBsSupplies = order.company === 'BS_SUPPLIES';
   const { net, vat, gross, weightKg } = orderTotals(order);
 
   return (
     <div className="bg-white min-h-screen p-10 max-w-[820px] mx-auto text-[13px] text-black">
       <div className="flex justify-between items-start border-b-2 border-forest pb-4 mb-6">
         <div>
-          <p className="text-2xl font-bold text-forest">Fender<span className="text-signal">BCS</span></p>
-          <p className="text-[11px] uppercase tracking-widest text-brand-700">Reinforcing steel specialists</p>
-          <p className="text-ink-muted mt-2">Scunthorpe &amp; Sunderland · Established 1981</p>
+          <p className="text-2xl font-bold text-forest">
+            {isBsSupplies ? <>BS <span className="text-signal">Supplies</span></> : <>Fender<span className="text-signal">BCS</span></>}
+          </p>
+          <p className="text-[11px] uppercase tracking-widest text-brand-700">
+            {isBsSupplies ? 'Steel & building supplies' : 'Reinforcing steel specialists'}
+          </p>
+          <p className="text-ink-muted mt-2">
+            {isBsSupplies ? 'Scunthorpe' : 'Scunthorpe & Houghton le Spring'} · Established 1981
+          </p>
         </div>
         <div className="text-right">
           <h1 className="text-xl font-bold">Delivery note</h1>

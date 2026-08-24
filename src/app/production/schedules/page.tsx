@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { minRadiusMm, minStraightBetweenBends, toleranceFor } from '@/lib/bs8666';
+import { getActiveCompany } from '@/lib/company';
 import { shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, Table } from '@/components/ui';
@@ -12,7 +13,7 @@ export default async function SchedulesPage() {
   const alerts = await getAlerts(user);
 
   const orders = await db.order.findMany({
-    where: { archived: false, barMarks: { some: {} }, stage: { notIn: ['COMPLETED', 'CANCELLED'] } },
+    where: { company: getActiveCompany(user), archived: false, barMarks: { some: {} }, stage: { notIn: ['COMPLETED', 'CANCELLED'] } },
     include: { customer: true, barMarks: { orderBy: { sortOrder: 'asc' }, include: { qcChecks: true } } },
     orderBy: { deliveryDate: 'asc' },
   });

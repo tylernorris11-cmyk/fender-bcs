@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { toleranceFor } from '@/lib/bs8666';
+import { getActiveCompany } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, Table } from '@/components/ui';
@@ -14,17 +15,18 @@ const DIMENSIONS = ['Total length', 'A', 'B', 'C', 'D', 'E/F'];
 export default async function ChecksPage({ searchParams }: { searchParams: { order?: string } }) {
   const user = await requirePermission('production.view');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
 
   const [orders, recent] = await Promise.all([
     db.order.findMany({
       where: {
-        archived: false, barMarks: { some: {} }, stage: { notIn: ['COMPLETED', 'CANCELLED', 'DRAFT'] },
+        company, archived: false, barMarks: { some: {} }, stage: { notIn: ['COMPLETED', 'CANCELLED', 'DRAFT'] },
         ...(searchParams.order ? { id: searchParams.order } : {}),
       },
       include: { customer: true, barMarks: { orderBy: { sortOrder: 'asc' }, include: { qcChecks: { include: { checkedBy: true }, orderBy: { at: 'desc' } } } } },
       orderBy: { deliveryDate: 'asc' },
     }),
-    db.qcCheck.findMany({ include: { checkedBy: true, barMark: { include: { order: true } } }, orderBy: { at: 'desc' }, take: 25 }),
+    db.qcCheck.findMany({ where: { barMark: { order: { company } } }, include: { checkedBy: true, barMark: { include: { order: true } } }, orderBy: { at: 'desc' }, take: 25 }),
   ]);
 
   return (

@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { poTotal, PO_STATUS_LABEL } from '@/lib/purchaseOrders';
 import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { money, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, Empty, PageHeader, Pill, SortTh, Stat, StatRow, Table } from '@/components/ui';
@@ -29,12 +30,14 @@ export default async function PurchaseOrdersPage({
   const user = await requirePermission('purchaseOrders.view');
   const alerts = await getAlerts(user);
   const showCosts = can(user, 'finance.costs');
+  const company = getActiveCompany(user);
 
   const q = (searchParams.q ?? '').trim();
   const status = searchParams.status as PurchaseOrderStatus | undefined;
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
 
   const where: Prisma.PurchaseOrderWhereInput = {
+    company,
     ...(status ? { status } : {}),
     ...(q
       ? { OR: [{ number: { contains: q, mode: 'insensitive' } }, { supplier: { name: { contains: q, mode: 'insensitive' } } }] }
@@ -50,7 +53,7 @@ export default async function PurchaseOrdersPage({
 
   const [purchaseOrders, counts] = await Promise.all([
     db.purchaseOrder.findMany({ where, include: { supplier: true, raisedBy: true, lines: true }, orderBy, take: 200 }),
-    db.purchaseOrder.groupBy({ by: ['status'], _count: true }),
+    db.purchaseOrder.groupBy({ by: ['status'], where: { company }, _count: true }),
   ]);
 
   const countOf = (s: PurchaseOrderStatus) => counts.find((c) => c.status === s)?._count ?? 0;
