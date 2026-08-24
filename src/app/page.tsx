@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
   ArrowRight, Bell, Bug, CalendarDays, ClipboardCheck, ClipboardList, Factory, Layers,
-  LogOut, Search, Settings, ShieldCheck, ShoppingCart, Truck, Users,
+  LogOut, Settings, ShieldCheck, ShoppingCart, Truck, Users,
 } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { can, MODULES, ROLE_LABELS } from '@/lib/rbac';
@@ -9,6 +9,7 @@ import { getAlerts } from '@/lib/alerts';
 import { longDate } from '@/lib/format';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
 import { Avatar } from '@/components/ui';
+import { GlobalSearch } from '@/components/GlobalSearch';
 
 const ICONS = {
   orders: ClipboardList, purchaseOrders: ShoppingCart, production: Factory, planning: CalendarDays, customers: Users,
@@ -42,23 +43,20 @@ export default async function Launcher() {
 
   return (
     <div className="min-h-screen">
-      <header className="bg-forest text-white relative overflow-hidden">
-        <div className="absolute inset-0 mesh-bg pointer-events-none" aria-hidden />
+      <header className="bg-forest text-white relative">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+          <div className="absolute inset-0 mesh-bg" />
+        </div>
         <div className="relative max-w-[1200px] mx-auto px-6 py-5 flex items-center gap-3">
           <span className="text-xl font-bold tracking-tight shrink-0">
             {isBsSupplies ? <>BCS<span className="text-white/60 font-medium"> Products</span></> : <>Fender<span className="text-white/60 font-medium">BCS</span></>}
           </span>
 
-          <form action="/search" className="hidden sm:flex flex-1 max-w-xl relative ml-4">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" aria-hidden />
-            <label className="sr-only" htmlFor="global-search">Search the whole system</label>
-            <input
-              id="global-search" name="q"
-              placeholder="Search orders, customers, stock, assets…"
-              className="w-full rounded-xl bg-white/10 border border-white/10 pl-10 pr-4 py-2.5 text-sm
-                         text-white placeholder:text-white/50 focus:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/30"
-            />
-          </form>
+          <GlobalSearch
+            label="Search the whole system"
+            placeholder="Search orders, customers, stock, assets…"
+            className="hidden sm:flex flex-1 max-w-xl relative ml-4"
+          />
 
           <div className="ml-auto flex items-center gap-3">
             {user.companies.length > 1 && (

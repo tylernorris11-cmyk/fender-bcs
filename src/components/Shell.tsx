@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Bell, Bug, Home, LogOut, Search } from 'lucide-react';
+import { Bell, Bug, Home, LogOut } from 'lucide-react';
 import type { Company } from '@prisma/client';
 import { can, MODULES, ROLE_LABELS, type Permission, type SessionUser } from '@/lib/rbac';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
 import { Avatar } from './ui';
 import { ModuleSwitcher } from './ModuleSwitcher';
+import { GlobalSearch } from './GlobalSearch';
 
 // `company`, when set, only shows this nav item while that company's view is
 // active — for things like BCS Products' cost centres that don't exist on
@@ -104,16 +105,7 @@ export function Shell({
           </Link>
           <ModuleSwitcher current={module} currentLabel={MODULE_TITLE[module]} items={switcherItems} />
 
-          <form action="/search" className="hidden sm:flex flex-1 max-w-xl relative">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" aria-hidden />
-            <label className="sr-only" htmlFor="global-search">Search orders and customers</label>
-            <input
-              id="global-search" name="q"
-              placeholder="Search orders, customers…"
-              className="w-full rounded-xl bg-white/10 border border-white/10 pl-10 pr-4 py-2.5 text-sm
-                         text-white placeholder:text-white/50 focus:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/30"
-            />
-          </form>
+          <GlobalSearch />
 
           <div className="ml-auto flex items-center gap-3">
             {user.companies.length > 1 && (
