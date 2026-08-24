@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Bell, Bug, ChevronDown, LogOut, Search } from 'lucide-react';
+import { Bell, Bug, ChevronDown, Home, LogOut, Search } from 'lucide-react';
 import type { Company } from '@prisma/client';
 import { can, MODULES, ROLE_LABELS, type Permission, type SessionUser } from '@/lib/rbac';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
@@ -94,6 +94,9 @@ export function Shell({
       {/* ------------------------------------------------------------ main */}
       <div className="flex-1 min-w-0">
         <header className="bg-forest text-white px-4 sm:px-6 py-3 flex items-center gap-3">
+          <Link href="/" className="rounded-xl bg-white/10 hover:bg-white/15 text-white p-2.5 shrink-0" aria-label="Home">
+            <Home size={18} />
+          </Link>
           <Link href="/" className="btn bg-white/10 hover:bg-white/15 text-white px-4 py-2 text-sm">
             {MODULE_TITLE[module]} <ChevronDown size={16} />
           </Link>
