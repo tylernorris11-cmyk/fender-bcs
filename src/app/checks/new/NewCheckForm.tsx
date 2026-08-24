@@ -13,19 +13,18 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
   const [assetId, setAssetId] = useState(initialAssetId && assets.some((a) => a.id === initialAssetId) ? initialAssetId : assets[0]?.id ?? '');
   const [oks, setOks] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [photos, setPhotos] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState<string | null>(null);
+  const [photo, setPhoto] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  async function onPhotoChosen(label: string, file: File | undefined) {
+  async function onPhotoChosen(file: File | undefined) {
     if (!file) return;
-    setBusy(label);
+    setBusy(true);
     try {
-      const dataUrl = await resizeImageToDataUrl(file);
-      setPhotos((p) => ({ ...p, [label]: dataUrl }));
+      setPhoto(await resizeImageToDataUrl(file));
     } catch {
       // Not a real photo, or the browser couldn't decode it — just skip it.
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }
 
@@ -79,37 +78,12 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
                   </button>
                   <span className="flex-1 text-sm font-medium">{label}</span>
                   {!ok && (
-                    <>
-                      <input
-                        name={`item[${i}][note]`}
-                        value={notes[label] ?? ''}
-                        onChange={(e) => setNotes((p) => ({ ...p, [label]: e.target.value }))}
-                        className="input flex-1 min-w-[200px]" placeholder="Note (optional)"
-                      />
-                      <input type="hidden" name={`item[${i}][photo]`} value={photos[label] ?? ''} />
-                      {photos[label] ? (
-                        <span className="relative shrink-0">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={photos[label]} alt="" className="h-10 w-10 rounded-lg object-cover border border-hairline" />
-                          <button
-                            type="button"
-                            onClick={() => setPhotos((p) => { const n = { ...p }; delete n[label]; return n; })}
-                            className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-ink text-white grid place-items-center"
-                            aria-label={`Remove photo for ${label}`}
-                          >
-                            <X size={10} />
-                          </button>
-                        </span>
-                      ) : (
-                        <label className="btn-secondary btn-sm shrink-0 cursor-pointer">
-                          <Camera size={14} /> {busy === label ? 'Adding…' : 'Add photo'}
-                          <input
-                            type="file" accept="image/*" capture="environment" className="sr-only"
-                            onChange={(e) => onPhotoChosen(label, e.target.files?.[0])}
-                          />
-                        </label>
-                      )}
-                    </>
+                    <input
+                      name={`item[${i}][note]`}
+                      value={notes[label] ?? ''}
+                      onChange={(e) => setNotes((p) => ({ ...p, [label]: e.target.value }))}
+                      className="input flex-1 min-w-[200px]" placeholder="Note (optional)"
+                    />
                   )}
                 </li>
               );
@@ -121,6 +95,34 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
       <section className="card card-pad">
         <label className="label" htmlFor="notes">Overall notes</label>
         <textarea id="notes" name="notes" rows={2} className="input" placeholder="Anything else worth recording" />
+
+        <input type="hidden" name="photo" value={photo} />
+        <div className="mt-3 flex items-center gap-3">
+          {photo ? (
+            <span className="relative shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photo} alt="" className="h-16 w-16 rounded-lg object-cover border border-hairline" />
+              <button
+                type="button"
+                onClick={() => setPhoto('')}
+                className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-ink text-white grid place-items-center"
+                aria-label="Remove photo"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ) : (
+            <label className="btn-secondary btn-sm cursor-pointer">
+              <Camera size={14} /> {busy ? 'Adding…' : 'Add photo'}
+              <input
+                type="file" accept="image/*" capture="environment" className="sr-only"
+                onChange={(e) => onPhotoChosen(e.target.files?.[0])}
+              />
+            </label>
+          )}
+          <p className="text-xs text-ink-faint">If there's a problem, a photo helps whoever picks this up next.</p>
+        </div>
+
         <button type="submit" className="btn-primary mt-4" disabled={!asset}>Save check</button>
       </section>
     </form>

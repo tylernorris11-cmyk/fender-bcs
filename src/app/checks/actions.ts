@@ -31,8 +31,9 @@ export async function logAssetCheck(formData: FormData) {
       userId: user.id,
       result: allOk ? 'PASS' : 'FAIL',
       notes: String(formData.get('notes') ?? ''),
+      photo: String(formData.get('photo') ?? '') || null,
       items: {
-        create: itemRows.map((r) => ({ label: r.label, ok: r.ok === '1', note: r.note ?? '', photo: r.photo || null })),
+        create: itemRows.map((r) => ({ label: r.label, ok: r.ok === '1', note: r.note ?? '' })),
       },
     },
   });

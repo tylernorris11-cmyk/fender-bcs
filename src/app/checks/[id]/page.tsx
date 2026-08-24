@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ImageOff } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
@@ -46,27 +46,23 @@ export default async function CheckDetailPage({ params }: { params: { id: string
               <div className="flex-1 min-w-[200px]">
                 <p className="text-sm font-medium">{i.label}</p>
                 {i.note && <p className="text-sm text-ink-muted mt-0.5">{i.note}</p>}
-                {!i.ok && !i.note && !i.photo && <p className="text-sm text-ink-faint mt-0.5">Not confirmed — no note left.</p>}
+                {!i.ok && !i.note && <p className="text-sm text-ink-faint mt-0.5">Not confirmed — no note left.</p>}
               </div>
-              {i.photo ? (
-                <a href={i.photo} target="_blank" rel="noreferrer" className="shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={i.photo} alt={`Photo for ${i.label}`} className="h-20 w-20 rounded-xl object-cover border border-hairline hover:opacity-90" />
-                </a>
-              ) : !i.ok ? (
-                <span className="shrink-0 h-20 w-20 rounded-xl border border-dashed border-hairline grid place-items-center text-ink-faint" title="No photo attached">
-                  <ImageOff size={20} />
-                </span>
-              ) : null}
             </li>
           ))}
         </ul>
       </section>
 
-      {check.notes && (
+      {(check.notes || check.photo) && (
         <section className="card card-pad mb-6">
           <h2 className="text-lg font-bold mb-2">Overall notes</h2>
-          <p className="text-sm">{check.notes}</p>
+          {check.notes && <p className="text-sm">{check.notes}</p>}
+          {check.photo && (
+            <a href={check.photo} target="_blank" rel="noreferrer" className="inline-block mt-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={check.photo} alt="Photo attached to this check" className="h-32 w-32 rounded-xl object-cover border border-hairline hover:opacity-90" />
+            </a>
+          )}
         </section>
       )}
 

@@ -113,7 +113,7 @@ export default async function ChecksPage({
                 <td className="td text-ink-muted">
                   <span className="inline-flex items-center gap-1.5">
                     {c.items.filter((i) => !i.ok).map((i) => i.label).join(', ') || c.notes || '—'}
-                    {c.items.some((i) => i.photo) && <Camera size={13} className="text-ink-faint shrink-0" aria-label="Has a photo attached" />}
+                    {c.photo && <Camera size={13} className="text-ink-faint shrink-0" aria-label="Has a photo attached" />}
                   </span>
                 </td>
               </tr>
