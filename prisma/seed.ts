@@ -63,7 +63,7 @@ async function main() {
 
   // ------------------------------------------------------------- people
   const people = [
-    { email: 'john.davies@fendersteel.co.uk', name: 'John Davies', jobTitle: 'CEO', role: 'ADMIN', colour: '#C0392B' },
+    { email: 'john.davies@fendersteel.co.uk', name: 'John Davies', jobTitle: 'CEO', role: 'MASTER_ADMIN', colour: '#C0392B' },
     { email: 'claire.bennett@fendersteel.co.uk', name: 'Claire Bennett', jobTitle: 'Quality manager', role: 'QUALITY', colour: '#0D4A42' },
     { email: 'martin.miller@fendersteel.co.uk', name: 'Martin Miller', jobTitle: 'Yard manager', role: 'MANAGER', colour: '#6C3FC5' },
     { email: 'james.ward@fendersteel.co.uk', name: 'James Ward', jobTitle: 'Sales', role: 'SALES', colour: '#16A085' },

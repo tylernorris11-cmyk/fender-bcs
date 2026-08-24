@@ -25,6 +25,31 @@ export async function setPrice(formData: FormData) {
 
 // --------------------------------------------------------------- users
 
+const ALL_COMPANIES: Company[] = ['FENDER', 'BS_SUPPLIES'];
+
+/**
+ * A company-scoped Administrator can only reach people who already share a
+ * company with them — a BS Supplies admin has no business touching a
+ * Fender-only account, even by guessing a userId in a form post.
+ */
+function assertCanManage(admin: { role: Role; companies: Company[] }, target: { role: Role; companies: Company[] }) {
+  if (admin.role === 'MASTER_ADMIN') return;
+  if (target.role === 'MASTER_ADMIN') throw new Error('Only a Master Administrator can manage that account.');
+  if (!target.companies.some((c) => admin.companies.includes(c))) {
+    throw new Error('You can only manage people within your own company.');
+  }
+}
+
+/** Master Administrator always has every company; Administrator always has exactly one. */
+function assertCompaniesForRole(role: Role, companies: Company[]) {
+  if (role === 'MASTER_ADMIN' && companies.length !== ALL_COMPANIES.length) {
+    throw new Error('Master Administrators always have access to every company.');
+  }
+  if (role === 'ADMIN' && companies.length > 1) {
+    throw new Error('Administrators can only have access to one company. Promote them to Master Administrator for both.');
+  }
+}
+
 export async function createUser(formData: FormData) {
   const admin = await assertPermission('setup.users');
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
@@ -36,10 +61,15 @@ export async function createUser(formData: FormData) {
   const problem = passwordProblem(password);
   if (problem) throw new Error(problem);
   if (await db.user.findUnique({ where: { email } })) throw new Error('There is already an account on that email.');
+  if (role === 'MASTER_ADMIN' && admin.role !== 'MASTER_ADMIN') {
+    throw new Error('Only a Master Administrator can grant that role.');
+  }
+
+  const companies = role === 'MASTER_ADMIN' ? ALL_COMPANIES : [getActiveCompany(admin)];
 
   const created = await db.user.create({
     data: {
-      email, name, role,
+      email, name, role, companies,
       jobTitle: String(formData.get('jobTitle') ?? ''),
       passwordHash: hashPassword(password),
       initials: initialsOf(name),
@@ -55,14 +85,18 @@ export async function updateUserRole(formData: FormData) {
   const admin = await assertPermission('setup.users');
   const userId = String(formData.get('userId'));
   const role = String(formData.get('role')) as Role;
+  const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  assertCanManage(admin, target);
 
-  // Never let the last administrator demote themselves out of the system.
-  if (role !== 'ADMIN') {
-    const admins = await db.user.count({ where: { role: 'ADMIN', active: true } });
-    const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
-    if (target.role === 'ADMIN' && admins <= 1) {
-      throw new Error('This is the last administrator. Give someone else admin first.');
-    }
+  if (role === 'MASTER_ADMIN' && admin.role !== 'MASTER_ADMIN') {
+    throw new Error('Only a Master Administrator can grant that role.');
+  }
+  assertCompaniesForRole(role, target.companies);
+
+  // Never let the last Master Administrator demote themselves out of the system.
+  if (target.role === 'MASTER_ADMIN' && role !== 'MASTER_ADMIN') {
+    const masters = await db.user.count({ where: { role: 'MASTER_ADMIN', active: true } });
+    if (masters <= 1) throw new Error('This is the last Master Administrator. Give someone else that role first.');
   }
 
   await db.user.update({ where: { id: userId }, data: { role } });
@@ -76,6 +110,13 @@ export async function updateUserCompanies(formData: FormData) {
   const companies = formData.getAll('companies').map(String) as Company[];
   if (companies.length === 0) throw new Error('Give them access to at least one company.');
 
+  const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  assertCanManage(admin, target);
+  if (admin.role !== 'MASTER_ADMIN' && companies.some((c) => !admin.companies.includes(c))) {
+    throw new Error('You can only grant access to companies you belong to yourself.');
+  }
+  assertCompaniesForRole(target.role, companies);
+
   await db.user.update({ where: { id: userId }, data: { companies } });
   await logActivity('User', userId, 'Company access changed', companies.join(', '), admin.id);
   revalidatePath('/setup/users');
@@ -85,10 +126,11 @@ export async function toggleUserActive(formData: FormData) {
   const admin = await assertPermission('setup.users');
   const userId = String(formData.get('userId'));
   const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  assertCanManage(admin, target);
 
-  if (target.active && target.role === 'ADMIN') {
-    const admins = await db.user.count({ where: { role: 'ADMIN', active: true } });
-    if (admins <= 1) throw new Error('This is the last active administrator. Promote someone else first.');
+  if (target.active && target.role === 'MASTER_ADMIN') {
+    const masters = await db.user.count({ where: { role: 'MASTER_ADMIN', active: true } });
+    if (masters <= 1) throw new Error('This is the last active Master Administrator. Promote someone else first.');
   }
 
   await db.user.update({ where: { id: userId }, data: { active: !target.active } });
@@ -102,6 +144,9 @@ export async function resetPassword(formData: FormData) {
   const password = String(formData.get('password') ?? '');
   const problem = passwordProblem(password);
   if (problem) throw new Error(problem);
+
+  const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  assertCanManage(admin, target);
 
   await db.user.update({ where: { id: userId }, data: { passwordHash: hashPassword(password), mustReset: true } });
   await logActivity('User', userId, 'Password reset', 'Reset by an administrator', admin.id);

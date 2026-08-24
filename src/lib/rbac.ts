@@ -72,7 +72,12 @@ const ALL: Permission[] = [
 ];
 
 export const PERMISSIONS: Record<Role, Permission[]> = {
+  // Owns the whole system. Same permissions as Administrator — the
+  // difference between the two is company access, enforced separately.
+  MASTER_ADMIN: ALL,
+
   // The CEO and directors. Everything, including purchase cost and margin.
+  // Locked to a single company (see setup/actions.ts) rather than both.
   ADMIN: ALL,
 
   // Runs the yard. Can do the whole job except set pay-grade pricing,
@@ -168,6 +173,7 @@ export const MODULES = [
 ] as const;
 
 export const ROLE_LABELS: Record<Role, string> = {
+  MASTER_ADMIN: 'Master Administrator',
   ADMIN: 'Administrator',
   MANAGER: 'Yard manager',
   SALES: 'Sales',
@@ -178,7 +184,8 @@ export const ROLE_LABELS: Record<Role, string> = {
 };
 
 export const ROLE_BLURBS: Record<Role, string> = {
-  ADMIN: 'Everything, including purchase costs, pricing and user accounts.',
+  MASTER_ADMIN: 'Everything, across both companies. Only role that can grant Master Administrator or multi-company access.',
+  ADMIN: 'Everything, including purchase costs, pricing and user accounts — locked to a single company.',
   MANAGER: 'Runs the yard. No purchase costs, pricing or user management.',
   SALES: 'Orders and customers. Cannot approve over a credit limit.',
   QUALITY: 'Owns the audit file — certificates, NCRs, calibration, returns.',

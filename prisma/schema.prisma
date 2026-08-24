@@ -28,7 +28,8 @@ enum Company {
 // ---------------------------------------------------------------- people
 
 enum Role {
-  ADMIN // CEO / directors — everything, including cost and margin
+  MASTER_ADMIN // Owns the whole system — every permission, both companies always.
+  ADMIN // Same admin permissions as Master, but locked to a single company.
   MANAGER // Runs the yard day to day. No cost prices.
   SALES // Orders, customers, pricing view
   QUALITY // Compliance, NCRs, certificates, calibration

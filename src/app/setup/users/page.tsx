@@ -11,13 +11,19 @@ import { createUser, resetPassword, toggleUserActive, updateUserCompanies, updat
 
 const COMPANIES = ['FENDER', 'BS_SUPPLIES'] as const;
 
-const ROLES = Object.keys(ROLE_LABELS) as Role[];
+const ALL_ROLES = Object.keys(ROLE_LABELS) as Role[];
 
 export default async function UsersPage({ searchParams }: { searchParams: { sort?: string; dir?: string } }) {
   const user = await requirePermission('setup.users');
   const alerts = await getAlerts(user);
+  const isMaster = user.role === 'MASTER_ADMIN';
+  // A company-scoped Administrator only sees, and can only grant, their own
+  // company — and can never hand out the Master Administrator role.
+  const ROLES = isMaster ? ALL_ROLES : ALL_ROLES.filter((r) => r !== 'MASTER_ADMIN');
+  const grantableCompanies = isMaster ? COMPANIES : COMPANIES.filter((c) => user.companies.includes(c));
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
   const users = await db.user.findMany({
+    where: isMaster ? undefined : { companies: { hasSome: user.companies } },
     orderBy:
       searchParams.sort === 'role' ? [{ role: dir }]
       : searchParams.sort === 'lastLogin' ? [{ lastLoginAt: dir }]
@@ -37,7 +43,9 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
           <th className="th">Company access</th>
           <th className="th">Status</th><th className="th sr-only">Reset password</th>
         </>}>
-          {users.map((u) => (
+          {users.map((u) => {
+            const locked = !isMaster && u.role === 'MASTER_ADMIN';
+            return (
             <tr key={u.id} className="row">
               <td className="td">
                 <span className="flex items-center gap-3">
@@ -49,46 +57,65 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
                 </span>
               </td>
               <td className="td">
-                <form action={updateUserRole} className="flex gap-2 items-center">
-                  <input type="hidden" name="userId" value={u.id} />
-                  <select name="role" defaultValue={u.role} className="input w-44 py-1.5" aria-label={`Role for ${u.name}`}>
-                    {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                  </select>
-                  <button className="btn-secondary btn-sm">Save</button>
-                </form>
+                {locked ? (
+                  <span className="text-sm text-ink-muted">{ROLE_LABELS[u.role]}</span>
+                ) : (
+                  <form action={updateUserRole} className="flex gap-2 items-center">
+                    <input type="hidden" name="userId" value={u.id} />
+                    <select name="role" defaultValue={u.role} className="input w-44 py-1.5" aria-label={`Role for ${u.name}`}>
+                      {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                    </select>
+                    <button className="btn-secondary btn-sm">Save</button>
+                  </form>
+                )}
               </td>
               <td className="td text-ink-muted whitespace-nowrap">{u.lastLoginAt ? shortDate(u.lastLoginAt) : 'Never'}</td>
               <td className="td">
-                <form action={updateUserCompanies} className="flex flex-col gap-1">
-                  <input type="hidden" name="userId" value={u.id} />
-                  {COMPANIES.map((c) => (
-                    <label key={c} className="flex items-center gap-1.5 text-xs">
-                      <input type="checkbox" name="companies" value={c} defaultChecked={u.companies.includes(c)} className="h-3.5 w-3.5 accent-brand" />
-                      {COMPANY_LABEL[c]}
-                    </label>
-                  ))}
-                  <button className="btn-secondary btn-sm mt-1 self-start">Save</button>
-                </form>
+                {locked ? (
+                  <span className="text-xs text-ink-faint">Every company</span>
+                ) : (
+                  <form action={updateUserCompanies} className="flex flex-col gap-1">
+                    <input type="hidden" name="userId" value={u.id} />
+                    {grantableCompanies.map((c) => (
+                      <label key={c} className="flex items-center gap-1.5 text-xs">
+                        <input type="checkbox" name="companies" value={c} defaultChecked={u.companies.includes(c)}
+                               disabled={u.role === 'MASTER_ADMIN'} className="h-3.5 w-3.5 accent-brand" />
+                        {COMPANY_LABEL[c]}
+                      </label>
+                    ))}
+                    {u.companies.filter((c) => !grantableCompanies.includes(c)).map((c) => (
+                      <span key={c} className="text-xs text-ink-faint">{COMPANY_LABEL[c]} (not yours to grant)</span>
+                    ))}
+                    {u.role !== 'MASTER_ADMIN' && <button className="btn-secondary btn-sm mt-1 self-start">Save</button>}
+                  </form>
+                )}
               </td>
               <td className="td">
-                <form action={toggleUserActive} className="flex items-center gap-2">
-                  <input type="hidden" name="userId" value={u.id} />
-                  {u.active ? <Pill tone="good">Active</Pill> : <Pill tone="bad">Suspended</Pill>}
-                  <button className="text-xs text-ink-faint hover:text-ink underline">
-                    {u.active ? 'suspend' : 'reactivate'}
-                  </button>
-                </form>
+                {locked ? (
+                  u.active ? <Pill tone="good">Active</Pill> : <Pill tone="bad">Suspended</Pill>
+                ) : (
+                  <form action={toggleUserActive} className="flex items-center gap-2">
+                    <input type="hidden" name="userId" value={u.id} />
+                    {u.active ? <Pill tone="good">Active</Pill> : <Pill tone="bad">Suspended</Pill>}
+                    <button className="text-xs text-ink-faint hover:text-ink underline">
+                      {u.active ? 'suspend' : 'reactivate'}
+                    </button>
+                  </form>
+                )}
               </td>
               <td className="td">
+                {locked ? null : (
                 <form action={resetPassword} className="flex gap-2 justify-end">
                   <input type="hidden" name="userId" value={u.id} />
                   <input name="password" type="text" className="input w-44 py-1.5" placeholder="New password"
                          aria-label={`New password for ${u.name}`} />
                   <button className="btn-secondary btn-sm">Reset</button>
                 </form>
+                )}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </Table>
       </section>
 
@@ -130,7 +157,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
               <li key={r}>
                 <div className="flex items-center gap-2">
                   <strong>{ROLE_LABELS[r]}</strong>
-                  <Pill tone={r === 'ADMIN' ? 'bad' : 'neutral'}>{PERMISSIONS[r].length} permissions</Pill>
+                  <Pill tone={r === 'ADMIN' || r === 'MASTER_ADMIN' ? 'bad' : 'neutral'}>{PERMISSIONS[r].length} permissions</Pill>
                 </div>
                 <p className="text-ink-muted mt-0.5">{ROLE_BLURBS[r]}</p>
               </li>

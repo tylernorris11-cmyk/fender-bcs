@@ -12,7 +12,7 @@ export default async function NewCustomerPage() {
   const user = await requirePermission('customers.edit');
   const [alerts, managers, towns] = await Promise.all([
     getAlerts(user),
-    db.user.findMany({ where: { active: true, role: { in: ['ADMIN', 'MANAGER', 'SALES'] } }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    db.user.findMany({ where: { active: true, role: { in: ['MASTER_ADMIN', 'ADMIN', 'MANAGER', 'SALES'] } }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
     db.town.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
   ]);
 

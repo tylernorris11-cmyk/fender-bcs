@@ -14,7 +14,7 @@ export default async function EditCustomerPage({ params }: { params: { id: strin
   const [alerts, customer, managers, towns] = await Promise.all([
     getAlerts(user),
     db.customer.findUnique({ where: { id: params.id } }),
-    db.user.findMany({ where: { active: true, role: { in: ['ADMIN', 'MANAGER', 'SALES'] } }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    db.user.findMany({ where: { active: true, role: { in: ['MASTER_ADMIN', 'ADMIN', 'MANAGER', 'SALES'] } }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
     db.town.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
   ]);
   if (!customer) notFound();
