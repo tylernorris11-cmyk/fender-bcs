@@ -146,7 +146,9 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
         <ul className="text-sm divide-y divide-hairline">
           {asset.checks.map((c) => (
             <li key={c.id} className="py-3 flex flex-wrap items-center gap-2">
-              <span className="text-ink-muted w-40">{shortDate(c.performedAt)} {clock(c.performedAt)}</span>
+              <Link href={`/checks/${c.id}`} className="text-ink-muted w-40 hover:text-ink hover:underline">
+                {shortDate(c.performedAt)} {clock(c.performedAt)}
+              </Link>
               <Pill tone={c.result === 'PASS' ? 'good' : 'bad'}>{c.result === 'PASS' ? 'Pass' : 'Issue flagged'}</Pill>
               <span className="text-ink-muted">{c.user?.name ?? 'Unknown'}</span>
               {c.items.some((i) => !i.ok) && (

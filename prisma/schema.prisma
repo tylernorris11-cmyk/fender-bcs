@@ -622,6 +622,7 @@ model AssetCheckItem {
   label   String
   ok      Boolean @default(true)
   note    String  @default("")
+  photo   String? @db.Text // a data URL — a photo of the problem, resized client-side before upload
 
   check AssetCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
 }

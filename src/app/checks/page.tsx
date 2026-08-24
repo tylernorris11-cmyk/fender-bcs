@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Camera, Plus } from 'lucide-react';
 import type { AssetType, CheckResult, Prisma } from '@prisma/client';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -98,7 +98,9 @@ export default async function ChecksPage({
                   <Link href={`/assets/${c.assetId}`} className="font-semibold text-brand-700 hover:underline">{c.asset.name}</Link>
                   <span className="block text-xs text-ink-faint">{c.asset.ref}</span>
                 </td>
-                <td className="td text-ink-muted whitespace-nowrap">{shortDate(c.performedAt)} {clock(c.performedAt)}</td>
+                <td className="td text-ink-muted whitespace-nowrap">
+                  <Link href={`/checks/${c.id}`} className="hover:text-ink hover:underline">{shortDate(c.performedAt)} {clock(c.performedAt)}</Link>
+                </td>
                 <td className="td"><Pill tone={c.result === 'PASS' ? 'good' : 'bad'}>{c.result === 'PASS' ? 'Pass' : 'Issue flagged'}</Pill></td>
                 <td className="td">
                   {c.user && (
@@ -109,7 +111,10 @@ export default async function ChecksPage({
                   )}
                 </td>
                 <td className="td text-ink-muted">
-                  {c.items.filter((i) => !i.ok).map((i) => i.label).join(', ') || c.notes || '—'}
+                  <span className="inline-flex items-center gap-1.5">
+                    {c.items.filter((i) => !i.ok).map((i) => i.label).join(', ') || c.notes || '—'}
+                    {c.items.some((i) => i.photo) && <Camera size={13} className="text-ink-faint shrink-0" aria-label="Has a photo attached" />}
+                  </span>
                 </td>
               </tr>
             ))}

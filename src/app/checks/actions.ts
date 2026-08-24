@@ -32,7 +32,7 @@ export async function logAssetCheck(formData: FormData) {
       result: allOk ? 'PASS' : 'FAIL',
       notes: String(formData.get('notes') ?? ''),
       items: {
-        create: itemRows.map((r) => ({ label: r.label, ok: r.ok === '1', note: r.note ?? '' })),
+        create: itemRows.map((r) => ({ label: r.label, ok: r.ok === '1', note: r.note ?? '', photo: r.photo || null })),
       },
     },
   });
