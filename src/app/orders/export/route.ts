@@ -15,14 +15,14 @@ export async function GET() {
   });
 
   const header = [
-    'Order', 'Customer', 'Town', 'Stage', 'Payment', 'Weight (t)', 'Net (ex VAT)', 'VAT', 'Gross',
+    'Order', 'Customer', 'Town', 'Depot', 'Stage', 'Payment', 'Weight (t)', 'Net (ex VAT)', 'VAT', 'Gross',
     'Delivery date', 'Customer PO', 'Raised by', 'Created', 'Archived',
   ];
 
   const rows = orders.map((o) => {
     const t = orderTotals(o);
     return [
-      o.number, o.customer.name, o.town, o.stage, o.paymentStatus,
+      o.number, o.customer.name, o.town, o.depot, o.stage, o.paymentStatus,
       (t.weightKg / 1000).toFixed(3), t.net.toFixed(2), t.vat.toFixed(2), t.gross.toFixed(2),
       o.deliveryDate?.toISOString().slice(0, 10) ?? '', o.poNumber, o.raisedBy?.name ?? '',
       o.createdAt.toISOString().slice(0, 10), o.archived ? 'Yes' : 'No',

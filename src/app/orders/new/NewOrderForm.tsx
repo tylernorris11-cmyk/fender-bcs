@@ -19,8 +19,8 @@ const newLine = (): Line => ({ key: seq++, productId: '', qty: '', unitPrice: ''
 const newBar = (): Bar => ({ key: seq++, mark: '', diaMm: '12', shapeCode: '21', lengthMm: '', bars: '', a: '', b: '', c: '', d: '', ef: '', unitPrice: '' });
 
 export function NewOrderForm({
-  customers, products, towns, cutBentPrice,
-}: { customers: Customer[]; products: Product[]; towns: string[]; cutBentPrice: number }) {
+  customers, products, towns, locations, cutBentPrice,
+}: { customers: Customer[]; products: Product[]; towns: string[]; locations: string[]; cutBentPrice: number }) {
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [bars, setBars] = useState<Bar[]>([]);
@@ -223,6 +223,13 @@ export function NewOrderForm({
             <div>
               <label className="label" htmlFor="deliveryDate">Delivery date</label>
               <input id="deliveryDate" name="deliveryDate" type="date" className="input" />
+            </div>
+            <div>
+              <label className="label" htmlFor="depot">Dispatching depot</label>
+              <select id="depot" name="depot" defaultValue={locations[0] ?? 'Scunthorpe'} className="input">
+                {locations.map((l) => <option key={l} value={l}>{l}</option>)}
+              </select>
+              <p className="hint">Which yard raises, produces and loads this order.</p>
             </div>
             <div>
               <label className="label" htmlFor="town">Town / city</label>

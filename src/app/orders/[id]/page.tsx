@@ -276,6 +276,7 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
           <h2 className="text-lg font-bold mb-3">Delivery</h2>
           <dl className="text-sm space-y-2">
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Date</dt><dd className="font-semibold">{shortDate(order.deliveryDate)}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-ink-muted">Depot</dt><dd className="font-semibold">{order.depot}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Town</dt><dd className="font-semibold">{order.town || '—'}</dd></div>
             <div><dt className="text-ink-muted">Address</dt><dd className="font-semibold mt-0.5">{order.address || '—'}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Customer PO</dt><dd className="font-semibold">{order.poNumber || '—'}</dd></div>

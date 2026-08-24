@@ -43,6 +43,7 @@ export default async function DeliverySheet({ params }: { params: { id: string }
           <h1 className="text-xl font-bold">Delivery note</h1>
           <p className="font-semibold">{order.number}</p>
           <p>Delivery {shortDate(order.deliveryDate)}</p>
+          <p>Dispatched from {order.depot}</p>
           {order.poNumber && <p>Customer PO {order.poNumber}</p>}
         </div>
       </div>

@@ -269,6 +269,7 @@ model Order {
   address       String        @default("")
   poNumber      String        @default("")
   yardNotes     String        @default("")
+  depot         String        @default("Scunthorpe") // which yard is raising and dispatching this order
   raisedById    String?
   archived      Boolean       @default(false)
   overrideCredit Boolean      @default(false)

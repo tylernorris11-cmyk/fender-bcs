@@ -44,6 +44,7 @@ export async function createOrder(formData: FormData) {
       customerId,
       stage: 'DRAFT',
       deliveryDate: deliveryDateRaw ? new Date(deliveryDateRaw) : null,
+      depot: String(formData.get('depot') ?? 'Scunthorpe'),
       town: String(formData.get('town') ?? ''),
       address: String(formData.get('address') ?? ''),
       poNumber: String(formData.get('poNumber') ?? ''),

@@ -64,6 +64,7 @@ async function main() {
   // ------------------------------------------------------------- people
   const people = [
     { email: 'john.davies@fendersteel.co.uk', name: 'John Davies', jobTitle: 'CEO', role: 'MASTER_ADMIN', colour: '#C0392B' },
+    { email: 'tyler@fendersteel.co.uk', name: 'Tyler Norris', jobTitle: '', role: 'MASTER_ADMIN', colour: '#2C3E50' },
     { email: 'claire.bennett@fendersteel.co.uk', name: 'Claire Bennett', jobTitle: 'Quality manager', role: 'QUALITY', colour: '#0D4A42' },
     { email: 'martin.miller@fendersteel.co.uk', name: 'Martin Miller', jobTitle: 'Yard manager', role: 'MANAGER', colour: '#6C3FC5' },
     { email: 'james.ward@fendersteel.co.uk', name: 'James Ward', jobTitle: 'Sales', role: 'SALES', colour: '#16A085' },
@@ -80,8 +81,10 @@ async function main() {
     users[p.name] = u.id;
   }
 
-  // John Davies runs both businesses — everyone else defaults to Fender only.
+  // John Davies and Tyler Norris are both Master Administrators and run both
+  // businesses — everyone else defaults to Fender only.
   await db.user.update({ where: { id: users['John Davies'] }, data: { companies: ['FENDER', 'BS_SUPPLIES'] } });
+  await db.user.update({ where: { id: users['Tyler Norris'] }, data: { companies: ['FENDER', 'BS_SUPPLIES'] } });
 
   // -------------------------------------------------------------- towns
   const towns = [
@@ -397,6 +400,7 @@ async function main() {
   const orderSeeds: {
     number: string; customer: string; stage: any; payment?: any; delivery: string; po: string;
     raisedBy: string; created: string; lines: LineSeed[]; bars?: BarSeed[]; archived?: boolean; checklistDone?: number;
+    depot?: string; // which yard dispatches it — defaults to Scunthorpe below when not given
   }[] = [
     {
       number: 'FS-26-05301', customer: 'Northside Civils Ltd', stage: 'READY_FOR_DELIVERY', delivery: '2026-08-13',
@@ -425,7 +429,7 @@ async function main() {
     },
     {
       number: 'FS-26-05305', customer: 'Wearside Piling Ltd', stage: 'DRAFT', delivery: '2026-08-18',
-      po: '', raisedBy: 'James Ward', created: '2026-08-07', checklistDone: 0,
+      po: '', raisedBy: 'James Ward', created: '2026-08-07', checklistDone: 0, depot: 'Houghton le Spring',
       lines: [['DWL-25-600', 80, 3.4], ['GR-SUPAFLOW', 24, 17.4]],
     },
     {
@@ -455,7 +459,7 @@ async function main() {
     },
     {
       number: 'FS-26-05311', customer: 'Wearside Piling Ltd', stage: 'DRAFT', delivery: '2026-08-20',
-      po: '', raisedBy: 'James Ward', created: '2026-08-08', archived: true, checklistDone: 0,
+      po: '', raisedBy: 'James Ward', created: '2026-08-08', archived: true, checklistDone: 0, depot: 'Houghton le Spring',
       lines: [['RB10-500B', 1.5, 832], ['MESH-A142', 10, 20.4]],
     },
   ];
@@ -472,6 +476,7 @@ async function main() {
         stage: s.stage,
         paymentStatus: s.payment ?? 'UNPAID',
         deliveryDate: d(s.delivery),
+        depot: s.depot ?? 'Scunthorpe',
         town: customer.town,
         address: customer.address,
         poNumber: s.po,
@@ -534,15 +539,15 @@ async function main() {
   }
 
   // BS Supplies' own orders — simple standard-product orders, no bending schedule.
-  const bsOrderSeeds: { number: string; customer: string; stage: any; delivery: string; created: string; lines: LineSeed[]; checklistDone: number }[] = [
+  const bsOrderSeeds: { number: string; customer: string; stage: any; delivery: string; created: string; lines: LineSeed[]; checklistDone: number; depot: string }[] = [
     {
       number: 'BS-26-0001', customer: 'Wearmouth Builders Merchants', stage: 'READY_FOR_DELIVERY',
-      delivery: '2026-08-27', created: '2026-08-20', checklistDone: 2,
+      delivery: '2026-08-27', created: '2026-08-20', checklistDone: 2, depot: 'Houghton le Spring',
       lines: [['BSS-TIMBER-4X2', 80, 8.5], ['BSS-PLY-18MM', 20, 42.0]],
     },
     {
       number: 'BS-26-0002', customer: 'Doncaster Timber & Building Supplies', stage: 'PENDING_APPROVAL',
-      delivery: '2026-09-02', created: '2026-08-22', checklistDone: 0,
+      delivery: '2026-09-02', created: '2026-08-22', checklistDone: 0, depot: 'Scunthorpe',
       lines: [['BSS-CEMENT-25KG', 100, 6.2]],
     },
   ];
@@ -552,7 +557,7 @@ async function main() {
     const order = await db.order.create({
       data: {
         number: s.number, company: 'BS_SUPPLIES', customerId: customer.id, stage: s.stage,
-        deliveryDate: d(s.delivery), town: customer.town, address: customer.address,
+        deliveryDate: d(s.delivery), depot: s.depot, town: customer.town, address: customer.address,
         raisedById: users['John Davies'], createdAt: d(s.created),
         approvedAt: ['DRAFT', 'PENDING_APPROVAL'].includes(s.stage) ? null : d(s.created),
         approvedBy: ['DRAFT', 'PENDING_APPROVAL'].includes(s.stage) ? '' : 'John Davies',

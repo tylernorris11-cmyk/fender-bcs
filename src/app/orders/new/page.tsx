@@ -13,7 +13,7 @@ export default async function NewOrderPage() {
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
 
-  const [customers, products, towns, balances] = await Promise.all([
+  const [customers, products, towns, locations, balances] = await Promise.all([
     db.customer.findMany({ where: { company, status: { not: 'Closed' } }, orderBy: { name: 'asc' } }),
     db.product.findMany({
       where: { company, active: true },
@@ -21,6 +21,7 @@ export default async function NewOrderPage() {
       include: { prices: { where: { minQty: 0 }, orderBy: { effectiveFrom: 'desc' }, take: 1 } },
     }),
     db.town.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     creditBalances(company),
   ]);
 
@@ -44,6 +45,7 @@ export default async function NewOrderPage() {
           kgPerUnit: String(p.kgPerUnit), price: Number(p.prices[0]?.unitPrice ?? 0),
         }))}
         towns={towns.map((t) => t.name)}
+        locations={locations.map((l) => l.name)}
         cutBentPrice={0}
       />
     </Shell>

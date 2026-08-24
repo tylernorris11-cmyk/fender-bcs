@@ -26,19 +26,22 @@ const FILTERS: { label: string; stage?: OrderStage }[] = [
 
 export default async function OrdersPage({
   searchParams,
-}: { searchParams: { stage?: string; q?: string; archived?: string; sort?: string; dir?: string } }) {
+}: { searchParams: { stage?: string; q?: string; archived?: string; sort?: string; dir?: string; depot?: string } }) {
   const user = await requirePermission('orders.view');
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
+  const locations = await db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
 
   const showArchived = searchParams.archived === '1';
   const q = (searchParams.q ?? '').trim();
   const stage = searchParams.stage as OrderStage | undefined;
+  const depot = searchParams.depot;
 
   const where: Prisma.OrderWhereInput = {
     company,
     ...(showArchived ? {} : { archived: false }),
     ...(stage ? { stage } : {}),
+    ...(depot ? { depot } : {}),
     ...(q
       ? {
           OR: [
@@ -56,6 +59,7 @@ export default async function OrdersPage({
     searchParams.sort === 'number' ? { number: dir }
     : searchParams.sort === 'customer' ? { customer: { name: dir } }
     : searchParams.sort === 'town' ? { town: dir }
+    : searchParams.sort === 'depot' ? { depot: dir }
     : searchParams.sort === 'stage' ? { stage: dir }
     : searchParams.sort === 'deliveryDate' ? { deliveryDate: dir }
     : searchParams.sort === 'raisedBy' ? { raisedBy: { name: dir } }
@@ -68,7 +72,7 @@ export default async function OrdersPage({
       orderBy,
       take: 200,
     }),
-    db.order.groupBy({ by: ['stage'], where: { company, archived: false }, _count: true }),
+    db.order.groupBy({ by: ['stage'], where: { company, archived: false, ...(depot ? { depot } : {}) }, _count: true }),
     creditBalances(company),
   ]);
 
@@ -117,10 +121,13 @@ export default async function OrdersPage({
         <Stat value={overLimit.size} label="Over credit limit" tone={overLimit.size ? 'bad' : 'default'} href="/customers" />
       </div>
 
-      <nav className="flex flex-wrap gap-2 mb-5" aria-label="Filter by stage">
+      <nav className="flex flex-wrap gap-2 mb-3" aria-label="Filter by stage">
         {FILTERS.map((f) => {
           const active = (f.stage ?? undefined) === stage;
-          const href = f.stage ? `/orders?stage=${f.stage}` : '/orders';
+          const params = new URLSearchParams();
+          if (f.stage) params.set('stage', f.stage);
+          if (depot) params.set('depot', depot);
+          const href = params.size ? `/orders?${params}` : '/orders';
           return (
             <Link key={f.label} href={href}
               className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${
@@ -132,9 +139,34 @@ export default async function OrdersPage({
         })}
       </nav>
 
+      <nav className="flex flex-wrap gap-2 mb-5" aria-label="Filter by depot">
+        {(() => {
+          const params = new URLSearchParams();
+          if (stage) params.set('stage', stage);
+          const href = params.size ? `/orders?${params}` : '/orders';
+          return (
+            <Link href={href} className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${!depot ? 'bg-forest text-white border-forest' : 'bg-white border-hairline hover:bg-canvas'}`}>
+              Both depots
+            </Link>
+          );
+        })()}
+        {locations.map((l) => {
+          const params = new URLSearchParams();
+          if (stage) params.set('stage', stage);
+          params.set('depot', l.name);
+          return (
+            <Link key={l.id} href={`/orders?${params}`}
+              className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${depot === l.name ? 'bg-forest text-white border-forest' : 'bg-white border-hairline hover:bg-canvas'}`}>
+              {l.name}
+            </Link>
+          );
+        })}
+      </nav>
+
       <section className="card card-pad">
         <form className="flex flex-wrap gap-3 mb-5">
           {stage && <input type="hidden" name="stage" value={stage} />}
+          {depot && <input type="hidden" name="depot" value={depot} />}
           <input name="q" defaultValue={q} className="input flex-1 min-w-[240px]"
                  placeholder="Search order number, customer, PO or town…" aria-label="Search orders" />
           <label className="flex items-center gap-2.5 text-sm font-medium px-4 rounded-xl border border-hairline bg-white cursor-pointer">
@@ -154,6 +186,7 @@ export default async function OrdersPage({
                 <SortTh label="Order" field="number" basePath="/orders" searchParams={searchParams} />
                 <SortTh label="Customer" field="customer" basePath="/orders" searchParams={searchParams} />
                 <SortTh label="Town" field="town" basePath="/orders" searchParams={searchParams} />
+                <SortTh label="Depot" field="depot" basePath="/orders" searchParams={searchParams} />
                 <SortTh label="Stage" field="stage" basePath="/orders" searchParams={searchParams} />
                 <SortTh label="Weight" field="weight" basePath="/orders" searchParams={searchParams} align="right" />
                 <SortTh label="Total (ex VAT)" field="total" basePath="/orders" searchParams={searchParams} align="right" />
@@ -176,6 +209,7 @@ export default async function OrdersPage({
                   </td>
                   <td className="td">{o.customer.name}</td>
                   <td className="td text-ink-muted">{o.town || '—'}</td>
+                  <td className="td text-ink-muted">{o.depot}</td>
                   <td className="td"><StagePill stage={o.stage} /></td>
                   <td className="td text-right tabular-nums">{tonnes(weightKg)}</td>
                   <td className="td text-right font-semibold tabular-nums">{money(net)}</td>

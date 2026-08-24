@@ -29,9 +29,10 @@ const GROUP_TONE = {
 
 export default async function PlanningPage({
   searchParams,
-}: { searchParams: { view?: View; date?: string } }) {
+}: { searchParams: { view?: View; date?: string; depot?: string } }) {
   const user = await requirePermission('planning.view');
   const alerts = await getAlerts(user);
+  const depot = searchParams.depot;
 
   const view: View = searchParams.view ?? 'week';
   const anchor = searchParams.date ? new Date(searchParams.date) : new Date();
@@ -42,13 +43,17 @@ export default async function PlanningPage({
   const days = view === 'month' ? 42 : view === 'day' ? 1 : 7;
   const to = addDays(from, days);
 
-  const [orders, events, assets] = await Promise.all([
+  const [orders, events, assets, locations] = await Promise.all([
     db.order.findMany({
-      where: { archived: false, deliveryDate: { gte: from, lt: to }, stage: { notIn: ['CANCELLED', 'DRAFT'] } },
+      where: {
+        archived: false, deliveryDate: { gte: from, lt: to }, stage: { notIn: ['CANCELLED', 'DRAFT'] },
+        ...(depot ? { depot } : {}),
+      },
       include: { customer: true },
     }),
     db.planningEvent.findMany({ where: { startsAt: { gte: from, lt: to } }, include: { asset: true, order: true } }),
-    db.asset.findMany({ where: { retired: false } }),
+    db.asset.findMany({ where: { retired: false, ...(depot ? { depot } : {}) } }),
+    db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
   ]);
 
   const entries: Entry[] = [];
@@ -71,6 +76,12 @@ export default async function PlanningPage({
   }
 
   for (const e of events) {
+    // An event tied to an order or a depot-based asset belongs to that
+    // depot; anything else (a toolbox talk, a general reminder) isn't
+    // depot-specific and stays visible whichever depot is selected.
+    const eventDepot = e.order?.depot ?? e.asset?.depot;
+    if (depot && eventDepot && eventDepot !== depot) continue;
+
     const orderCompany = e.order?.company;
     const visible = !orderCompany || user.companies.includes(orderCompany);
     entries.push({
@@ -109,11 +120,15 @@ export default async function PlanningPage({
     ? anchor.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
     : view === 'day' ? shortDate(anchor) : `Week of ${shortDate(from)}`;
 
+  const withDepot = (params: URLSearchParams) => {
+    if (depot) params.set('depot', depot);
+    return params;
+  };
   const shift = (n: number) => {
     const d = view === 'month'
       ? new Date(anchor.getFullYear(), anchor.getMonth() + n, 1)
       : addDays(anchor, n * (view === 'day' ? 1 : 7));
-    return `/planning?view=${view}&date=${d.toISOString().slice(0, 10)}`;
+    return `/planning?${withDepot(new URLSearchParams({ view, date: d.toISOString().slice(0, 10) }))}`;
   };
 
   const dayList = Array.from({ length: days }, (_, i) => addDays(from, i));
@@ -122,10 +137,10 @@ export default async function PlanningPage({
     <Shell user={user} module="planning" nav={NAV.planning} current={`/planning${view === 'week' ? '' : `?view=${view}`}`} alerts={alerts.length}>
       <PageHeader title="Planning" blurb="Deliveries, inspections and everything else with a date on it." />
 
-      <div className="flex flex-wrap items-center gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-3">
         <div className="flex gap-2">
           {(['day', 'week', 'month'] as View[]).map((v) => (
-            <Link key={v} href={`/planning?view=${v}`}
+            <Link key={v} href={`/planning?${withDepot(new URLSearchParams({ view: v }))}`}
               className={`rounded-pill px-5 py-2 text-sm font-medium border capitalize transition-colors ${
                 view === v ? 'bg-brand text-white border-brand' : 'bg-white border-hairline hover:bg-canvas'
               }`}>
@@ -137,9 +152,22 @@ export default async function PlanningPage({
           <Link href={shift(-1)} className="btn-secondary p-2.5" aria-label="Previous"><ChevronLeft size={18} /></Link>
           <h2 className="text-lg font-bold min-w-[180px] text-center">{heading}</h2>
           <Link href={shift(1)} className="btn-secondary p-2.5" aria-label="Next"><ChevronRight size={18} /></Link>
-          <Link href={`/planning?view=${view}`} className="text-brand-700 font-semibold text-sm hover:underline">Today</Link>
+          <Link href={`/planning?${withDepot(new URLSearchParams({ view }))}`} className="text-brand-700 font-semibold text-sm hover:underline">Today</Link>
         </div>
       </div>
+
+      <nav className="flex flex-wrap gap-2 mb-6" aria-label="Filter by depot">
+        <Link href={`/planning?${new URLSearchParams({ view })}`}
+          className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${!depot ? 'bg-forest text-white border-forest' : 'bg-white border-hairline hover:bg-canvas'}`}>
+          Both depots
+        </Link>
+        {locations.map((l) => (
+          <Link key={l.id} href={`/planning?${new URLSearchParams({ view, depot: l.name })}`}
+            className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${depot === l.name ? 'bg-forest text-white border-forest' : 'bg-white border-hairline hover:bg-canvas'}`}>
+            {l.name}
+          </Link>
+        ))}
+      </nav>
 
       <div className={`grid gap-3 ${view === 'day' ? '' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-7'}`}>
         {dayList.map((day) => {
