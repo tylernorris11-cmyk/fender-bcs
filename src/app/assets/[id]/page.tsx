@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
-import { daysUntil, shortDate } from '@/lib/format';
+import { clock, daysUntil, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill } from '@/components/ui';
 import { addAssetNote, logInspection, retireAsset } from '../actions';
@@ -36,6 +36,7 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
     include: {
       inspections: { include: { loggedBy: true }, orderBy: { performedOn: 'desc' } },
       notes: { include: { user: true }, orderBy: { at: 'desc' } },
+      checks: { include: { user: true, items: true }, orderBy: { performedAt: 'desc' }, take: 20 },
     },
   });
   if (!asset) notFound();
@@ -49,12 +50,19 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
       <PageHeader
         title={asset.name}
         blurb={`${asset.ref} · ${asset.category} · ${asset.depot}`}
-        actions={can(user, 'assets.edit') && (
-          <form action={retireAsset}>
-            <input type="hidden" name="assetId" value={asset.id} />
-            <button className="btn-danger">{asset.retired ? 'Back into service' : 'Retire asset'}</button>
-          </form>
-        )}
+        actions={
+          <>
+            {can(user, 'checks.create') && (
+              <Link href={`/checks/new?assetId=${asset.id}`} className="btn-secondary"><ClipboardCheck size={16} /> Run a check</Link>
+            )}
+            {can(user, 'assets.edit') && (
+              <form action={retireAsset}>
+                <input type="hidden" name="assetId" value={asset.id} />
+                <button className="btn-danger">{asset.retired ? 'Back into service' : 'Retire asset'}</button>
+              </form>
+            )}
+          </>
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
@@ -132,6 +140,23 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
           </form>
         </section>
       )}
+
+      <section className="card card-pad mb-6">
+        <h2 className="text-lg font-bold mb-3">Check history</h2>
+        <ul className="text-sm divide-y divide-hairline">
+          {asset.checks.map((c) => (
+            <li key={c.id} className="py-3 flex flex-wrap items-center gap-2">
+              <span className="text-ink-muted w-40">{shortDate(c.performedAt)} {clock(c.performedAt)}</span>
+              <Pill tone={c.result === 'PASS' ? 'good' : 'bad'}>{c.result === 'PASS' ? 'Pass' : 'Issue flagged'}</Pill>
+              <span className="text-ink-muted">{c.user?.name ?? 'Unknown'}</span>
+              {c.items.some((i) => !i.ok) && (
+                <span className="text-signal w-full text-sm">{c.items.filter((i) => !i.ok).map((i) => i.label).join(', ')}</span>
+              )}
+            </li>
+          ))}
+          {asset.checks.length === 0 && <li className="py-3 text-ink-muted">Nothing logged yet.</li>}
+        </ul>
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card card-pad">

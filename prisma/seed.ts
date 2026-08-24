@@ -25,6 +25,10 @@ async function main() {
   const password = process.env.SEED_PASSWORD ?? 'ChangeMe123!';
 
   // Order matters — children before parents.
+  await db.assetCheckItem.deleteMany();
+  await db.assetCheck.deleteMany();
+  await db.purchaseOrderLine.deleteMany();
+  await db.purchaseOrder.deleteMany();
   await db.qcCheck.deleteMany();
   await db.productionEvent.deleteMany();
   await db.checklistItem.deleteMany();
@@ -165,6 +169,57 @@ async function main() {
   ]) {
     const s = await db.supplier.create({ data: { name, approvedFor } });
     suppliers[name] = s.id;
+  }
+
+  // ---------------------------------------------------- purchase orders
+  const poSeeds: {
+    number: string; supplier: string; status: 'DRAFT' | 'SENT' | 'CONFIRMED' | 'RECEIVED'; expected: string;
+    raisedBy: string; sentAt?: string; confirmedAt?: string; receivedAt?: string;
+    lines: { code: string; desc: string; qty: number; unitCost: number }[];
+  }[] = [
+    {
+      number: 'PO-26-0001', supplier: 'ROM Ltd', status: 'DRAFT', expected: '2026-09-01',
+      raisedBy: 'Martin Miller', lines: [{ code: 'RB20-500B', desc: 'Rebar 20mm B500B', qty: 20, unitCost: 705 }],
+    },
+    {
+      number: 'PO-26-0002', supplier: 'British Steel (Scunthorpe)', status: 'SENT', expected: '2026-08-29',
+      raisedBy: 'Martin Miller', sentAt: '2026-08-20', lines: [
+        { code: 'RB12-500B', desc: 'Rebar 12mm B500B', qty: 30, unitCost: 690 },
+        { code: 'RB25-500B', desc: 'Rebar 25mm B500B', qty: 15, unitCost: 715 },
+      ],
+    },
+    {
+      number: 'PO-26-0003', supplier: 'Celsa Steel UK', status: 'RECEIVED', expected: '2026-08-01',
+      raisedBy: 'John Davies', sentAt: '2026-07-24', confirmedAt: '2026-07-25', receivedAt: '2026-08-01',
+      lines: [{ code: 'RB16-500B', desc: 'Rebar 16mm B500B', qty: 26, unitCost: 684 }],
+    },
+  ];
+
+  for (const po of poSeeds) {
+    await db.purchaseOrder.create({
+      data: {
+        number: po.number,
+        supplierId: suppliers[po.supplier],
+        status: po.status,
+        expectedDate: d(po.expected),
+        raisedById: users[po.raisedBy],
+        sentAt: po.sentAt ? d(po.sentAt) : null,
+        confirmedAt: po.confirmedAt ? d(po.confirmedAt) : null,
+        receivedAt: po.receivedAt ? d(po.receivedAt) : null,
+        createdAt: d(po.sentAt ?? po.expected),
+        lines: {
+          create: po.lines.map((l, i) => ({
+            productId: products[l.code],
+            description: l.desc,
+            qty: l.qty,
+            unit: 't',
+            unitCost: l.unitCost,
+            lineTotal: +(l.qty * l.unitCost).toFixed(2),
+            sortOrder: i,
+          })),
+        },
+      },
+    });
   }
 
   // ------------------------------------------------------- certificates
@@ -484,6 +539,38 @@ async function main() {
       { assetId: assets['VH-001'], kind: 'MOT', result: 'Pass', provider: 'DVSA Scunthorpe', performedOn: d('2025-09-17'), nextDueOn: d('2026-09-17') },
     ],
   });
+
+  // ------------------------------------------------- morning checks
+  // Real relative dates (not fixed 2026 ones) so "checked today" is always
+  // actually today, however far in the future this seed gets run again.
+  const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000);
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+  const VEHICLE_ITEMS = ['Tyres — condition and pressure', 'Lights, indicators and beacon', 'Brakes', 'Fluid levels (oil, water, screenwash)', 'Load securing equipment (straps, chains, headboard)', 'No visible damage, leaks or corrosion'];
+  const MACHINE_ITEMS = ['Guards in place and secure', 'Emergency stop tested', 'No visible damage to blades, dies or rollers', 'Hydraulic and air lines — no leaks', 'Work area clear and clean'];
+
+  async function seedCheck(assetRef: string, when: Date, byName: string, failLabel: string | null, itemLabels: string[]) {
+    await db.assetCheck.create({
+      data: {
+        assetId: assets[assetRef], userId: users[byName], performedAt: when,
+        result: failLabel ? 'FAIL' : 'PASS',
+        items: {
+          create: itemLabels.map((label) => ({
+            label, ok: label !== failLabel,
+            note: label === failLabel ? 'Nearside rear tyre worn close to the limit — flagged for the yard to look at before it goes out again.' : '',
+          })),
+        },
+      },
+    });
+  }
+
+  await seedCheck('VH-001', hoursAgo(3), 'Dave Wilson', null, VEHICLE_ITEMS);
+  await seedCheck('VH-003', hoursAgo(2), 'Dave Wilson', 'Tyres — condition and pressure', VEHICLE_ITEMS);
+  await seedCheck('MC-001', hoursAgo(4), 'Martin Miller', null, MACHINE_ITEMS);
+  await seedCheck('VH-004', daysAgo(1), 'Dave Wilson', null, VEHICLE_ITEMS);
+  await seedCheck('MC-002', daysAgo(2), 'Martin Miller', null, MACHINE_ITEMS);
+  // VH-002 and the remaining machines are left with no checks at all — real
+  // yards start somewhere, and it gives the "not checked today" alert
+  // something honest to show on first boot.
 
   // ----------------------------------------------------------- planning
   await db.planningEvent.createMany({

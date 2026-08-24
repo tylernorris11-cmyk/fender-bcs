@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
-  ArrowRight, Bell, CalendarDays, ClipboardList, Factory, Layers,
-  LogOut, Settings, ShieldCheck, Truck, Users,
+  ArrowRight, Bell, CalendarDays, ClipboardCheck, ClipboardList, Factory, Layers,
+  LogOut, Search, Settings, ShieldCheck, ShoppingCart, Truck, Users,
 } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { can, MODULES, ROLE_LABELS } from '@/lib/rbac';
@@ -10,19 +10,21 @@ import { longDate } from '@/lib/format';
 import { Avatar } from '@/components/ui';
 
 const ICONS = {
-  orders: ClipboardList, production: Factory, planning: CalendarDays, customers: Users,
-  compliance: ShieldCheck, stock: Layers, assets: Truck,
+  orders: ClipboardList, purchaseOrders: ShoppingCart, production: Factory, planning: CalendarDays, customers: Users,
+  compliance: ShieldCheck, stock: Layers, assets: Truck, checks: ClipboardCheck,
 } as const;
 
 // Each tile gets its own accent so people learn the colour before the label.
 const TONES = {
   orders: { icon: 'bg-brand-100 text-brand-700', bar: 'bg-brand', arrow: 'border-brand text-brand' },
+  purchaseOrders: { icon: 'bg-cyan-100 text-cyan-700', bar: 'bg-cyan-500', arrow: 'border-cyan-500 text-cyan-600' },
   production: { icon: 'bg-violet-100 text-violet-700', bar: 'bg-violet-500', arrow: 'border-violet-500 text-violet-600' },
   planning: { icon: 'bg-sky-100 text-sky-700', bar: 'bg-sky-500', arrow: 'border-sky-500 text-sky-600' },
   customers: { icon: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500', arrow: 'border-emerald-500 text-emerald-600' },
   compliance: { icon: 'bg-signal/10 text-signal', bar: 'bg-signal', arrow: 'border-signal text-signal' },
   stock: { icon: 'bg-amber-100 text-amber-700', bar: 'bg-amber-500', arrow: 'border-amber-500 text-amber-600' },
   assets: { icon: 'bg-indigo-100 text-indigo-700', bar: 'bg-indigo-500', arrow: 'border-indigo-500 text-indigo-600' },
+  checks: { icon: 'bg-lime-100 text-lime-700', bar: 'bg-lime-500', arrow: 'border-lime-500 text-lime-600' },
 } as const;
 
 function greeting() {
@@ -40,9 +42,21 @@ export default async function Launcher() {
       <header className="bg-forest text-white relative overflow-hidden">
         <div className="absolute inset-0 mesh-bg pointer-events-none" aria-hidden />
         <div className="relative max-w-[1200px] mx-auto px-6 py-5 flex items-center gap-3">
-          <span className="text-xl font-bold tracking-tight">
+          <span className="text-xl font-bold tracking-tight shrink-0">
             Fender<span className="text-white/60 font-medium">BCS</span>
           </span>
+
+          <form action="/search" className="hidden sm:flex flex-1 max-w-xl relative ml-4">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50" aria-hidden />
+            <label className="sr-only" htmlFor="global-search">Search the whole system</label>
+            <input
+              id="global-search" name="q"
+              placeholder="Search orders, customers, stock, assets…"
+              className="w-full rounded-xl bg-white/10 border border-white/10 pl-10 pr-4 py-2.5 text-sm
+                         text-white placeholder:text-white/50 focus:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/30"
+            />
+          </form>
+
           <div className="ml-auto flex items-center gap-3">
             <Link href="/alerts" className="relative rounded-xl bg-white/10 hover:bg-white/15 p-2.5" aria-label={`Alerts, ${alerts.length} needing attention`}>
               <Bell size={18} />

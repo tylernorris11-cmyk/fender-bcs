@@ -22,7 +22,10 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
   const in90 = new Date(Date.now() + 90 * 86_400_000);
   const in21 = new Date(Date.now() + 21 * 86_400_000);
 
-  const [certs, openNcrs, quarantined, suppliers, assets, overCredit, pending, missingCert] = await Promise.all([
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const [certs, openNcrs, quarantined, suppliers, assets, overCredit, pending, missingCert, checkedTodayIds] = await Promise.all([
     db.certificate.findMany({ where: { expiresOn: { lte: in90 } }, orderBy: { expiresOn: 'asc' } }),
     db.ncr.findMany({ where: { status: 'OPEN' }, orderBy: { raisedAt: 'asc' } }),
     db.batch.findMany({ where: { status: 'Quarantined' }, include: { product: true, supplier: true } }),
@@ -31,7 +34,21 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
     db.customer.findMany({ include: { orders: { where: { paymentStatus: 'UNPAID', stage: { notIn: ['CANCELLED'] } } } } }),
     db.order.count({ where: { stage: 'PENDING_APPROVAL', archived: false } }),
     db.batch.count({ where: { millCertUrl: '', status: { not: 'Rejected' } } }),
+    db.assetCheck.findMany({ where: { performedAt: { gte: startOfToday } }, select: { assetId: true } }),
   ]);
+
+  const checkedToday = new Set(checkedTodayIds.map((c) => c.assetId));
+  const notCheckedToday = assets.filter((a) => !checkedToday.has(a.id));
+  if (notCheckedToday.length > 0) {
+    out.push({
+      id: 'checks-missing-today',
+      severity: 'warn',
+      title: `${notCheckedToday.length} ${notCheckedToday.length === 1 ? 'asset has' : 'assets have'} not been checked today`,
+      detail: notCheckedToday.slice(0, 3).map((a) => a.name).join(', ') + (notCheckedToday.length > 3 ? ` and ${notCheckedToday.length - 3} more.` : '.'),
+      href: '/checks',
+      perm: 'checks.view',
+    });
+  }
 
   for (const c of certs) {
     const days = daysUntil(c.expiresOn)!;

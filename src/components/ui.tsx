@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { OrderStage } from '@prisma/client';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 
 // ---------------------------------------------------------------- stages
 
@@ -127,6 +128,61 @@ export function Meter({ used, limit }: { used: number; limit: number }) {
     <div className="h-2 w-full rounded-full bg-hairline overflow-hidden" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
       <div className={`h-full rounded-full ${tone}`} style={{ width: `${Math.max(pct, pct > 0 ? 3 : 0)}%` }} />
     </div>
+  );
+}
+
+// -------------------------------------------------------------- sorting
+
+/**
+ * A clickable column header for `<Table>` pages. Preserves every other
+ * query param, toggles `sort=<field>&dir=asc|desc` (unsorted -> asc -> desc
+ * -> asc...), and shows which column and direction is active.
+ */
+export function SortTh({
+  label, field, basePath, searchParams, align,
+}: {
+  label: string;
+  field: string;
+  basePath: string;
+  searchParams: Record<string, string | undefined>;
+  align?: 'right';
+}) {
+  const isActive = searchParams.sort === field;
+  const dir: 'asc' | 'desc' = searchParams.dir === 'desc' ? 'desc' : 'asc';
+  const nextDir: 'asc' | 'desc' = isActive && dir === 'asc' ? 'desc' : 'asc';
+
+  const params = new URLSearchParams();
+  Object.entries(searchParams).forEach(([k, v]) => {
+    if (v && k !== 'sort' && k !== 'dir') params.set(k, v);
+  });
+  params.set('sort', field);
+  params.set('dir', nextDir);
+
+  const Icon = !isActive ? ArrowUpDown : dir === 'asc' ? ArrowUp : ArrowDown;
+
+  return (
+    <th className={`th ${align === 'right' ? 'text-right' : ''}`}>
+      <Link
+        href={`${basePath}?${params.toString()}`}
+        className={`inline-flex items-center gap-1 hover:text-ink transition-colors ${align === 'right' ? 'flex-row-reverse' : ''}`}
+      >
+        {label}
+        <Icon size={12} className={isActive ? 'text-brand' : 'opacity-30'} aria-hidden />
+      </Link>
+    </th>
+  );
+}
+
+/** A plain `<select name="sort">` for list pages that aren't `<Table>` rows. */
+export function SortSelect({
+  value, options, label = 'Sort',
+}: { value?: string; options: { value: string; label: string }[]; label?: string }) {
+  return (
+    <select name="sort" defaultValue={value ?? options[0]?.value} className="input w-auto" aria-label={label}>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
   );
 }
 

@@ -6,7 +6,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { daysUntil, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { Empty, PageHeader, Pill, Stat, StatRow } from '@/components/ui';
+import { Empty, PageHeader, Pill, SortSelect, Stat, StatRow } from '@/components/ui';
 
 function DueDate({ label, due }: { label: string; due: Date | null }) {
   if (!due) return null;
@@ -21,7 +21,7 @@ function DueDate({ label, due }: { label: string; due: Date | null }) {
   );
 }
 
-export default async function AssetsPage({ searchParams }: { searchParams: { type?: AssetType; retired?: string; q?: string } }) {
+export default async function AssetsPage({ searchParams }: { searchParams: { type?: AssetType; retired?: string; q?: string; sort?: string } }) {
   const user = await requirePermission('assets.view');
   const alerts = await getAlerts(user);
 
@@ -40,8 +40,17 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
         { depot: { contains: q, mode: 'insensitive' } },
       ] } : {}),
     },
-    orderBy: { ref: 'asc' },
+    orderBy: searchParams.sort === 'name' ? { name: 'asc' } : searchParams.sort === 'category' ? { category: 'asc' } : { ref: 'asc' },
   });
+
+  const dueDates = (a: (typeof assets)[number]) => [a.motDue, a.taxDue, a.weeklyCheckDue, a.puwerDue, a.lolerDue, a.serviceDue, a.calibrationDue].filter(Boolean) as Date[];
+  if (searchParams.sort === 'due') {
+    assets.sort((a, b) => {
+      const earliestA = Math.min(...dueDates(a).map((d) => d.getTime()), Infinity);
+      const earliestB = Math.min(...dueDates(b).map((d) => d.getTime()), Infinity);
+      return earliestA - earliestB;
+    });
+  }
 
   const all = await db.asset.findMany({ where: { retired: false } });
   const dates = (a: typeof all[number]) => [a.motDue, a.taxDue, a.weeklyCheckDue, a.puwerDue, a.lolerDue, a.serviceDue, a.calibrationDue];
@@ -61,15 +70,26 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
         <Stat value={soon} label="Due within 3 weeks" tone={soon ? 'warn' : 'default'} />
       </StatRow>
 
-      <form className="mb-5">
+      <form className="mb-5 flex flex-wrap gap-3">
         {type && <input type="hidden" name="type" value={type} />}
-        <input name="q" defaultValue={q} className="input max-w-md" placeholder="Search reg, model, type or depot…" aria-label="Search assets" />
+        {retired && <input type="hidden" name="retired" value="1" />}
+        <input name="q" defaultValue={q} className="input flex-1 min-w-[220px] max-w-md" placeholder="Search reg, model, type or depot…" aria-label="Search assets" />
+        <SortSelect
+          value={searchParams.sort}
+          options={[
+            { value: 'ref', label: 'Reference' },
+            { value: 'name', label: 'Name A-Z' },
+            { value: 'category', label: 'Category' },
+            { value: 'due', label: 'Next check due' },
+          ]}
+        />
+        <button className="btn-secondary">Apply</button>
       </form>
 
       {assets.length === 0 ? <Empty title="Nothing here." /> : (
         <section className="card overflow-hidden">
           {assets.map((a) => (
-            <Link key={a.id} href={`/assets/${a.id}`} className="flex flex-wrap items-center gap-4 px-5 py-4 border-b border-hairline last:border-0 hover:bg-canvas transition-colors">
+            <Link key={a.id} href={`/assets/${a.id}`} className="flex flex-wrap items-center gap-4 px-4 py-2.5 border-b border-hairline last:border-0 hover:bg-canvas transition-colors">
               <div className="min-w-[190px]">
                 <p className="font-bold">{a.name}</p>
                 <p className="text-xs text-ink-faint">{a.ref} · {a.category} · {a.depot}</p>

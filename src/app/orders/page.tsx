@@ -8,7 +8,7 @@ import { orderTotals } from '@/lib/orders';
 import { can } from '@/lib/rbac';
 import { money, shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { Avatar, Empty, PageHeader, Pill, StagePill, Stat, StatRow, Table } from '@/components/ui';
+import { Avatar, Empty, PageHeader, Pill, SortTh, StagePill, Stat, StatRow, Table } from '@/components/ui';
 import { archiveOrder } from './actions';
 
 const FILTERS: { label: string; stage?: OrderStage }[] = [
@@ -25,7 +25,7 @@ const FILTERS: { label: string; stage?: OrderStage }[] = [
 
 export default async function OrdersPage({
   searchParams,
-}: { searchParams: { stage?: string; q?: string; archived?: string; sort?: string } }) {
+}: { searchParams: { stage?: string; q?: string; archived?: string; sort?: string; dir?: string } }) {
   const user = await requirePermission('orders.view');
   const alerts = await getAlerts(user);
 
@@ -48,16 +48,37 @@ export default async function OrdersPage({
       : {}),
   };
 
+  const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
+  const orderBy: Prisma.OrderOrderByWithRelationInput =
+    searchParams.sort === 'number' ? { number: dir }
+    : searchParams.sort === 'customer' ? { customer: { name: dir } }
+    : searchParams.sort === 'town' ? { town: dir }
+    : searchParams.sort === 'stage' ? { stage: dir }
+    : searchParams.sort === 'deliveryDate' ? { deliveryDate: dir }
+    : searchParams.sort === 'raisedBy' ? { raisedBy: { name: dir } }
+    : { createdAt: 'desc' };
+
   const [orders, counts, balances] = await Promise.all([
     db.order.findMany({
       where,
       include: { customer: true, raisedBy: true, lines: true, barMarks: true },
-      orderBy: searchParams.sort === 'oldest' ? { createdAt: 'asc' } : { createdAt: 'desc' },
+      orderBy,
       take: 200,
     }),
     db.order.groupBy({ by: ['stage'], where: { archived: false }, _count: true }),
     creditBalances(),
   ]);
+
+  // weight/total aren't real columns — they're summed from lines/barMarks — so
+  // sort the fetched page in memory when one of those is asked for.
+  if (searchParams.sort === 'weight' || searchParams.sort === 'total') {
+    const key = searchParams.sort;
+    orders.sort((a, b) => {
+      const va = key === 'weight' ? orderTotals(a).weightKg : orderTotals(a).net;
+      const vb = key === 'weight' ? orderTotals(b).weightKg : orderTotals(b).net;
+      return dir === 'asc' ? va - vb : vb - va;
+    });
+  }
 
   const countOf = (s: OrderStage) => counts.find((c) => c.stage === s)?._count ?? 0;
   const total = counts.reduce((sum, c) => sum + c._count, 0);
@@ -113,10 +134,6 @@ export default async function OrdersPage({
           {stage && <input type="hidden" name="stage" value={stage} />}
           <input name="q" defaultValue={q} className="input flex-1 min-w-[240px]"
                  placeholder="Search order number, customer, PO or town…" aria-label="Search orders" />
-          <select name="sort" defaultValue={searchParams.sort ?? 'newest'} className="input w-auto" aria-label="Sort">
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-          </select>
           <label className="flex items-center gap-2.5 text-sm font-medium px-4 rounded-xl border border-hairline bg-white cursor-pointer">
             <input type="checkbox" name="archived" value="1" defaultChecked={showArchived}
                    className="h-4 w-4 accent-brand" />
@@ -131,14 +148,14 @@ export default async function OrdersPage({
           <Table
             head={
               <>
-                <th className="th">Order</th>
-                <th className="th">Customer</th>
-                <th className="th">Town</th>
-                <th className="th">Stage</th>
-                <th className="th text-right">Weight</th>
-                <th className="th text-right">Total (ex VAT)</th>
-                <th className="th">Delivery</th>
-                <th className="th">Raised by</th>
+                <SortTh label="Order" field="number" basePath="/orders" searchParams={searchParams} />
+                <SortTh label="Customer" field="customer" basePath="/orders" searchParams={searchParams} />
+                <SortTh label="Town" field="town" basePath="/orders" searchParams={searchParams} />
+                <SortTh label="Stage" field="stage" basePath="/orders" searchParams={searchParams} />
+                <SortTh label="Weight" field="weight" basePath="/orders" searchParams={searchParams} align="right" />
+                <SortTh label="Total (ex VAT)" field="total" basePath="/orders" searchParams={searchParams} align="right" />
+                <SortTh label="Delivery" field="deliveryDate" basePath="/orders" searchParams={searchParams} />
+                <SortTh label="Raised by" field="raisedBy" basePath="/orders" searchParams={searchParams} />
                 <th className="th sr-only">Archive</th>
               </>
             }

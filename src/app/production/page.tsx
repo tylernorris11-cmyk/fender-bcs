@@ -4,16 +4,19 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { Empty, PageHeader, Pill, StagePill, Stat, StatRow } from '@/components/ui';
+import { Empty, PageHeader, Pill, SortSelect, StagePill, Stat, StatRow } from '@/components/ui';
 
-export default async function ProductionPage() {
+export default async function ProductionPage({ searchParams }: { searchParams: { sort?: string } }) {
   const user = await requirePermission('production.view');
   const alerts = await getAlerts(user);
 
   const orders = await db.order.findMany({
     where: { archived: false, stage: { in: ['APPROVED', 'IN_PRODUCTION', 'READY_FOR_DELIVERY'] } },
     include: { customer: true, barMarks: { include: { qcChecks: true } }, lines: true, production: { include: { user: true }, orderBy: { at: 'desc' }, take: 1 } },
-    orderBy: [{ deliveryDate: 'asc' }],
+    orderBy:
+      searchParams.sort === 'number' ? [{ number: 'asc' }]
+      : searchParams.sort === 'customer' ? [{ customer: { name: 'asc' } }]
+      : [{ deliveryDate: 'asc' }],
   });
 
   const cutBent = orders.filter((o) => o.barMarks.length > 0);
@@ -33,13 +36,25 @@ export default async function ProductionPage() {
         <Stat value={failed} label="Marks out of tolerance" tone={failed ? 'bad' : 'default'} href="/production/checks" />
       </StatRow>
 
+      <form className="flex justify-end gap-2 mb-4">
+        <SortSelect
+          value={searchParams.sort}
+          options={[
+            { value: 'delivery', label: 'Delivery soonest' },
+            { value: 'number', label: 'Order A-Z' },
+            { value: 'customer', label: 'Customer A-Z' },
+          ]}
+        />
+        <button className="btn-secondary btn-sm">Apply</button>
+      </form>
+
       {orders.length === 0 ? <Empty title="Nothing in production. Approve an order to start it." /> : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {orders.map((o) => {
             const scheduled = o.barMarks.filter((b) => b.status === 'Scheduled').length;
             const checked = o.barMarks.filter((b) => b.qcChecks.length > 0).length;
             return (
-              <article key={o.id} className="card card-pad flex flex-wrap items-center gap-5">
+              <article key={o.id} className="card p-4 sm:p-5 flex flex-wrap items-center gap-5">
                 <div className="min-w-[200px]">
                   <Link href={`/orders/${o.id}`} className="font-bold text-brand-700 hover:underline">{o.number}</Link>
                   <p className="text-sm text-ink-muted">{o.customer.name} · {o.town}</p>

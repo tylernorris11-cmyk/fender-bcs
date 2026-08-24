@@ -3,20 +3,28 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { daysUntil, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { PageHeader, Pill, Table } from '@/components/ui';
+import { PageHeader, Pill, SortTh, Table } from '@/components/ui';
 import { addDriver } from '../actions';
 
-export default async function DriversPage() {
+export default async function DriversPage({ searchParams }: { searchParams: { sort?: string; dir?: string } }) {
   const user = await requirePermission('setup.lists');
   const alerts = await getAlerts(user);
-  const drivers = await db.driver.findMany({ orderBy: { name: 'asc' } });
+  const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
+  const drivers = await db.driver.findMany({
+    orderBy: searchParams.sort === 'depot' ? { depot: dir } : { name: searchParams.sort === 'name' ? dir : 'asc' },
+  });
 
   return (
     <Shell user={user} module="setup" nav={NAV.setup} current="/setup/drivers" alerts={alerts.length}>
       <PageHeader title="Drivers" blurb="Who can be put on a run, and when their Driver CPC runs out." />
 
       <section className="card card-pad mb-6">
-        <Table head={<><th className="th">Driver</th><th className="th">Phone</th><th className="th">Licence</th><th className="th">Depot</th><th className="th">CPC expiry</th></>}>
+        <Table head={<>
+          <SortTh label="Driver" field="name" basePath="/setup/drivers" searchParams={searchParams} />
+          <th className="th">Phone</th><th className="th">Licence</th>
+          <SortTh label="Depot" field="depot" basePath="/setup/drivers" searchParams={searchParams} />
+          <th className="th">CPC expiry</th>
+        </>}>
           {drivers.map((d) => {
             const days = d.cpcExpiry ? daysUntil(d.cpcExpiry)! : null;
             return (

@@ -5,15 +5,22 @@ import { getAlerts } from '@/lib/alerts';
 import { PERMISSIONS, ROLE_BLURBS, ROLE_LABELS } from '@/lib/rbac';
 import { shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { Avatar, PageHeader, Pill, Table } from '@/components/ui';
+import { Avatar, PageHeader, Pill, SortTh, Table } from '@/components/ui';
 import { createUser, resetPassword, toggleUserActive, updateUserRole } from '../actions';
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[];
 
-export default async function UsersPage() {
+export default async function UsersPage({ searchParams }: { searchParams: { sort?: string; dir?: string } }) {
   const user = await requirePermission('setup.users');
   const alerts = await getAlerts(user);
-  const users = await db.user.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }] });
+  const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
+  const users = await db.user.findMany({
+    orderBy:
+      searchParams.sort === 'role' ? [{ role: dir }]
+      : searchParams.sort === 'lastLogin' ? [{ lastLoginAt: dir }]
+      : searchParams.sort === 'name' ? [{ name: dir }]
+      : [{ active: 'desc' }, { name: 'asc' }],
+  });
 
   return (
     <Shell user={user} module="setup" nav={NAV.setup} current="/setup/users" alerts={alerts.length}>
@@ -21,7 +28,9 @@ export default async function UsersPage() {
 
       <section className="card card-pad mb-6">
         <Table head={<>
-          <th className="th">Person</th><th className="th">Role</th><th className="th">Last signed in</th>
+          <SortTh label="Person" field="name" basePath="/setup/users" searchParams={searchParams} />
+          <SortTh label="Role" field="role" basePath="/setup/users" searchParams={searchParams} />
+          <SortTh label="Last signed in" field="lastLogin" basePath="/setup/users" searchParams={searchParams} />
           <th className="th">Status</th><th className="th sr-only">Reset password</th>
         </>}>
           {users.map((u) => (

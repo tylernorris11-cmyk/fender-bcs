@@ -6,12 +6,13 @@ import { creditBalances, getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { money, money0 } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { Empty, Meter, PageHeader, Stat, StatRow, Table } from '@/components/ui';
+import { Empty, Meter, PageHeader, SortTh, Stat, StatRow, Table } from '@/components/ui';
 
-export default async function CustomersPage({ searchParams }: { searchParams: { q?: string } }) {
+export default async function CustomersPage({ searchParams }: { searchParams: { q?: string; sort?: string; dir?: string } }) {
   const user = await requirePermission('customers.view');
   const [alerts, balances] = await Promise.all([getAlerts(user), creditBalances()]);
   const q = (searchParams.q ?? '').trim();
+  const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
 
   const customers = await db.customer.findMany({
     where: q
@@ -22,7 +23,10 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
           { code: { contains: q, mode: 'insensitive' } },
         ] }
       : undefined,
-    orderBy: { name: 'asc' },
+    orderBy:
+      searchParams.sort === 'town' ? { town: dir }
+      : searchParams.sort === 'limit' ? { creditLimit: dir }
+      : { name: searchParams.sort === 'name' ? dir : 'asc' },
   });
 
   const totalUsed = [...balances.values()].reduce((a, b) => a + b, 0);
@@ -56,8 +60,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
 
         {customers.length === 0 ? <Empty title="No customers match that." /> : (
           <Table head={<>
-            <th className="th">Customer</th><th className="th">Contact</th><th className="th">Town</th>
-            <th className="th">Credit used</th><th className="th text-right">Limit</th>
+            <SortTh label="Customer" field="name" basePath="/customers" searchParams={searchParams} />
+            <th className="th">Contact</th>
+            <SortTh label="Town" field="town" basePath="/customers" searchParams={searchParams} />
+            <th className="th">Credit used</th>
+            <SortTh label="Limit" field="limit" basePath="/customers" searchParams={searchParams} align="right" />
           </>}>
             {customers.map((c) => {
               const used = balances.get(c.id) ?? 0;

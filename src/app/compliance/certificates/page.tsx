@@ -4,17 +4,25 @@ import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { daysUntil, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { PageHeader, Pill, Table } from '@/components/ui';
+import { PageHeader, Pill, SortTh, Table } from '@/components/ui';
 import { saveCertificate } from '../actions';
 
 const SCHEMES = ['CARES SRC', 'Supplier', 'ISO 9001', 'ISO 14001', 'ISO 45001', 'Calibration', 'Insurance', 'Other'];
 
-export default async function CertificatesPage() {
+export default async function CertificatesPage({ searchParams }: { searchParams: { sort?: string; dir?: string } }) {
   const user = await requirePermission('compliance.view');
   const alerts = await getAlerts(user);
+  const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
 
   const [certificates, suppliers] = await Promise.all([
-    db.certificate.findMany({ include: { supplier: true }, orderBy: { expiresOn: 'asc' } }),
+    db.certificate.findMany({
+      include: { supplier: true },
+      orderBy:
+        searchParams.sort === 'title' ? { title: dir }
+        : searchParams.sort === 'scheme' ? { scheme: dir }
+        : searchParams.sort === 'issued' ? { issuedOn: dir }
+        : { expiresOn: searchParams.sort === 'expires' ? dir : 'asc' },
+    }),
     db.supplier.findMany({ orderBy: { name: 'asc' } }),
   ]);
 
@@ -24,8 +32,12 @@ export default async function CertificatesPage() {
 
       <section className="card card-pad mb-6">
         <Table head={<>
-          <th className="th">Certificate</th><th className="th">Scheme</th><th className="th">Held by</th>
-          <th className="th">Issued</th><th className="th">Expires</th><th className="th">File</th>
+          <SortTh label="Certificate" field="title" basePath="/compliance/certificates" searchParams={searchParams} />
+          <SortTh label="Scheme" field="scheme" basePath="/compliance/certificates" searchParams={searchParams} />
+          <th className="th">Held by</th>
+          <SortTh label="Issued" field="issued" basePath="/compliance/certificates" searchParams={searchParams} />
+          <SortTh label="Expires" field="expires" basePath="/compliance/certificates" searchParams={searchParams} />
+          <th className="th">File</th>
         </>}>
           {certificates.map((c) => {
             const days = daysUntil(c.expiresOn)!;

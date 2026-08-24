@@ -4,11 +4,12 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { daysUntil, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { PageHeader, Pill, Table } from '@/components/ui';
+import { PageHeader, Pill, SortTh, Table } from '@/components/ui';
 
-export default async function SuppliersPage() {
+export default async function SuppliersPage({ searchParams }: { searchParams: { sort?: string; dir?: string } }) {
   const user = await requirePermission('compliance.view');
   const alerts = await getAlerts(user);
+  const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
 
   const suppliers = await db.supplier.findMany({
     orderBy: { name: 'asc' },
@@ -18,6 +19,27 @@ export default async function SuppliersPage() {
   const unapproved = suppliers.filter(
     (s) => s.batches.length > 0 && !s.certificates.some((c) => c.expiresOn > new Date()),
   );
+
+  const rows = suppliers.map((s) => {
+    const latest = s.certificates[0];
+    const lastDelivery = s.batches.reduce<Date | null>(
+      (max, b) => (!max || b.receivedAt > max ? b.receivedAt : max), null,
+    );
+    return { s, latest, lastDelivery, tonnage: s.batches.reduce((t, b) => t + Number(b.qtyReceived), 0) };
+  });
+
+  if (searchParams.sort) {
+    const mul = dir === 'asc' ? 1 : -1;
+    rows.sort((a, b) => {
+      switch (searchParams.sort) {
+        case 'batches': return mul * (a.s.batches.length - b.s.batches.length);
+        case 'tonnage': return mul * (a.tonnage - b.tonnage);
+        case 'lastDelivery': return mul * ((a.lastDelivery?.getTime() ?? 0) - (b.lastDelivery?.getTime() ?? 0));
+        case 'approval': return mul * ((a.latest?.expiresOn.getTime() ?? 0) - (b.latest?.expiresOn.getTime() ?? 0));
+        default: return mul * a.s.name.localeCompare(b.s.name);
+      }
+    });
+  }
 
   return (
     <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/suppliers" alerts={alerts.length}>
@@ -37,20 +59,19 @@ export default async function SuppliersPage() {
 
       <section className="card card-pad">
         <Table head={<>
-          <th className="th">Supplier</th><th className="th text-right">Batches</th><th className="th text-right">Tonnage received</th>
-          <th className="th">Last delivery</th><th className="th">CARES approval</th>
+          <SortTh label="Supplier" field="name" basePath="/compliance/suppliers" searchParams={searchParams} />
+          <SortTh label="Batches" field="batches" basePath="/compliance/suppliers" searchParams={searchParams} align="right" />
+          <SortTh label="Tonnage received" field="tonnage" basePath="/compliance/suppliers" searchParams={searchParams} align="right" />
+          <SortTh label="Last delivery" field="lastDelivery" basePath="/compliance/suppliers" searchParams={searchParams} />
+          <SortTh label="CARES approval" field="approval" basePath="/compliance/suppliers" searchParams={searchParams} />
         </>}>
-          {suppliers.map((s) => {
-            const latest = s.certificates[0];
+          {rows.map(({ s, latest, lastDelivery, tonnage }) => {
             const days = latest ? daysUntil(latest.expiresOn)! : null;
-            const lastDelivery = s.batches.reduce<Date | null>(
-              (max, b) => (!max || b.receivedAt > max ? b.receivedAt : max), null,
-            );
             return (
               <tr key={s.id} className="row">
                 <td className="td font-semibold">{s.name}<span className="block text-xs font-normal text-ink-faint">{s.approvedFor}</span></td>
                 <td className="td text-right tabular-nums">{s.batches.length}</td>
-                <td className="td text-right tabular-nums">{s.batches.reduce((t, b) => t + Number(b.qtyReceived), 0).toFixed(0)} t</td>
+                <td className="td text-right tabular-nums">{tonnage.toFixed(0)} t</td>
                 <td className="td text-ink-muted whitespace-nowrap">{shortDate(lastDelivery)}</td>
                 <td className="td">
                   {!latest ? <Pill tone="bad">Not on file</Pill>

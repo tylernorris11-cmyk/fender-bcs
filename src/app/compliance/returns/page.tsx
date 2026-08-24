@@ -1,23 +1,30 @@
+import type { Prisma } from '@prisma/client';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { daysUntil, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { PageHeader, Pill, Table } from '@/components/ui';
+import { PageHeader, Pill, SortSelect, Table } from '@/components/ui';
 import { closeAuditAction, submitReturn } from '../actions';
 
 function quarterOf(d: Date) {
   return `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3) + 1}`;
 }
 
-export default async function ReturnsPage() {
+const ACTION_SORTS: Record<string, Prisma.AuditActionOrderByWithRelationInput[]> = {
+  due: [{ closedAt: 'asc' }, { dueOn: 'asc' }],
+  newest: [{ dueOn: 'desc' }],
+  ref: [{ ref: 'asc' }],
+};
+
+export default async function ReturnsPage({ searchParams }: { searchParams: { sort?: string } }) {
   const user = await requirePermission('compliance.view');
   const alerts = await getAlerts(user);
 
   const [returns, actions, delivered] = await Promise.all([
     db.quarterlyReturn.findMany({ orderBy: { period: 'desc' } }),
-    db.auditAction.findMany({ orderBy: [{ closedAt: 'asc' }, { dueOn: 'asc' }] }),
+    db.auditAction.findMany({ orderBy: ACTION_SORTS[searchParams.sort ?? 'due'] ?? ACTION_SORTS.due }),
     db.order.findMany({
       where: { stage: { in: ['DELIVERED', 'COMPLETED'] } },
       select: { deliveredAt: true, completedAt: true, createdAt: true, lines: { select: { weightKg: true } }, barMarks: { select: { weightKg: true } } },
@@ -79,14 +86,28 @@ export default async function ReturnsPage() {
       </section>
 
       <section className="card card-pad">
-        <h2 className="text-lg font-bold mb-1">Audit actions</h2>
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-1">
+          <h2 className="text-lg font-bold">Audit actions</h2>
+          <form className="flex gap-2">
+            <SortSelect
+              value={searchParams.sort}
+              label="Sort"
+              options={[
+                { value: 'due', label: 'Due soonest' },
+                { value: 'newest', label: 'Newest' },
+                { value: 'ref', label: 'Ref A-Z' },
+              ]}
+            />
+            <button className="btn-secondary btn-sm">Apply</button>
+          </form>
+        </div>
         <p className="text-sm text-ink-muted mb-4">{openActions.length} open. Close each one with the evidence, not just a tick.</p>
 
-        <ul className="space-y-3">
+        <ul className="space-y-2">
           {actions.map((a) => {
             const days = a.dueOn ? daysUntil(a.dueOn) : null;
             return (
-              <li key={a.id} className="border border-hairline rounded-xl p-4">
+              <li key={a.id} className="border border-hairline rounded-xl p-3">
                 <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   <span className="font-semibold">{a.ref}</span>
                   <Pill>{a.source}</Pill>

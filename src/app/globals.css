@@ -73,10 +73,10 @@
   }
 
   .th {
-    @apply text-left text-[11px] font-semibold uppercase tracking-wider text-ink-faint pb-3 px-4;
+    @apply text-left text-[11px] font-semibold uppercase tracking-wider text-ink-faint pb-2 px-3;
   }
   .td {
-    @apply px-4 py-3.5 text-sm align-middle;
+    @apply px-3 py-2 text-sm align-middle;
   }
   .row {
     @apply border-t border-hairline hover:bg-canvas/70 transition-colors;

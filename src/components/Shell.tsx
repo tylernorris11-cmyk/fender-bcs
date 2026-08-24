@@ -7,8 +7,8 @@ import { Avatar } from './ui';
 export type NavItem = { label: string; href: string; perm?: Permission };
 
 const MODULE_TITLE: Record<string, string> = {
-  orders: 'Orders', production: 'Production', planning: 'Planning', customers: 'Customers',
-  compliance: 'Compliance', stock: 'Stock', assets: 'Assets', setup: 'Set Up',
+  orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Planning',
+  customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', setup: 'Set Up',
 };
 
 export function Shell({
@@ -131,6 +131,11 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'New order', href: '/orders/new', perm: 'orders.create' },
     { label: 'Awaiting approval', href: '/orders?stage=PENDING_APPROVAL' },
   ],
+  purchaseOrders: [
+    { label: 'All purchase orders', href: '/purchase-orders' },
+    { label: 'New purchase order', href: '/purchase-orders/new', perm: 'purchaseOrders.create' },
+    { label: 'Awaiting delivery', href: '/purchase-orders?status=SENT' },
+  ],
   production: [
     { label: 'Work in progress', href: '/production' },
     { label: 'Bending schedules', href: '/production/schedules' },
@@ -159,6 +164,10 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'Vehicles', href: '/assets' },
     { label: 'Machinery', href: '/assets?type=MACHINE' },
     { label: 'Retired', href: '/assets?retired=1' },
+  ],
+  checks: [
+    { label: 'Check history', href: '/checks' },
+    { label: 'Run a check', href: '/checks/new', perm: 'checks.create' },
   ],
   setup: [
     { label: 'Pricing', href: '/setup/pricing', perm: 'setup.pricing' },

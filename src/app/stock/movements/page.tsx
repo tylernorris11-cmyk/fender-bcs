@@ -1,17 +1,25 @@
+import type { Prisma } from '@prisma/client';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { PageHeader, Pill, Table } from '@/components/ui';
+import { PageHeader, Pill, SortTh, Table } from '@/components/ui';
 
-export default async function MovementsPage() {
+export default async function MovementsPage({ searchParams }: { searchParams: { sort?: string; dir?: string } }) {
   const user = await requirePermission('stock.view');
   const alerts = await getAlerts(user);
+  const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
+
+  const orderBy: Prisma.StockMovementOrderByWithRelationInput =
+    searchParams.sort === 'type' ? { type: dir }
+    : searchParams.sort === 'product' ? { product: { name: dir } }
+    : searchParams.sort === 'qty' ? { qty: dir }
+    : { at: dir === 'asc' ? 'asc' : 'desc' };
 
   const movements = await db.stockMovement.findMany({
     include: { product: true, batch: true, user: true },
-    orderBy: { at: 'desc' },
+    orderBy,
     take: 300,
   });
 
@@ -20,8 +28,12 @@ export default async function MovementsPage() {
       <PageHeader title="Stock movements" blurb="Every tonne in and out, with the cast it came from and who moved it." />
       <section className="card card-pad">
         <Table head={<>
-          <th className="th">When</th><th className="th">Type</th><th className="th">Product</th>
-          <th className="th">Cast</th><th className="th text-right">Qty</th><th className="th">Reference</th><th className="th">By</th>
+          <SortTh label="When" field="at" basePath="/stock/movements" searchParams={searchParams} />
+          <SortTh label="Type" field="type" basePath="/stock/movements" searchParams={searchParams} />
+          <SortTh label="Product" field="product" basePath="/stock/movements" searchParams={searchParams} />
+          <th className="th">Cast</th>
+          <SortTh label="Qty" field="qty" basePath="/stock/movements" searchParams={searchParams} align="right" />
+          <th className="th">Reference</th><th className="th">By</th>
         </>}>
           {movements.map((m) => (
             <tr key={m.id} className="row">

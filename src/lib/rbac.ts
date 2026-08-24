@@ -35,6 +35,13 @@ export type Permission =
   // Assets
   | 'assets.view'
   | 'assets.edit'
+  // Purchase orders (buying steel and materials from suppliers)
+  | 'purchaseOrders.view'
+  | 'purchaseOrders.create'
+  | 'purchaseOrders.edit'
+  // Checks — morning pre-use checks on vehicles and machines
+  | 'checks.view'
+  | 'checks.create'
   // Planning
   | 'planning.view'
   | 'planning.edit'
@@ -56,6 +63,8 @@ const ALL: Permission[] = [
   'production.view', 'production.progress', 'production.qc',
   'compliance.view', 'compliance.edit', 'compliance.ncr',
   'assets.view', 'assets.edit',
+  'purchaseOrders.view', 'purchaseOrders.create', 'purchaseOrders.edit',
+  'checks.view', 'checks.create',
   'planning.view', 'planning.edit',
   'setup.view', 'setup.pricing', 'setup.users', 'setup.lists', 'setup.backups',
   'finance.costs', 'finance.debtors',
@@ -75,6 +84,8 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'production.view', 'production.progress', 'production.qc',
     'compliance.view', 'compliance.ncr',
     'assets.view', 'assets.edit',
+    'purchaseOrders.view', 'purchaseOrders.create', 'purchaseOrders.edit',
+    'checks.view', 'checks.create',
     'planning.view', 'planning.edit',
     'setup.view', 'setup.lists',
     'finance.debtors',
@@ -100,6 +111,8 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'production.view', 'production.qc',
     'compliance.view', 'compliance.edit', 'compliance.ncr',
     'assets.view', 'assets.edit',
+    'purchaseOrders.view',
+    'checks.view',
     'planning.view', 'planning.edit',
     'setup.view', 'setup.lists',
   ],
@@ -111,14 +124,19 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'production.view', 'production.progress',
     'compliance.view', 'compliance.ncr',
     'assets.view',
+    'purchaseOrders.view', 'purchaseOrders.create',
+    'checks.view', 'checks.create',
     'planning.view',
   ],
 
   // Drivers see the run and mark deliveries done.
-  DRIVER: ['orders.view', 'orders.progress', 'planning.view', 'assets.view'],
+  DRIVER: ['orders.view', 'orders.progress', 'planning.view', 'assets.view', 'checks.view', 'checks.create'],
 
   // Read only — auditors, office cover, new starters.
-  VIEWER: ['orders.view', 'customers.view', 'stock.view', 'production.view', 'compliance.view', 'planning.view', 'assets.view'],
+  VIEWER: [
+    'orders.view', 'customers.view', 'stock.view', 'production.view', 'compliance.view', 'planning.view', 'assets.view',
+    'purchaseOrders.view', 'checks.view',
+  ],
 };
 
 export type SessionUser = { id: string; name: string; email: string; role: Role; jobTitle: string; initials: string; colour: string };
@@ -134,13 +152,15 @@ export function canAny(user: SessionUser | null | undefined, ...perms: Permissio
 
 /** Which launcher tiles this user gets. */
 export const MODULES = [
-  { key: 'orders', label: 'Orders', href: '/orders', perm: 'orders.view' as Permission, blurb: 'Create, manage and track all customer orders.' },
+  { key: 'orders', label: 'Sales Orders', href: '/orders', perm: 'orders.view' as Permission, blurb: 'Create, manage and track customer sales orders.' },
+  { key: 'purchaseOrders', label: 'Purchase Orders', href: '/purchase-orders', perm: 'purchaseOrders.view' as Permission, blurb: 'Raise and track orders placed with suppliers.' },
   { key: 'production', label: 'Production', href: '/production', perm: 'production.view' as Permission, blurb: 'Cutting, bending and dimensional checks to BS 8666.' },
   { key: 'planning', label: 'Planning', href: '/planning', perm: 'planning.view' as Permission, blurb: 'View and manage deliveries, collections and site schedules.' },
   { key: 'customers', label: 'Customers', href: '/customers', perm: 'customers.view' as Permission, blurb: 'Manage customer profiles, contacts and history.' },
   { key: 'compliance', label: 'Compliance', href: '/compliance', perm: 'compliance.view' as Permission, blurb: 'CARES approval, certificates and full steel traceability.' },
   { key: 'stock', label: 'Stock', href: '/stock', perm: 'stock.view' as Permission, blurb: 'Track inventory levels, materials and movements.' },
   { key: 'assets', label: 'Assets', href: '/assets', perm: 'assets.view' as Permission, blurb: 'Manage company assets, equipment and maintenance.' },
+  { key: 'checks', label: 'Checks', href: '/checks', perm: 'checks.view' as Permission, blurb: 'Morning checks on machines, lorries and pickups before use.' },
 ] as const;
 
 export const ROLE_LABELS: Record<Role, string> = {

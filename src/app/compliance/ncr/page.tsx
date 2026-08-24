@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
+import type { Prisma } from '@prisma/client';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { PageHeader, Pill } from '@/components/ui';
+import { PageHeader, Pill, SortSelect } from '@/components/ui';
 import { closeNcr, raiseNcr } from '../actions';
 
 const TYPE_LABEL = {
@@ -15,14 +16,21 @@ const TYPE_LABEL = {
   SUPPLIER_ISSUE: 'Supplier issue',
 } as const;
 
-export default async function NcrPage({ searchParams }: { searchParams: { raise?: string } }) {
+const NCR_SORTS: Record<string, Prisma.NcrOrderByWithRelationInput[]> = {
+  open: [{ status: 'asc' }, { raisedAt: 'desc' }],
+  newest: [{ raisedAt: 'desc' }],
+  oldest: [{ raisedAt: 'asc' }],
+  ref: [{ ref: 'asc' }],
+};
+
+export default async function NcrPage({ searchParams }: { searchParams: { raise?: string; sort?: string } }) {
   const user = await requirePermission('compliance.view');
   const alerts = await getAlerts(user);
 
   const [ncrs, orders, customers, suppliers, batches] = await Promise.all([
     db.ncr.findMany({
       include: { order: true, customer: true, batch: true, supplier: true, raisedBy: true },
-      orderBy: [{ status: 'asc' }, { raisedAt: 'desc' }],
+      orderBy: NCR_SORTS[searchParams.sort ?? 'open'] ?? NCR_SORTS.open,
     }),
     db.order.findMany({ where: { archived: false }, orderBy: { createdAt: 'desc' }, take: 60, select: { id: true, number: true } }),
     db.customer.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
@@ -48,9 +56,24 @@ export default async function NcrPage({ searchParams }: { searchParams: { raise?
         Auditors read this register first.
       </p>
 
-      <div className="flex gap-2 mb-6">
-        <Pill tone={open.length ? 'warn' : 'good'}>{open.length} open</Pill>
-        <Pill>{ncrs.length - open.length} closed</Pill>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex gap-2">
+          <Pill tone={open.length ? 'warn' : 'good'}>{open.length} open</Pill>
+          <Pill>{ncrs.length - open.length} closed</Pill>
+        </div>
+        <form className="flex gap-2">
+          <SortSelect
+            value={searchParams.sort}
+            label="Sort"
+            options={[
+              { value: 'open', label: 'Open first' },
+              { value: 'newest', label: 'Newest' },
+              { value: 'oldest', label: 'Oldest' },
+              { value: 'ref', label: 'Ref A-Z' },
+            ]}
+          />
+          <button className="btn-secondary btn-sm">Apply</button>
+        </form>
       </div>
 
       {showForm && can(user, 'compliance.ncr') && (
@@ -116,9 +139,9 @@ export default async function NcrPage({ searchParams }: { searchParams: { raise?
         </section>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {ncrs.map((n) => (
-          <article key={n.id} className="card card-pad">
+          <article key={n.id} className="card p-4 sm:p-5">
             <header className="flex flex-wrap items-start justify-between gap-3 mb-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
