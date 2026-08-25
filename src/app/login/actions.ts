@@ -57,8 +57,8 @@ export async function signIn(formData: FormData) {
   setSessionCookie(user!.id);
 
   // A password set by someone else (admin reset, approved access request)
-  // means straight to Your account to pick a real one — not wherever they were headed.
-  if (user!.mustReset) redirect('/account');
+  // means straight to a dedicated reset screen — not wherever they were headed.
+  if (user!.mustReset) redirect('/change-password');
 
   // Only ever send people to a path inside this app.
   redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/');
