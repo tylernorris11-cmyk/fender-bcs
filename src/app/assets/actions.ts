@@ -57,7 +57,7 @@ export async function createAsset(formData: FormData) {
   // A sensible starting checklist for its type — editable from here on,
   // since a real lorry or machine often needs its own tweaks.
   await db.assetChecklistItem.createMany({
-    data: defaultCheckItems(type).map((label, i) => ({ assetId: asset.id, label, sortOrder: i })),
+    data: defaultCheckItems(type, category).map((label, i) => ({ assetId: asset.id, label, sortOrder: i })),
   });
 
   await logActivity('Asset', asset.id, 'Added', `${asset.ref} — ${name}`, user.id);

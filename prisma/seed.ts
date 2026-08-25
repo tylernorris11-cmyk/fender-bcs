@@ -24,6 +24,16 @@ const MACHINE_CHECK_ITEMS = [
   'Hydraulic and air lines — no leaks', 'Work area clear and clean', 'Lifting equipment inspected (if fitted)',
   'Noise and vibration normal on start-up',
 ];
+// Matches the site's own FLT Check and Defect Report pad.
+const FORKLIFT_CHECK_ITEMS = [
+  'Rating plate visible', 'Safety frame / body / cab', 'Emergency stop / foot and park brakes',
+  'Forks / load guard / overhead guard', 'Oil level / transmission and brake fluid',
+  'Lamps / brake lights / indicators / beacon', 'Windscreen wipers / washers and mirrors',
+  'Seat and restraints / seat pressure switch', 'Tyres / pressure / axles / wheel nuts',
+  'Mast / chains / pivot pins / hydraulic lines', 'Hydraulic controls and lift', 'Steering / gauges / instruments',
+  'Horn and audible warning', 'Battery level / electrical lines', 'Fork attachments and locking pins',
+  'Fuel level / fuel tank and restraints', 'Coolant and water level',
+];
 
 function hash(plain: string) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -688,7 +698,7 @@ async function main() {
 
     // A starting pre-use checklist per type — same defaults the app itself
     // uses when someone adds a new asset from Set Up, editable from there on.
-    const defaultItems = a.type === 'VEHICLE' ? VEHICLE_CHECK_ITEMS : MACHINE_CHECK_ITEMS;
+    const defaultItems = a.category === 'Forklift' ? FORKLIFT_CHECK_ITEMS : a.type === 'VEHICLE' ? VEHICLE_CHECK_ITEMS : MACHINE_CHECK_ITEMS;
     await db.assetChecklistItem.createMany({
       data: defaultItems.map((label, i) => ({ assetId: created.id, label, sortOrder: i })),
     });

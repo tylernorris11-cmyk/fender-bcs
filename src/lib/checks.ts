@@ -28,6 +28,29 @@ export const MACHINE_CHECK_ITEMS = [
   'Noise and vibration normal on start-up',
 ];
 
-export function defaultCheckItems(assetType: AssetType): string[] {
+// Matches the site's own FLT Check and Defect Report pad (items 1–17 —
+// the numbered pre-use checks; the sign-off declaration isn't a check item).
+export const FORKLIFT_CHECK_ITEMS = [
+  'Rating plate visible',
+  'Safety frame / body / cab',
+  'Emergency stop / foot and park brakes',
+  'Forks / load guard / overhead guard',
+  'Oil level / transmission and brake fluid',
+  'Lamps / brake lights / indicators / beacon',
+  'Windscreen wipers / washers and mirrors',
+  'Seat and restraints / seat pressure switch',
+  'Tyres / pressure / axles / wheel nuts',
+  'Mast / chains / pivot pins / hydraulic lines',
+  'Hydraulic controls and lift',
+  'Steering / gauges / instruments',
+  'Horn and audible warning',
+  'Battery level / electrical lines',
+  'Fork attachments and locking pins',
+  'Fuel level / fuel tank and restraints',
+  'Coolant and water level',
+];
+
+export function defaultCheckItems(assetType: AssetType, category?: string): string[] {
+  if (category?.trim().toLowerCase() === 'forklift') return FORKLIFT_CHECK_ITEMS;
   return assetType === 'VEHICLE' ? VEHICLE_CHECK_ITEMS : MACHINE_CHECK_ITEMS;
 }
