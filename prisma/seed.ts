@@ -12,6 +12,19 @@ import crypto from 'node:crypto';
 
 const db = new PrismaClient();
 
+// Same defaults as src/lib/checks.ts — duplicated here since this script
+// runs standalone via tsx, outside the Next.js path-alias setup.
+const VEHICLE_CHECK_ITEMS = [
+  'Tyres — condition and pressure', 'Lights, indicators and beacon', 'Mirrors and windscreen', 'Brakes',
+  'Fluid levels (oil, water, screenwash)', 'Load securing equipment (straps, chains, headboard)', 'Wheel nuts',
+  'Reversing alarm / camera', 'No visible damage, leaks or corrosion', 'Documents in cab (licence, insurance, tacho)',
+];
+const MACHINE_CHECK_ITEMS = [
+  'Guards in place and secure', 'Emergency stop tested', 'No visible damage to blades, dies or rollers',
+  'Hydraulic and air lines — no leaks', 'Work area clear and clean', 'Lifting equipment inspected (if fitted)',
+  'Noise and vibration normal on start-up',
+];
+
 function hash(plain: string) {
   const salt = crypto.randomBytes(16).toString('hex');
   return `scrypt$${salt}$${crypto.scryptSync(plain, salt, 64).toString('hex')}`;
@@ -51,6 +64,7 @@ async function main() {
   await db.customer.deleteMany();
   await db.inspection.deleteMany();
   await db.assetNote.deleteMany();
+  await db.assetChecklistItem.deleteMany();
   await db.asset.deleteMany();
   await db.auditAction.deleteMany();
   await db.quarterlyReturn.deleteMany();
@@ -671,6 +685,13 @@ async function main() {
       },
     });
     assets[a.ref] = created.id;
+
+    // A starting pre-use checklist per type — same defaults the app itself
+    // uses when someone adds a new asset from Set Up, editable from there on.
+    const defaultItems = a.type === 'VEHICLE' ? VEHICLE_CHECK_ITEMS : MACHINE_CHECK_ITEMS;
+    await db.assetChecklistItem.createMany({
+      data: defaultItems.map((label, i) => ({ assetId: created.id, label, sortOrder: i })),
+    });
   }
 
   await db.assetNote.create({

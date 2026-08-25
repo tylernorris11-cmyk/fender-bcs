@@ -9,16 +9,17 @@ import { qty as fmtQty } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortSelect, Stat, StatRow } from '@/components/ui';
 
-export default async function StockPage({ searchParams }: { searchParams: { category?: string; sort?: string; depot?: string } }) {
+export default async function StockPage({ searchParams }: { searchParams: { category?: string; sort?: string; depot?: string; inactive?: string } }) {
   const user = await requirePermission('stock.view');
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
   const caresApplies = company === 'FENDER';
   const depot = searchParams.depot;
+  const showInactive = searchParams.inactive === '1';
 
   const [products, locations] = await Promise.all([
     db.product.findMany({
-      where: { company, active: true, ...(searchParams.category ? { category: searchParams.category } : {}) },
+      where: { company, active: !showInactive, ...(searchParams.category ? { category: searchParams.category } : {}) },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
       include: { batches: { where: { status: { in: ['Available', 'Quarantined'] }, ...(depot ? { depot } : {}) } } },
     }),
@@ -50,9 +51,16 @@ export default async function StockPage({ searchParams }: { searchParams: { cate
       <PageHeader
         title="Stock"
         blurb={caresApplies ? 'Tap a product to see its batches and certificates.' : 'Tap a product to see its batches.'}
-        actions={can(user, 'stock.goodsIn') && (
-          <Link href="/stock/goods-in" className="btn-primary"><Plus size={16} /> {caresApplies ? 'Book steel in' : 'Book stock in'}</Link>
-        )}
+        actions={
+          <>
+            {can(user, 'stock.adjust') && (
+              <Link href="/stock/new" className="btn-secondary"><Plus size={16} /> Add product</Link>
+            )}
+            {can(user, 'stock.goodsIn') && (
+              <Link href="/stock/goods-in" className="btn-primary"><Plus size={16} /> {caresApplies ? 'Book steel in' : 'Book stock in'}</Link>
+            )}
+          </>
+        }
       />
 
       <StatRow>
@@ -78,9 +86,13 @@ export default async function StockPage({ searchParams }: { searchParams: { cate
         ))}
       </nav>
 
-      <form className="mb-4 flex justify-end gap-2">
+      <form className="mb-4 flex flex-wrap items-center justify-end gap-3">
         {searchParams.category && <input type="hidden" name="category" value={searchParams.category} />}
         {depot && <input type="hidden" name="depot" value={depot} />}
+        <label className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border border-hairline bg-white cursor-pointer">
+          <input type="checkbox" name="inactive" value="1" defaultChecked={showInactive} className="h-4 w-4 accent-brand" />
+          Show inactive
+        </label>
         <SortSelect
           value={searchParams.sort}
           label="Sort within category"

@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import { Camera, X } from 'lucide-react';
 import type { AssetType } from '@prisma/client';
-import { defaultCheckItems } from '@/lib/checks';
 import { resizeImageToDataUrl } from '@/lib/image';
 import { logAssetCheck } from '../actions';
 
-type Asset = { id: string; name: string; ref: string; type: AssetType };
+type Asset = { id: string; name: string; ref: string; type: AssetType; checklistItems: { label: string }[] };
 
 export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; initialAssetId?: string }) {
   const [assetId, setAssetId] = useState(initialAssetId && assets.some((a) => a.id === initialAssetId) ? initialAssetId : assets[0]?.id ?? '');
@@ -29,7 +28,7 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
   }
 
   const asset = assets.find((a) => a.id === assetId);
-  const items = asset ? defaultCheckItems(asset.type) : [];
+  const items = asset ? asset.checklistItems.map((i) => i.label) : [];
   const vehicles = assets.filter((a) => a.type === 'VEHICLE');
   const machines = assets.filter((a) => a.type === 'MACHINE');
 

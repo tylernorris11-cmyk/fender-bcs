@@ -1,8 +1,80 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import type { AssetType } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
+import { defaultCheckItems } from '@/lib/checks';
+
+async function nextAssetRef(type: AssetType) {
+  const prefix = type === 'VEHICLE' ? 'VH' : 'MC';
+  const last = await db.asset.findFirst({ where: { type }, orderBy: { ref: 'desc' }, select: { ref: true } });
+  const seq = last ? Number(last.ref.split('-')[1]) + 1 : 1;
+  return `${prefix}-${String(seq).padStart(3, '0')}`;
+}
+
+export async function createAsset(formData: FormData) {
+  const user = await assertPermission('assets.edit');
+  const type = String(formData.get('type')) as AssetType;
+  const name = String(formData.get('name') ?? '').trim();
+  const category = String(formData.get('category') ?? '').trim();
+  if (!name) throw new Error('Give it a name or registration.');
+  if (!category) throw new Error('Give it a category.');
+
+  const dateField = (key: string) => {
+    const raw = formData.get(key);
+    return raw ? new Date(String(raw)) : null;
+  };
+
+  const asset = await db.asset.create({
+    data: {
+      type, name, category,
+      ref: await nextAssetRef(type),
+      makeModel: String(formData.get('makeModel') ?? ''),
+      year: formData.get('year') ? Number(formData.get('year')) : null,
+      serialNumber: String(formData.get('serialNumber') ?? ''),
+      depot: String(formData.get('depot') ?? 'Scunthorpe'),
+      hours: formData.get('hours') ? Number(formData.get('hours')) : null,
+      liftingEquipment: formData.get('liftingEquipment') === '1',
+      motDue: dateField('motDue'),
+      taxDue: dateField('taxDue'),
+      weeklyCheckDue: dateField('weeklyCheckDue'),
+      puwerDue: dateField('puwerDue'),
+      lolerDue: dateField('lolerDue'),
+      serviceDue: dateField('serviceDue'),
+      calibrationDue: dateField('calibrationDue'),
+    },
+  });
+
+  // A sensible starting checklist for its type — editable from here on,
+  // since a real lorry or machine often needs its own tweaks.
+  await db.assetChecklistItem.createMany({
+    data: defaultCheckItems(type).map((label, i) => ({ assetId: asset.id, label, sortOrder: i })),
+  });
+
+  await logActivity('Asset', asset.id, 'Added', `${asset.ref} — ${name}`, user.id);
+  revalidatePath('/assets');
+  redirect(`/assets/${asset.id}`);
+}
+
+export async function addAssetChecklistItem(formData: FormData) {
+  await assertPermission('assets.edit');
+  const assetId = String(formData.get('assetId'));
+  const label = String(formData.get('label') ?? '').trim();
+  if (!label) return;
+  const count = await db.assetChecklistItem.count({ where: { assetId } });
+  await db.assetChecklistItem.create({ data: { assetId, label, sortOrder: count } });
+  revalidatePath(`/assets/${assetId}`);
+}
+
+export async function removeAssetChecklistItem(formData: FormData) {
+  await assertPermission('assets.edit');
+  const id = String(formData.get('itemId'));
+  const item = await db.assetChecklistItem.findUniqueOrThrow({ where: { id }, select: { assetId: true } });
+  await db.assetChecklistItem.delete({ where: { id } });
+  revalidatePath(`/assets/${item.assetId}`);
+}
 
 /**
  * Logging an inspection rolls the next due date forward. Calibration matters

@@ -14,7 +14,10 @@ export default async function NewCheckPage({ searchParams }: { searchParams: { a
   const assets = await db.asset.findMany({
     where: { retired: false },
     orderBy: [{ type: 'asc' }, { name: 'asc' }],
-    select: { id: true, name: true, ref: true, type: true },
+    select: {
+      id: true, name: true, ref: true, type: true,
+      checklistItems: { where: { active: true }, orderBy: { sortOrder: 'asc' }, select: { label: true } },
+    },
   });
 
   return (

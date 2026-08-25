@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import type { AssetType } from '@prisma/client';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { can } from '@/lib/rbac';
 import { daysUntil, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, SortSelect, Stat, StatRow } from '@/components/ui';
@@ -61,7 +62,13 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
 
   return (
     <Shell user={user} module="assets" nav={NAV.assets} current={retired ? '/assets?retired=1' : type === 'MACHINE' ? '/assets?type=MACHINE' : '/assets'} alerts={alerts.length}>
-      <PageHeader title={title} blurb="Tap a vehicle or machine to see its full record." />
+      <PageHeader
+        title={title}
+        blurb="Tap a vehicle or machine to see its full record."
+        actions={can(user, 'assets.edit') && (
+          <Link href="/assets/new" className="btn-primary"><Plus size={16} /> Add asset</Link>
+        )}
+      />
 
       <StatRow>
         <Stat value={all.filter((a) => a.type === 'VEHICLE').length} label="Vehicles" href="/assets?type=VEHICLE" />

@@ -8,7 +8,7 @@ import { can } from '@/lib/rbac';
 import { money, clock, qty as fmtQty, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, Table } from '@/components/ui';
-import { setBatchStatus } from '../actions';
+import { setBatchStatus, toggleProductActive } from '../actions';
 
 export default async function StockItemPage({ params }: { params: { id: string } }) {
   const user = await requirePermission('stock.view');
@@ -38,9 +38,20 @@ export default async function StockItemPage({ params }: { params: { id: string }
       <PageHeader
         title={product.name}
         blurb={`${product.code} · ${product.category}${product.standard ? ` · ${product.standard}` : ''}`}
-        actions={can(user, 'stock.goodsIn') && (
-          <Link href={`/stock/goods-in?product=${product.id}`} className="btn-primary"><Plus size={16} /> Goods in</Link>
-        )}
+        actions={
+          <>
+            {!product.active && <Pill tone="neutral">Inactive</Pill>}
+            {can(user, 'stock.adjust') && (
+              <form action={toggleProductActive}>
+                <input type="hidden" name="productId" value={product.id} />
+                <button className="btn-danger">{product.active ? 'Deactivate' : 'Reactivate'}</button>
+              </form>
+            )}
+            {can(user, 'stock.goodsIn') && (
+              <Link href={`/stock/goods-in?product=${product.id}`} className="btn-primary"><Plus size={16} /> Goods in</Link>
+            )}
+          </>
+        }
       />
 
       <section className="card card-pad mb-6">

@@ -572,11 +572,28 @@ model Asset {
   serviceDue     DateTime?
   calibrationDue DateTime? // control of measuring devices — CARES requirement
 
-  inspections Inspection[]
-  notes       AssetNote[]
-  events      PlanningEvent[]
-  production  ProductionEvent[]
-  checks      AssetCheck[]
+  inspections    Inspection[]
+  notes          AssetNote[]
+  events         PlanningEvent[]
+  production     ProductionEvent[]
+  checks         AssetCheck[]
+  checklistItems AssetChecklistItem[]
+}
+
+// The pre-use checklist for one specific vehicle or machine — starts from a
+// sensible default for its type when the asset is added, but every asset
+// keeps its own list from then on so it can be tailored (a lorry with a
+// tail lift needs a different check to one without).
+model AssetChecklistItem {
+  id        String  @id @default(cuid())
+  assetId   String
+  label     String
+  sortOrder Int     @default(0)
+  active    Boolean @default(true)
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
 }
 
 model Inspection {

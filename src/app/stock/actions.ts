@@ -5,7 +5,46 @@ import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { can } from '@/lib/rbac';
-import { assertCompanyAccess } from '@/lib/company';
+import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
+
+export async function createProduct(formData: FormData) {
+  const user = await assertPermission('stock.adjust');
+  const company = getActiveCompany(user);
+  const code = String(formData.get('code') ?? '').trim().toUpperCase();
+  const name = String(formData.get('name') ?? '').trim();
+  const category = String(formData.get('category') ?? '').trim();
+  if (!code || !name || !category) throw new Error('Give it a code, a name and a category.');
+
+  if (await db.product.findUnique({ where: { code } })) {
+    throw new Error(`${code} is already in use — codes have to be unique.`);
+  }
+
+  const product = await db.product.create({
+    data: {
+      company, code, name, category,
+      unit: String(formData.get('unit') ?? 't'),
+      kgPerUnit: Number(formData.get('kgPerUnit') ?? 1000),
+      standard: String(formData.get('standard') ?? ''),
+      reorderAt: Number(formData.get('reorderAt') ?? 0),
+      isRebar: formData.get('isRebar') === '1',
+    },
+  });
+
+  await logActivity('Product', product.id, 'Added', `${code} — ${name}`, user.id);
+  revalidatePath('/stock');
+  redirect(`/stock/${product.id}`);
+}
+
+export async function toggleProductActive(formData: FormData) {
+  const user = await assertPermission('stock.adjust');
+  const id = String(formData.get('productId'));
+  const product = await db.product.findUniqueOrThrow({ where: { id } });
+  assertCompanyAccess(user, product.company);
+  await db.product.update({ where: { id }, data: { active: !product.active } });
+  await logActivity('Product', id, product.active ? 'Deactivated' : 'Reactivated', '', user.id);
+  revalidatePath('/stock');
+  revalidatePath(`/stock/${id}`);
+}
 
 /**
  * Booking steel in. This is where traceability starts: no batch exists without
