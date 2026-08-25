@@ -2,9 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import type { AssetType } from '@prisma/client';
+import type { AssetType, Company } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
+import { canAccessCompany } from '@/lib/company';
 import { defaultCheckItems } from '@/lib/checks';
 
 async function nextAssetRef(type: AssetType) {
@@ -22,6 +23,12 @@ export async function createAsset(formData: FormData) {
   if (!name) throw new Error('Give it a name or registration.');
   if (!category) throw new Error('Give it a category.');
 
+  const companyRaw = String(formData.get('company') ?? '');
+  const company = (companyRaw === 'FENDER' || companyRaw === 'BS_SUPPLIES' ? companyRaw : null) as Company | null;
+  if (company && !canAccessCompany(user, company)) {
+    throw new Error('You can only scope an asset to a company you have access to yourself.');
+  }
+
   const dateField = (key: string) => {
     const raw = formData.get(key);
     return raw ? new Date(String(raw)) : null;
@@ -29,7 +36,7 @@ export async function createAsset(formData: FormData) {
 
   const asset = await db.asset.create({
     data: {
-      type, name, category,
+      type, name, category, company,
       ref: await nextAssetRef(type),
       makeModel: String(formData.get('makeModel') ?? ''),
       year: formData.get('year') ? Number(formData.get('year')) : null,

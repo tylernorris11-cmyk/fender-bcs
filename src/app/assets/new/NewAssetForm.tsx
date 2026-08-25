@@ -1,15 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import type { AssetType } from '@prisma/client';
+import type { AssetType, Company } from '@prisma/client';
 import { createAsset } from '../actions';
 
 const VEHICLE_CATEGORIES = ['HGV', 'Van', 'Pickup'];
 const MACHINE_CATEGORIES = ['Bar bender', 'Shear line', 'Link bender', 'Forklift', 'Overhead crane'];
+// A tiny client-safe copy — lib/company.ts is server-only (it reads cookies).
+const COMPANY_LABEL: Record<Company, string> = { FENDER: 'Fender Steel', BS_SUPPLIES: 'BCS Products' };
 
-export function NewAssetForm({ locations }: { locations: string[] }) {
+export function NewAssetForm({ locations, companies }: { locations: string[]; companies: Company[] }) {
   const [type, setType] = useState<AssetType>('VEHICLE');
   const [liftingEquipment, setLiftingEquipment] = useState(false);
+  const [company, setCompany] = useState(''); // '' = shared fleet
   const isVehicle = type === 'VEHICLE';
 
   return (
@@ -30,6 +33,18 @@ export function NewAssetForm({ locations }: { locations: string[] }) {
         </div>
         <input type="hidden" name="type" value={type} />
       </section>
+
+      {companies.length > 1 && (
+        <section className="card card-pad">
+          <label className="label" htmlFor="company">Which side is this for?</label>
+          <select id="company" name="company" value={company} onChange={(e) => setCompany(e.target.value)} className="input max-w-xs">
+            <option value="">Shared — both companies</option>
+            {companies.map((c) => <option key={c} value={c}>{COMPANY_LABEL[c]} only</option>)}
+          </select>
+          <p className="hint">Most lorries and machines are shared — pick one company only if it&apos;s kit that side doesn&apos;t use.</p>
+        </section>
+      )}
+      {companies.length === 1 && <input type="hidden" name="company" value={companies[0]} />}
 
       <section className="card card-pad grid gap-4 sm:grid-cols-2">
         <div>

@@ -37,7 +37,7 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
     db.ncr.findMany({ where: { company, status: 'OPEN' }, orderBy: { raisedAt: 'asc' } }),
     db.batch.findMany({ where: { company, status: 'Quarantined' }, include: { product: true, supplier: true } }),
     db.supplier.findMany({ where: { company, blocked: false }, include: { certificates: true, batches: { take: 1 } } }),
-    db.asset.findMany({ where: { retired: false } }),
+    db.asset.findMany({ where: { retired: false, OR: [{ company: null }, { company }] } }),
     db.customer.findMany({ where: { company }, include: { orders: { where: { paymentStatus: 'UNPAID', stage: { notIn: ['CANCELLED'] } } } } }),
     db.order.count({ where: { company, stage: 'PENDING_APPROVAL', archived: false } }),
     db.batch.count({ where: { company, millCertUrl: '', status: { not: 'Rejected' } } }),

@@ -17,6 +17,7 @@ export default async function CheckDetailPage({ params }: { params: { id: string
     include: { asset: true, user: true, items: true },
   });
   if (!check) notFound();
+  if (check.asset.company && !user.companies.includes(check.asset.company)) notFound();
 
   return (
     <Shell user={user} module="checks" nav={NAV.checks} current="/checks" alerts={alerts.length}>

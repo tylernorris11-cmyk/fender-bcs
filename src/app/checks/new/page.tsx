@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { getActiveCompany } from '@/lib/company';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
 import { NewCheckForm } from './NewCheckForm';
@@ -10,9 +11,10 @@ import { NewCheckForm } from './NewCheckForm';
 export default async function NewCheckPage({ searchParams }: { searchParams: { assetId?: string } }) {
   const user = await requirePermission('checks.create');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
 
   const assets = await db.asset.findMany({
-    where: { retired: false },
+    where: { retired: false, OR: [{ company: null }, { company }] },
     orderBy: [{ type: 'asc' }, { name: 'asc' }],
     select: {
       id: true, name: true, ref: true, type: true,

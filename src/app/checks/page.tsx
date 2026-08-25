@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, Empty, PageHeader, Pill, SortTh, Stat, StatRow, Table } from '@/components/ui';
@@ -14,6 +15,7 @@ export default async function ChecksPage({
 }: { searchParams: { type?: AssetType; result?: CheckResult; sort?: string; dir?: string } }) {
   const user = await requirePermission('checks.view');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
 
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
   const orderBy: Prisma.AssetCheckOrderByWithRelationInput =
@@ -28,14 +30,17 @@ export default async function ChecksPage({
   const [checks, activeAssets, checkedTodayIds] = await Promise.all([
     db.assetCheck.findMany({
       where: {
+        asset: {
+          OR: [{ company: null }, { company }],
+          ...(searchParams.type ? { type: searchParams.type } : {}),
+        },
         ...(searchParams.result ? { result: searchParams.result } : {}),
-        ...(searchParams.type ? { asset: { type: searchParams.type } } : {}),
       },
       include: { asset: true, user: true, items: true },
       orderBy,
       take: 200,
     }),
-    db.asset.findMany({ where: { retired: false } }),
+    db.asset.findMany({ where: { retired: false, OR: [{ company: null }, { company }] } }),
     db.assetCheck.findMany({ where: { performedAt: { gte: startOfToday } }, select: { assetId: true } }),
   ]);
 

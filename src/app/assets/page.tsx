@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
+import { getActiveCompany } from '@/lib/company';
 import { daysUntil, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, SortSelect, Stat, StatRow } from '@/components/ui';
@@ -25,6 +26,7 @@ function DueDate({ label, due }: { label: string; due: Date | null }) {
 export default async function AssetsPage({ searchParams }: { searchParams: { type?: AssetType; retired?: string; q?: string; sort?: string } }) {
   const user = await requirePermission('assets.view');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
 
   const retired = searchParams.retired === '1';
   const type = searchParams.type;
@@ -33,13 +35,14 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
   const assets = await db.asset.findMany({
     where: {
       retired,
+      OR: [{ company: null }, { company }],
       ...(type ? { type } : {}),
-      ...(q ? { OR: [
+      ...(q ? { AND: [{ OR: [
         { name: { contains: q, mode: 'insensitive' } },
         { makeModel: { contains: q, mode: 'insensitive' } },
         { category: { contains: q, mode: 'insensitive' } },
         { depot: { contains: q, mode: 'insensitive' } },
-      ] } : {}),
+      ] }] } : {}),
     },
     orderBy: searchParams.sort === 'name' ? { name: 'asc' } : searchParams.sort === 'category' ? { category: 'asc' } : { ref: 'asc' },
   });
@@ -53,7 +56,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
     });
   }
 
-  const all = await db.asset.findMany({ where: { retired: false } });
+  const all = await db.asset.findMany({ where: { retired: false, OR: [{ company: null }, { company }] } });
   const dates = (a: typeof all[number]) => [a.motDue, a.taxDue, a.weeklyCheckDue, a.puwerDue, a.lolerDue, a.serviceDue, a.calibrationDue];
   const overdue = all.filter((a) => dates(a).some((d) => d && daysUntil(d)! < 0)).length;
   const soon = all.filter((a) => dates(a).some((d) => d && daysUntil(d)! >= 0 && daysUntil(d)! <= 21)).length;

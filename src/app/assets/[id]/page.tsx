@@ -41,6 +41,7 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
     },
   });
   if (!asset) notFound();
+  if (asset.company && !user.companies.includes(asset.company)) notFound();
 
   return (
     <Shell user={user} module="assets" nav={NAV.assets} current="/assets" alerts={alerts.length}>

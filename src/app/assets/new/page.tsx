@@ -21,7 +21,7 @@ export default async function NewAssetPage() {
 
       <PageHeader title="Add a vehicle or machine" blurb="Give it a reference number automatically — fill in statutory dates now or log them later." />
 
-      <NewAssetForm locations={locations.map((l) => l.name)} />
+      <NewAssetForm locations={locations.map((l) => l.name)} companies={user.companies} />
     </Shell>
   );
 }

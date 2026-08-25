@@ -556,6 +556,7 @@ model Asset {
   type           AssetType
   name           String // registration or machine name
   category       String // HGV | Van | Pickup | Bar bender | Shear line ...
+  company        Company?  // null = shared fleet (same yard, same lorries); set = only that company's side
   makeModel      String    @default("")
   year           Int?
   serialNumber   String    @default("")

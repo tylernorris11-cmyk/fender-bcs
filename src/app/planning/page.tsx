@@ -52,7 +52,7 @@ export default async function PlanningPage({
       include: { customer: true },
     }),
     db.planningEvent.findMany({ where: { startsAt: { gte: from, lt: to } }, include: { asset: true, order: true } }),
-    db.asset.findMany({ where: { retired: false, ...(depot ? { depot } : {}) } }),
+    db.asset.findMany({ where: { retired: false, OR: [{ company: null }, { company: { in: user.companies } }], ...(depot ? { depot } : {}) } }),
     db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
   ]);
 
@@ -76,6 +76,12 @@ export default async function PlanningPage({
   }
 
   for (const e of events) {
+    // Unlike an order (masked to logistics-only, since the lorry is shared),
+    // an event tied to a company-restricted asset isn't shareable at all —
+    // there's no shared-fleet reason for the other side to see it, so it's
+    // left off the board entirely rather than shown masked.
+    if (e.asset?.company && !user.companies.includes(e.asset.company)) continue;
+
     // An event tied to an order or a depot-based asset belongs to that
     // depot; anything else (a toolbox talk, a general reminder) isn't
     // depot-specific and stays visible whichever depot is selected.
