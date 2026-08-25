@@ -6,6 +6,7 @@ import { PERMISSIONS, ROLE_BLURBS, ROLE_LABELS } from '@/lib/rbac';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, PageHeader, Pill } from '@/components/ui';
+import { PasswordInput } from '@/components/PasswordInput';
 import { changeOwnPassword } from '../setup/actions';
 
 export default async function AccountPage() {
@@ -46,11 +47,11 @@ export default async function AccountPage() {
           <form action={changeOwnPassword} className="space-y-4 mt-4">
             <div>
               <label className="label" htmlFor="current">Current password</label>
-              <input id="current" name="current" type="password" required autoComplete="current-password" className="input" />
+              <PasswordInput id="current" name="current" required autoComplete="current-password" className="input" />
             </div>
             <div>
               <label className="label" htmlFor="next">New password</label>
-              <input id="next" name="next" type="password" required autoComplete="new-password" className="input" />
+              <PasswordInput id="next" name="next" required autoComplete="new-password" className="input" />
               <p className="hint">At least ten characters with a number in it.</p>
             </div>
             <button className="btn-primary">Change password</button>

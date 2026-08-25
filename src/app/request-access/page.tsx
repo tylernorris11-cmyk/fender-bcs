@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
+import { PasswordInput } from '@/components/PasswordInput';
 import { submitAccessRequest } from './actions';
 
 export default async function RequestAccessPage({ searchParams }: { searchParams: { sent?: string; error?: string } }) {
@@ -51,13 +52,13 @@ export default async function RequestAccessPage({ searchParams }: { searchParams
 
             <div>
               <label className="label" htmlFor="password">Password</label>
-              <input id="password" name="password" type="password" autoComplete="new-password" required className="input" />
+              <PasswordInput id="password" name="password" autoComplete="new-password" required className="input" />
               <p className="hint">At least ten characters with a number. This is what you&apos;ll sign in with if approved.</p>
             </div>
 
             <div>
               <label className="label" htmlFor="confirm">Confirm password</label>
-              <input id="confirm" name="confirm" type="password" autoComplete="new-password" required className="input" />
+              <PasswordInput id="confirm" name="confirm" autoComplete="new-password" required className="input" />
             </div>
 
             <button type="submit" className="btn-primary w-full">Send request</button>

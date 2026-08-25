@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { getCurrentUser } from '@/lib/auth';
 import { COMPANY_COOKIE } from '@/lib/company';
+import { PasswordInput } from '@/components/PasswordInput';
 import { signIn, setLoginBrand } from './actions';
 
 export default async function LoginPage({ searchParams }: { searchParams: { error?: string; next?: string } }) {
@@ -84,7 +85,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
                 <label className="label" htmlFor="password">Password</label>
                 <Link href="/forgot-password" className="text-xs font-semibold text-brand-700 hover:underline">Forgot it?</Link>
               </div>
-              <input id="password" name="password" type="password" autoComplete="current-password" required className="input" />
+              <PasswordInput id="password" name="password" autoComplete="current-password" required className="input" />
             </div>
 
             <button type="submit" className="btn-primary w-full">Sign in</button>

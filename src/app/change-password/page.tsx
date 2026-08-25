@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { PasswordInput } from '@/components/PasswordInput';
 import { completeMustReset } from './actions';
 
 export default async function ChangePasswordPage({ searchParams }: { searchParams: { error?: string } }) {
@@ -22,12 +23,12 @@ export default async function ChangePasswordPage({ searchParams }: { searchParam
           )}
           <div>
             <label className="label" htmlFor="password">New password</label>
-            <input id="password" name="password" type="password" autoComplete="new-password" required className="input" />
+            <PasswordInput id="password" name="password" autoComplete="new-password" required className="input" />
             <p className="hint">At least ten characters with a number.</p>
           </div>
           <div>
             <label className="label" htmlFor="confirm">Confirm password</label>
-            <input id="confirm" name="confirm" type="password" autoComplete="new-password" required className="input" />
+            <PasswordInput id="confirm" name="confirm" autoComplete="new-password" required className="input" />
           </div>
           <button type="submit" className="btn-primary w-full">Set password and continue</button>
         </form>
