@@ -50,7 +50,29 @@ export const FORKLIFT_CHECK_ITEMS = [
   'Coolant and water level',
 ];
 
+// Matches the site's own Overhead Crane Daily Inspection Checklist log book.
+export const OVERHEAD_CRANE_CHECK_ITEMS = [
+  'Lifting gear is within the 6 months testing period',
+  'Pendant support wire secure and in good condition',
+  'Emergency stops and stop button are operational',
+  'Control labels are readable, clear and in good condition',
+  'All guards are correctly fitted',
+  'Travel path and runway beams are clear of obstacles',
+  'All D shackles are in good working condition',
+  'All D shackles are fitted correctly',
+  'Hoist operation is stable with control button pressed',
+  'All pins are in good working condition',
+  'All pins are fitted correctly',
+  'Hook is not damaged',
+  'Safety latch is operational',
+  'Electrical isolation points are accessible and operational',
+  'Electrical isolation points are free, clear and visible',
+  'Warning signs are clear and visible',
+];
+
 export function defaultCheckItems(assetType: AssetType, category?: string): string[] {
-  if (category?.trim().toLowerCase() === 'forklift') return FORKLIFT_CHECK_ITEMS;
+  const c = category?.trim().toLowerCase();
+  if (c === 'forklift') return FORKLIFT_CHECK_ITEMS;
+  if (c === 'overhead crane') return OVERHEAD_CRANE_CHECK_ITEMS;
   return assetType === 'VEHICLE' ? VEHICLE_CHECK_ITEMS : MACHINE_CHECK_ITEMS;
 }

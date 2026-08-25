@@ -34,6 +34,17 @@ const FORKLIFT_CHECK_ITEMS = [
   'Horn and audible warning', 'Battery level / electrical lines', 'Fork attachments and locking pins',
   'Fuel level / fuel tank and restraints', 'Coolant and water level',
 ];
+// Matches the site's own Overhead Crane Daily Inspection Checklist log book.
+const OVERHEAD_CRANE_CHECK_ITEMS = [
+  'Lifting gear is within the 6 months testing period', 'Pendant support wire secure and in good condition',
+  'Emergency stops and stop button are operational', 'Control labels are readable, clear and in good condition',
+  'All guards are correctly fitted', 'Travel path and runway beams are clear of obstacles',
+  'All D shackles are in good working condition', 'All D shackles are fitted correctly',
+  'Hoist operation is stable with control button pressed', 'All pins are in good working condition',
+  'All pins are fitted correctly', 'Hook is not damaged', 'Safety latch is operational',
+  'Electrical isolation points are accessible and operational', 'Electrical isolation points are free, clear and visible',
+  'Warning signs are clear and visible',
+];
 
 function hash(plain: string) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -698,7 +709,9 @@ async function main() {
 
     // A starting pre-use checklist per type — same defaults the app itself
     // uses when someone adds a new asset from Set Up, editable from there on.
-    const defaultItems = a.category === 'Forklift' ? FORKLIFT_CHECK_ITEMS : a.type === 'VEHICLE' ? VEHICLE_CHECK_ITEMS : MACHINE_CHECK_ITEMS;
+    const defaultItems = a.category === 'Forklift' ? FORKLIFT_CHECK_ITEMS
+      : a.category === 'Overhead crane' ? OVERHEAD_CRANE_CHECK_ITEMS
+      : a.type === 'VEHICLE' ? VEHICLE_CHECK_ITEMS : MACHINE_CHECK_ITEMS;
     await db.assetChecklistItem.createMany({
       data: defaultItems.map((label, i) => ({ assetId: created.id, label, sortOrder: i })),
     });
