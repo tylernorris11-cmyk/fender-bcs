@@ -56,6 +56,10 @@ export async function signIn(formData: FormData) {
   await db.user.update({ where: { id: user!.id }, data: { lastLoginAt: new Date() } });
   setSessionCookie(user!.id);
 
+  // A password set by someone else (admin reset, approved access request)
+  // means straight to Your account to pick a real one — not wherever they were headed.
+  if (user!.mustReset) redirect('/account');
+
   // Only ever send people to a path inside this app.
   redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/');
 }
