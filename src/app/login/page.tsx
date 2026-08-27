@@ -22,13 +22,13 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
         <div className="relative flex items-start justify-between gap-4">
           <div className="inline-block rounded-2xl bg-white/95 px-7 py-6 shadow-pop">
             {isBsSupplies ? (
-              <p className="text-3xl font-bold tracking-tight text-forest">BCS <span className="text-signal">Products</span></p>
+              <>
+                <p className="text-3xl font-bold tracking-tight text-forest">BCS <span className="text-signal">Products</span></p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-brand-700 mt-1.5">Steel & building supplies</p>
+              </>
             ) : (
-              <Image src="/fender-logo.png" alt="Fender" width={200} height={141} priority className="w-[200px] h-auto" />
+              <Image src="/fender-logo.png" alt="Fender" width={340} height={240} priority className="w-[340px] h-auto" />
             )}
-            <p className="text-[10px] uppercase tracking-[0.16em] text-brand-700 mt-1.5">
-              {isBsSupplies ? 'Steel & building supplies' : 'Reinforcing steel specialists'}
-            </p>
           </div>
 
           <div className="flex items-center rounded-xl bg-white/10 p-1 text-xs font-semibold shrink-0">

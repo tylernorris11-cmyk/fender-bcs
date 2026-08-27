@@ -47,7 +47,7 @@ export function Shell({
             {isBsSupplies ? (
               <span className="text-xl font-bold tracking-tight">BCS<span className="text-white/60 font-medium"> Products</span></span>
             ) : (
-              <Image src="/fender-logo.png" alt="Fender" width={140} height={99} priority className="w-[140px] h-auto" />
+              <Image src="/fender-logo.png" alt="Fender" width={210} height={148} priority className="w-[210px] h-auto" />
             )}
             <span className="hidden lg:block text-[10px] uppercase tracking-[0.18em] text-white/45 mt-1">
               {isBsSupplies ? 'Steel & building supplies' : 'Reinforcing steel specialists'}
