@@ -70,6 +70,8 @@ model User {
   notes            Note[]
   bugReports       BugReport[]
   accessRequestsDecided AccessRequest[] @relation("decidedBy")
+  testCertificatesUploaded TestCertificate[]
+  castNumbersConfirmed     ExtractedCastNumber[] @relation("castConfirmedBy")
 }
 
 // ------------------------------------------------------------- customers
@@ -213,6 +215,7 @@ model Batch {
   movements StockMovement[]
   orderLines OrderLine[]
   ncrs      Ncr[]
+  matchedCastNumbers ExtractedCastNumber[]
 
   @@unique([heatNumber, productId])
   @@index([productId, receivedAt])
@@ -793,6 +796,44 @@ model AccessRequest {
   decidedBy User? @relation("decidedBy", fields: [decidedById], references: [id])
 
   @@index([status])
+}
+
+// ------------------------------------------------- test cert cast-number reader
+// An uploaded mill test certificate (PDF or photo). One certificate can list
+// several cast numbers, so each read is its own row under it. A person always
+// confirms a reading before it's trusted enough to fill in a batch's mill
+// certificate — an AI-misread digit becoming a traceability record with
+// nobody having checked it is exactly the mistake this is meant to prevent.
+model TestCertificate {
+  id           String   @id @default(cuid())
+  company      Company  @default(FENDER)
+  fileUrl      String
+  fileName     String
+  status       String   @default("Processing") // Processing | NeedsReview | Reviewed | Failed
+  errorMessage String   @default("")
+  uploadedById String?
+  uploadedAt   DateTime @default(now())
+
+  uploadedBy  User?                 @relation(fields: [uploadedById], references: [id])
+  castNumbers ExtractedCastNumber[]
+
+  @@index([company])
+}
+
+model ExtractedCastNumber {
+  id             String    @id @default(cuid())
+  certificateId  String
+  castNumber     String
+  confirmed      Boolean   @default(false)
+  confirmedById  String?
+  confirmedAt    DateTime?
+  matchedBatchId String? // set once it fills in a batch missing its mill certificate
+
+  certificate  TestCertificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  confirmedBy  User?           @relation("castConfirmedBy", fields: [confirmedById], references: [id])
+  matchedBatch Batch?          @relation(fields: [matchedBatchId], references: [id])
+
+  @@index([castNumber])
 }
 
 model ActivityLog {

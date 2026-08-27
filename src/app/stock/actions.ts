@@ -67,7 +67,7 @@ export async function receiveBatch(formData: FormData) {
   const supplierId = String(formData.get('supplierId'));
   const heatNumber = String(formData.get('heatNumber') ?? '').trim();
   const qtyReceived = Number(formData.get('qty'));
-  const millCertUrl = String(formData.get('millCertUrl') ?? '').trim();
+  let millCertUrl = String(formData.get('millCertUrl') ?? '').trim();
 
   if (!heatNumber) throw new Error('Enter a batch or delivery reference.');
   if (!(qtyReceived > 0)) throw new Error('Enter how much arrived.');
@@ -76,6 +76,17 @@ export async function receiveBatch(formData: FormData) {
     db.supplier.findUniqueOrThrow({ where: { id: supplierId }, include: { certificates: { where: { scheme: 'Supplier' } } } }),
     db.product.findUniqueOrThrow({ where: { id: productId } }),
   ]);
+
+  // A Test certs upload may already have confirmed this cast number before the
+  // steel itself was booked in — if so, carry its mill certificate straight over.
+  let matchedCastId: string | null = null;
+  if (!millCertUrl) {
+    const preConfirmed = await db.extractedCastNumber.findFirst({
+      where: { castNumber: heatNumber, confirmed: true, matchedBatchId: null, certificate: { company: product.company } },
+      include: { certificate: true },
+    });
+    if (preConfirmed) { millCertUrl = preConfirmed.certificate.fileUrl; matchedCastId = preConfirmed.id; }
+  }
 
   // CARES-driven quarantine only applies to Fender's reinforcing steel — BCS
   // Products isn't CARES-approved, so its goods-in never gets held up over a
@@ -105,10 +116,12 @@ export async function receiveBatch(formData: FormData) {
   await db.stockMovement.create({
     data: { productId, batchId: batch.id, type: 'GOODS_IN', qty: qtyReceived, reference: batch.deliveryNote, userId: user.id },
   });
+  if (matchedCastId) await db.extractedCastNumber.update({ where: { id: matchedCastId }, data: { matchedBatchId: batch.id } });
   await logActivity('Batch', batch.id, 'Received', `${qtyReceived} of heat ${heatNumber} from ${supplier.name}`, user.id);
 
   revalidatePath('/stock');
   revalidatePath('/compliance');
+  revalidatePath('/compliance/test-certs');
   redirect(`/stock/${productId}`);
 }
 

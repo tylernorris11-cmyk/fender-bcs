@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: { serverActions: { bodySizeLimit: '8mb' } },
+  // 16mb to leave headroom for a photographed mill certificate upload.
+  experimental: { serverActions: { bodySizeLimit: '16mb' } },
 };
 export default nextConfig;
