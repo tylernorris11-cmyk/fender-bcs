@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   ArrowRight, Bell, Bug, CalendarDays, ClipboardCheck, ClipboardList, Factory, Layers,
   LogOut, Settings, ShieldCheck, ShoppingCart, Truck, Users,
@@ -53,9 +54,11 @@ export default async function Launcher() {
           <div className="absolute inset-0 mesh-bg" />
         </div>
         <div className="relative max-w-[1200px] mx-auto px-6 py-5 flex items-center gap-3">
-          <span className="text-xl font-bold tracking-tight shrink-0">
-            {isBsSupplies ? <>BCS<span className="text-white/60 font-medium"> Products</span></> : <>Fender<span className="text-white/60 font-medium">BCS</span></>}
-          </span>
+          {isBsSupplies ? (
+            <span className="text-xl font-bold tracking-tight shrink-0">BCS<span className="text-white/60 font-medium"> Products</span></span>
+          ) : (
+            <Image src="/fender-logo.png" alt="Fender" width={78} height={55} priority className="w-[78px] h-auto shrink-0" />
+          )}
 
           <GlobalSearch
             label="Search the whole system"

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { Bell, Bug, Home, LogOut } from 'lucide-react';
 import type { Company } from '@prisma/client';
@@ -43,9 +44,11 @@ export function Shell({
         <div className="absolute inset-0 mesh-bg pointer-events-none" aria-hidden />
         <div className="relative flex lg:block items-center justify-between p-4 lg:p-0">
           <Link href="/" className="block lg:px-5 lg:pt-6 lg:pb-4">
-            <span className="text-xl font-bold tracking-tight">
-              {isBsSupplies ? <>BCS<span className="text-white/60 font-medium"> Products</span></> : <>Fender<span className="text-white/60 font-medium">BCS</span></>}
-            </span>
+            {isBsSupplies ? (
+              <span className="text-xl font-bold tracking-tight">BCS<span className="text-white/60 font-medium"> Products</span></span>
+            ) : (
+              <Image src="/fender-logo.png" alt="Fender" width={140} height={99} priority className="w-[140px] h-auto" />
+            )}
             <span className="hidden lg:block text-[10px] uppercase tracking-[0.18em] text-white/45 mt-1">
               {isBsSupplies ? 'Steel & building supplies' : 'Reinforcing steel specialists'}
             </span>

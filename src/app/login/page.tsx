@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { getCurrentUser } from '@/lib/auth';
@@ -20,9 +21,11 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
         <div className="absolute inset-0 mesh-bg pointer-events-none" aria-hidden />
         <div className="relative flex items-start justify-between gap-4">
           <div className="inline-block rounded-2xl bg-white/95 px-7 py-6 shadow-pop">
-            <p className="text-3xl font-bold tracking-tight text-forest">
-              {isBsSupplies ? <>BCS <span className="text-signal">Products</span></> : <>Fender<span className="text-signal">BCS</span></>}
-            </p>
+            {isBsSupplies ? (
+              <p className="text-3xl font-bold tracking-tight text-forest">BCS <span className="text-signal">Products</span></p>
+            ) : (
+              <Image src="/fender-logo.png" alt="Fender" width={200} height={141} priority className="w-[200px] h-auto" />
+            )}
             <p className="text-[10px] uppercase tracking-[0.16em] text-brand-700 mt-1.5">
               {isBsSupplies ? 'Steel & building supplies' : 'Reinforcing steel specialists'}
             </p>
