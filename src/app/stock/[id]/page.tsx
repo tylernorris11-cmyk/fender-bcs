@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
-import { money, clock, qty as fmtQty, shortDate } from '@/lib/format';
+import { money, clock, qty as fmtQty, shortDate, productSpec } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, Table } from '@/components/ui';
 import { setBatchStatus, toggleProductActive } from '../actions';
@@ -37,7 +37,7 @@ export default async function StockItemPage({ params }: { params: { id: string }
 
       <PageHeader
         title={product.name}
-        blurb={`${product.code} · ${product.category}${product.standard ? ` · ${product.standard}` : ''}`}
+        blurb={`${product.code} · ${product.category}${product.standard ? ` · ${product.standard}` : ''}${productSpec(product) ? ` · ${productSpec(product)}` : ''}`}
         actions={
           <>
             {!product.active && <Pill tone="neutral">Inactive</Pill>}

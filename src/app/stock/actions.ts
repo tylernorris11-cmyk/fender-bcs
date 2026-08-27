@@ -19,6 +19,11 @@ export async function createProduct(formData: FormData) {
     throw new Error(`${code} is already in use — codes have to be unique.`);
   }
 
+  const numOrNull = (key: string) => {
+    const raw = formData.get(key);
+    return raw != null && raw !== '' ? Number(raw) : null;
+  };
+
   const product = await db.product.create({
     data: {
       company, code, name, category,
@@ -27,6 +32,10 @@ export async function createProduct(formData: FormData) {
       standard: String(formData.get('standard') ?? ''),
       reorderAt: Number(formData.get('reorderAt') ?? 0),
       isRebar: formData.get('isRebar') === '1',
+      lengthFt: numOrNull('lengthFt'),
+      lengthIn: numOrNull('lengthIn'),
+      thicknessMm: numOrNull('thicknessMm'),
+      bundleWeightKg: numOrNull('bundleWeightKg'),
     },
   });
 

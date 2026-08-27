@@ -125,6 +125,14 @@ model Product {
   active      Boolean @default(true)
   isRebar     Boolean @default(false) // drives traceability + FIFO batch picking
 
+  // Sizing for products sold by length, e.g. BCS Products' fence posts —
+  // null on anything else. Bundle weight is reference/handling info, separate
+  // from kgPerUnit (which converts the *sale* unit, e.g. tonnes, to kg).
+  lengthFt       Int?
+  lengthIn       Int?
+  thicknessMm    Decimal? @db.Decimal(6, 2)
+  bundleWeightKg Decimal? @db.Decimal(10, 2)
+
   prices     Price[]
   batches    Batch[]
   orderLines OrderLine[]

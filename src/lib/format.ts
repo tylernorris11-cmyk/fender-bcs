@@ -31,3 +31,16 @@ export const initialsOf = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('');
 
 export const num = (v: unknown) => Number(v ?? 0);
+
+/** 6 ft + 3 in -> 6'3" — feet on its own still reads fine as 6'0". */
+export const feetInches = (ft?: number | null, inches?: number | null) =>
+  ft == null && inches == null ? '' : `${ft ?? 0}'${inches ?? 0}"`;
+
+/** A short spec line for products sized by length — empty string if none of it is set. */
+export const productSpec = (p: { lengthFt?: number | null; lengthIn?: number | null; thicknessMm?: unknown; bundleWeightKg?: unknown }) => {
+  const parts: string[] = [];
+  if (p.lengthFt != null || p.lengthIn != null) parts.push(feetInches(p.lengthFt, p.lengthIn));
+  if (p.thicknessMm != null) parts.push(`${Number(p.thicknessMm)}mm`);
+  if (p.bundleWeightKg != null) parts.push(`${Number(p.bundleWeightKg)}kg/bundle`);
+  return parts.join(' · ');
+};

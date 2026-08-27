@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
-import { qty as fmtQty } from '@/lib/format';
+import { qty as fmtQty, productSpec } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortSelect, Stat, StatRow } from '@/components/ui';
 
@@ -113,7 +113,7 @@ export default async function StockPage({ searchParams }: { searchParams: { cate
                 <Link key={p.id} href={`/stock/${p.id}`} className="flex items-center gap-4 px-4 py-2.5 border-t border-hairline hover:bg-canvas transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold truncate">{p.name}</p>
-                    <p className="text-xs text-ink-faint">{p.code}{p.standard && ` · ${p.standard}`}</p>
+                    <p className="text-xs text-ink-faint">{p.code}{p.standard && ` · ${p.standard}`}{productSpec(p) && ` · ${productSpec(p)}`}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {quarantined > 0 && <Pill tone="warn">{quarantined} quarantined</Pill>}
