@@ -143,7 +143,7 @@ export async function uploadTestCertificate(formData: FormData) {
 
   const bytes = await file.arrayBuffer();
   const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '-');
-  const blob = await put(`test-certs/${Date.now()}-${safeName}`, Buffer.from(bytes), { access: 'public' });
+  const blob = await put(`test-certs/${Date.now()}-${safeName}`, Buffer.from(bytes), { access: 'private' });
 
   const certificate = await db.testCertificate.create({
     data: { company, fileUrl: blob.url, fileName: file.name, uploadedById: user.id, status: 'Processing' },

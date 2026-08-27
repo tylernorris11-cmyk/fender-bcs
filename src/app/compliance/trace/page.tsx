@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { getActiveCompany } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
+import { blobFileHref } from '@/lib/blob';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, Table } from '@/components/ui';
 
@@ -83,7 +84,7 @@ export default async function TracePage({ searchParams }: { searchParams: { q?: 
             <div className="flex gap-2">
               <Pill tone={b.status === 'Available' ? 'good' : b.status === 'Quarantined' ? 'bad' : 'neutral'}>{b.status}</Pill>
               {b.millCertUrl
-                ? <a href={b.millCertUrl} className="btn-secondary btn-sm">Mill certificate</a>
+                ? <a href={blobFileHref(b.millCertUrl)} className="btn-secondary btn-sm">Mill certificate</a>
                 : <Pill tone="bad">No mill certificate</Pill>}
             </div>
           </header>

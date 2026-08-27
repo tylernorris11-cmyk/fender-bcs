@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { money, clock, qty as fmtQty, shortDate, productSpec } from '@/lib/format';
+import { blobFileHref } from '@/lib/blob';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, Table } from '@/components/ui';
 import { setBatchStatus, toggleProductActive } from '../actions';
@@ -99,7 +100,7 @@ export default async function StockItemPage({ params }: { params: { id: string }
               {caresApplies && (
                 <td className="td">
                   {b.millCertUrl
-                    ? <a href={b.millCertUrl} className="inline-flex items-center gap-1.5 text-brand-700 hover:underline"><FileText size={15} /> Open</a>
+                    ? <a href={blobFileHref(b.millCertUrl)} className="inline-flex items-center gap-1.5 text-brand-700 hover:underline"><FileText size={15} /> Open</a>
                     : <Pill tone="bad">Not on file</Pill>}
                 </td>
               )}

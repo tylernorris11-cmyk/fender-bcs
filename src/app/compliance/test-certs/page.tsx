@@ -6,6 +6,7 @@ import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
+import { blobFileHref } from '@/lib/blob';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill } from '@/components/ui';
 import { confirmCastNumber, rejectCastNumber, uploadTestCertificate } from '../actions';
@@ -61,7 +62,7 @@ export default async function TestCertsPage() {
             <section key={cert.id} className="card card-pad">
               <header className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2">
-                  <a href={cert.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-brand-700 hover:underline">
+                  <a href={blobFileHref(cert.fileUrl)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-brand-700 hover:underline">
                     <FileText size={16} /> {cert.fileName}
                   </a>
                   <span className="text-sm text-ink-faint">
