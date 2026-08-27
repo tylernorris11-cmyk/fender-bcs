@@ -27,7 +27,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
                 <p className="text-[10px] uppercase tracking-[0.16em] text-brand-700 mt-1.5">Steel & building supplies</p>
               </>
             ) : (
-              <Image src="/fender-logo.png" alt="Fender" width={340} height={240} priority className="w-[340px] h-auto" />
+              <Image src="/fender-logo.png" alt="Fender" width={260} height={181} priority className="w-[260px] h-auto" />
             )}
           </div>
 

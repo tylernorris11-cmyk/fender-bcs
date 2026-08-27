@@ -77,7 +77,7 @@ export function NewAssetForm({ locations, companies }: { locations: string[]; co
 
         <div>
           <label className="label" htmlFor="depot">Depot</label>
-          <select id="depot" name="depot" defaultValue={locations[0] ?? 'Scunthorpe'} className="input">
+          <select id="depot" name="depot" defaultValue={locations.includes('Scunthorpe') ? 'Scunthorpe' : (locations[0] ?? 'Scunthorpe')} className="input">
             {locations.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
         </div>
