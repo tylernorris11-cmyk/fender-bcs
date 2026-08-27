@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
@@ -16,6 +17,9 @@ export default async function ChecksPage({ searchParams }: { searchParams: { ord
   const user = await requirePermission('production.view');
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
+
+  // BS 8666 dimensional tolerances only apply to bent rebar — BCS has nothing to check here.
+  if (company !== 'FENDER') redirect('/production');
 
   const [orders, recent] = await Promise.all([
     db.order.findMany({

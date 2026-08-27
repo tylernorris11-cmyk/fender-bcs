@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
@@ -11,9 +12,13 @@ import { Empty, PageHeader, Pill, Table } from '@/components/ui';
 export default async function SchedulesPage() {
   const user = await requirePermission('production.view');
   const alerts = await getAlerts(user);
+  const company = getActiveCompany(user);
+
+  // Bending is a rebar concept — BCS Products cuts fence post to length, nothing to bend.
+  if (company !== 'FENDER') redirect('/production');
 
   const orders = await db.order.findMany({
-    where: { company: getActiveCompany(user), archived: false, barMarks: { some: {} }, stage: { notIn: ['COMPLETED', 'CANCELLED'] } },
+    where: { company, archived: false, barMarks: { some: {} }, stage: { notIn: ['COMPLETED', 'CANCELLED'] } },
     include: { customer: true, barMarks: { orderBy: { sortOrder: 'asc' }, include: { qcChecks: true } } },
     orderBy: { deliveryDate: 'asc' },
   });
