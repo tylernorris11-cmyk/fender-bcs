@@ -141,7 +141,7 @@ export default async function PlanningPage({
 
   return (
     <Shell user={user} module="planning" nav={NAV.planning} current={`/planning${view === 'week' ? '' : `?view=${view}`}`} alerts={alerts.length}>
-      <PageHeader title="Planning" blurb="Deliveries, inspections and everything else with a date on it." />
+      <PageHeader title="Deliveries" blurb="Deliveries, inspections and everything else with a date on it." />
 
       <div className="flex flex-wrap items-center gap-3 mb-3">
         <div className="flex gap-2">

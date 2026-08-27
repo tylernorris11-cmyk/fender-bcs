@@ -40,6 +40,11 @@ export default async function Launcher() {
   const active = getActiveCompany(user);
   const tiles = MODULES.filter((m) => can(user, m.perm) && (!('company' in m) || m.company === active));
   const isBsSupplies = active === 'BS_SUPPLIES';
+  // BCS cuts fence post to length from coil — the default blurb describes
+  // Fender's cut-and-bend-to-BS-8666 process, which doesn't apply there.
+  const blurbOverrides: Partial<Record<string, string>> = isBsSupplies
+    ? { production: "What still needs cutting to length, and what's already off the straightening line." }
+    : {};
 
   return (
     <div className="min-h-screen">
@@ -133,7 +138,7 @@ export default async function Launcher() {
                   <Icon size={26} />
                 </span>
                 <h2 className="text-lg font-bold mt-14">{m.label}</h2>
-                <p className="text-sm text-ink-muted mt-1.5 pr-14">{m.blurb}</p>
+                <p className="text-sm text-ink-muted mt-1.5 pr-14">{blurbOverrides[m.key] ?? m.blurb}</p>
                 <span className={`absolute bottom-6 right-6 grid place-items-center h-10 w-10 rounded-full border-2 ${tone.arrow} group-hover:translate-x-0.5 transition-transform`} aria-hidden>
                   <ArrowRight size={18} />
                 </span>

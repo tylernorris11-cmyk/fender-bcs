@@ -237,7 +237,7 @@ export function NewOrderForm({
                 <option value="">—</option>
                 {towns.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
-              <p className="hint">Used by Planning to group deliveries going the same way.</p>
+              <p className="hint">Used by Deliveries to group runs going the same way.</p>
             </div>
             <div className="sm:col-span-2">
               <label className="label" htmlFor="address">Full delivery address</label>

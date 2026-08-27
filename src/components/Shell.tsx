@@ -14,7 +14,7 @@ import { GlobalSearch } from './GlobalSearch';
 export type NavItem = { label: string; href: string; perm?: Permission; company?: Company };
 
 const MODULE_TITLE: Record<string, string> = {
-  orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Planning',
+  orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Deliveries',
   customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', setup: 'Set Up',
 };
 

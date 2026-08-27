@@ -14,7 +14,7 @@ export default async function TownsPage({ searchParams }: { searchParams: { sort
 
   return (
     <Shell user={user} module="setup" nav={NAV.setup} current="/setup/towns" alerts={alerts.length}>
-      <PageHeader title="Towns & cities" blurb="The delivery areas Planning groups runs by." />
+      <PageHeader title="Towns & cities" blurb="The areas the Deliveries screen groups runs by." />
       <section className="card card-pad max-w-2xl">
         <form className="flex justify-end gap-2 mb-3">
           <SortSelect value={searchParams.sort} options={[{ value: 'name', label: 'Name A-Z' }, { value: 'region', label: 'Region' }]} />
