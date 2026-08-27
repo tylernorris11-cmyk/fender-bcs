@@ -47,6 +47,7 @@ export default async function NewOrderPage() {
         towns={towns.map((t) => t.name)}
         locations={locations.map((l) => l.name)}
         cutBentPrice={0}
+        isFender={company === 'FENDER'}
       />
     </Shell>
   );

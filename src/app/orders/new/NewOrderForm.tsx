@@ -10,6 +10,7 @@ type Product = { id: string; name: string; code: string; category: string; unit:
 
 type Line = { key: number; productId: string; qty: string; unitPrice: string };
 type Bar = { key: number; mark: string; diaMm: string; shapeCode: string; lengthMm: string; bars: string; a: string; b: string; c: string; d: string; ef: string; unitPrice: string };
+type Fence = { key: number; lengthFt: string; lengthIn: string; thicknessMm: string; qty: string; unitPrice: string };
 
 const VAT = 0.2;
 const gbp = (n: number) => n.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 });
@@ -17,13 +18,15 @@ const gbp = (n: number) => n.toLocaleString('en-GB', { style: 'currency', curren
 let seq = 0;
 const newLine = (): Line => ({ key: seq++, productId: '', qty: '', unitPrice: '' });
 const newBar = (): Bar => ({ key: seq++, mark: '', diaMm: '12', shapeCode: '21', lengthMm: '', bars: '', a: '', b: '', c: '', d: '', ef: '', unitPrice: '' });
+const newFence = (): Fence => ({ key: seq++, lengthFt: '', lengthIn: '', thicknessMm: '', qty: '', unitPrice: '' });
 
 export function NewOrderForm({
-  customers, products, towns, locations, cutBentPrice,
-}: { customers: Customer[]; products: Product[]; towns: string[]; locations: string[]; cutBentPrice: number }) {
+  customers, products, towns, locations, cutBentPrice, isFender,
+}: { customers: Customer[]; products: Product[]; towns: string[]; locations: string[]; cutBentPrice: number; isFender: boolean }) {
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [bars, setBars] = useState<Bar[]>([]);
+  const [fences, setFences] = useState<Fence[]>([]);
   const [address, setAddress] = useState(customers[0]?.address ?? '');
   const [town, setTown] = useState(customers[0]?.town ?? '');
 
@@ -40,9 +43,11 @@ export function NewOrderForm({
       return s + perM * (Number(b.lengthMm || 0) / 1000) * Number(b.bars || 0);
     }, 0);
     const barNet = bars.reduce((s, b) => s + Number(b.bars || 0) * Number(b.unitPrice || 0), 0);
-    const net = productNet + barNet;
-    return { net, vat: net * VAT, gross: net * (1 + VAT), kg: productKg + barKg };
-  }, [lines, bars, products]);
+    const fenceNet = fences.reduce((s, f) => s + Number(f.qty || 0) * Number(f.unitPrice || 0), 0);
+    const fenceKg = fences.reduce((s, f) => s + Number(f.qty || 0) * 1000, 0);
+    const net = productNet + barNet + fenceNet;
+    return { net, vat: net * VAT, gross: net * (1 + VAT), kg: productKg + barKg + fenceKg };
+  }, [lines, bars, fences, products]);
 
   const limit = Number(customer?.creditLimit ?? 0);
   const used = customer?.used ?? 0;
@@ -145,6 +150,7 @@ export function NewOrderForm({
       </section>
 
       {/* -------------------------------------------------- bending schedule */}
+      {isFender ? (
       <section className="card card-pad">
         <h2 className="text-lg font-bold flex items-center gap-2">
           Cut &amp; bent — bending schedule <Info size={16} className="text-ink-faint" aria-hidden />
@@ -214,6 +220,71 @@ export function NewOrderForm({
           <Plus size={16} /> Add bar mark
         </button>
       </section>
+      ) : (
+      <section className="card card-pad">
+        <h2 className="text-lg font-bold">Fence posts</h2>
+        <p className="text-sm text-ink-muted mt-1 mb-4">
+          Cut to length from coil — no need to add it to Stock first, just describe what the customer wants
+          and it&apos;ll show up in Production ready to cut.
+        </p>
+
+        {fences.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr>
+                  {['Length', '', 'Thickness (mm)', 'Qty (t)', '£ per tonne', 'Line total', ''].map((h, i) => (
+                    <th key={i} className="th pb-2">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {fences.map((f, i) => {
+                  const lineTotal = Number(f.qty || 0) * Number(f.unitPrice || 0);
+                  return (
+                    <tr key={f.key} className="border-t border-hairline">
+                      <td className="py-2 pr-2">
+                        <input name={`fence[${i}][lengthFt]`} type="number" min="0" step="1" placeholder="6" className="input w-16 px-2 py-1.5"
+                               value={f.lengthFt} onChange={(e) => setFences((p) => p.map((x) => x.key === f.key ? { ...x, lengthFt: e.target.value } : x))} aria-label="Feet" />
+                        <span className="text-ink-faint text-xs px-0.5">ft</span>
+                      </td>
+                      <td className="py-2 pr-2">
+                        <input name={`fence[${i}][lengthIn]`} type="number" min="0" max="11" step="1" placeholder="0" className="input w-16 px-2 py-1.5"
+                               value={f.lengthIn} onChange={(e) => setFences((p) => p.map((x) => x.key === f.key ? { ...x, lengthIn: e.target.value } : x))} aria-label="Inches" />
+                        <span className="text-ink-faint text-xs px-0.5">in</span>
+                      </td>
+                      <td className="py-2 pr-2">
+                        <input name={`fence[${i}][thicknessMm]`} type="number" min="0" step="0.1" placeholder="3" className="input w-24 px-2 py-1.5"
+                               value={f.thicknessMm} onChange={(e) => setFences((p) => p.map((x) => x.key === f.key ? { ...x, thicknessMm: e.target.value } : x))} />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <input name={`fence[${i}][qty]`} type="number" min="0" step="0.5" placeholder="1" className="input w-24 px-2 py-1.5"
+                               value={f.qty} onChange={(e) => setFences((p) => p.map((x) => x.key === f.key ? { ...x, qty: e.target.value } : x))} />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <input name={`fence[${i}][unitPrice]`} type="number" min="0" step="0.01" placeholder="0.00" className="input w-28 px-2 py-1.5"
+                               value={f.unitPrice} onChange={(e) => setFences((p) => p.map((x) => x.key === f.key ? { ...x, unitPrice: e.target.value } : x))} />
+                      </td>
+                      <td className="py-2 pr-2 font-bold tabular-nums">{gbp(lineTotal)}</td>
+                      <td className="py-2">
+                        <button type="button" onClick={() => setFences((p) => p.filter((x) => x.key !== f.key))}
+                                className="btn-ghost p-2" aria-label={`Remove fence post line ${i + 1}`}>
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <button type="button" onClick={() => setFences((p) => [...p, newFence()])} className="btn-secondary mt-4">
+          <Plus size={16} /> Add fence post line
+        </button>
+      </section>
+      )}
 
       {/* --------------------------------------------- delivery and summary */}
       <div className="grid gap-6 lg:grid-cols-[1fr_340px] items-start">

@@ -8,6 +8,7 @@ import { assertPermission, logActivity } from '@/lib/auth';
 import { assertCompanyAccess } from '@/lib/company';
 import { applyChecklistTemplate, creditCheck, nextOrderNumber, NEXT_STAGE, pickOldestFirst } from '@/lib/orders';
 import { barWeightKg, shapeName } from '@/lib/bs8666';
+import { feetInches } from '@/lib/format';
 
 /** Read the repeating product / bar-mark rows out of the new-order form. */
 function rows(formData: FormData, prefix: string): Record<string, string>[] {
@@ -32,9 +33,27 @@ export async function createOrder(formData: FormData) {
 
   const productRows = rows(formData, 'product').filter((r) => r.productId && Number(r.qty) > 0);
   const barRows = rows(formData, 'bar').filter((r) => r.mark && Number(r.bars) > 0);
+  const fenceRows = rows(formData, 'fence').filter((r) => r.thicknessMm && Number(r.qty) > 0);
 
   const products = await db.product.findMany({
     where: { id: { in: productRows.map((r) => r.productId) } },
+  });
+
+  // Fence post is described inline (length, thickness) rather than picked from Stock —
+  // BCS Products cuts it to length from coil, so there's no catalogue SKU to require.
+  const fenceLines = fenceRows.map((r) => {
+    const qty = Number(r.qty);
+    const unitPrice = Number(r.unitPrice || 0);
+    const label = feetInches(r.lengthFt ? Number(r.lengthFt) : null, r.lengthIn ? Number(r.lengthIn) : null);
+    return {
+      productId: null,
+      description: `${label ? `${label} x ` : ''}${r.thicknessMm}mm fence post`,
+      qty,
+      unit: 't',
+      unitPrice,
+      lineTotal: +(qty * unitPrice).toFixed(2),
+      weightKg: +(qty * 1000).toFixed(3),
+    };
   });
 
   const order = await db.order.create({
@@ -51,21 +70,23 @@ export async function createOrder(formData: FormData) {
       yardNotes: String(formData.get('yardNotes') ?? ''),
       raisedById: user.id,
       lines: {
-        create: productRows.map((r, i) => {
-          const product = products.find((p) => p.id === r.productId);
-          const qty = Number(r.qty);
-          const unitPrice = Number(r.unitPrice || 0);
-          return {
-            productId: r.productId,
-            description: product?.name ?? 'Item',
-            qty,
-            unit: product?.unit ?? 'each',
-            unitPrice,
-            lineTotal: +(qty * unitPrice).toFixed(2),
-            weightKg: +(qty * Number(product?.kgPerUnit ?? 0)).toFixed(3),
-            sortOrder: i,
-          };
-        }),
+        create: [
+          ...productRows.map((r) => {
+            const product = products.find((p) => p.id === r.productId);
+            const qty = Number(r.qty);
+            const unitPrice = Number(r.unitPrice || 0);
+            return {
+              productId: r.productId,
+              description: product?.name ?? 'Item',
+              qty,
+              unit: product?.unit ?? 'each',
+              unitPrice,
+              lineTotal: +(qty * unitPrice).toFixed(2),
+              weightKg: +(qty * Number(product?.kgPerUnit ?? 0)).toFixed(3),
+            };
+          }),
+          ...fenceLines,
+        ].map((line, i) => ({ ...line, sortOrder: i })),
       },
       barMarks: {
         create: barRows.map((r, i) => {
