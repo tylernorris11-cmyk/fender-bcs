@@ -57,7 +57,9 @@ export default async function Launcher() {
           {isBsSupplies ? (
             <span className="text-xl font-bold tracking-tight shrink-0">BCS<span className="text-white/60 font-medium"> Products</span></span>
           ) : (
-            <Image src="/fender-logo.png" alt="Fender" width={64} height={45} priority className="w-[64px] h-auto shrink-0" />
+            <span className="inline-block bg-white rounded-lg px-2 py-1.5 shrink-0">
+              <Image src="/fender-logo.png" alt="Fender" width={56} height={39} priority className="w-[56px] h-auto" />
+            </span>
           )}
 
           <GlobalSearch
