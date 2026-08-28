@@ -19,7 +19,7 @@ export default async function TestCertsPage() {
   if (company !== 'FENDER') {
     return (
       <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/test-certs" alerts={alerts.length}>
-        <PageHeader title="Test certs" />
+        <PageHeader title="Upload certificate" />
         <div className="banner-warn">
           Compliance is a Fender Steel thing — BCS Products is not CARES-approved and none of this applies to it.
         </div>
@@ -36,7 +36,7 @@ export default async function TestCertsPage() {
   return (
     <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/test-certs" alerts={alerts.length}>
       <PageHeader
-        title="Test certs"
+        title="Upload certificate"
         blurb="Upload a mill test certificate and it reads the cast numbers off it automatically — confirm each one to file it against the matching batch."
       />
 

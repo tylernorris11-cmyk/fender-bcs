@@ -180,8 +180,7 @@ export const NAV: Record<string, NavItem[]> = {
   customers: [{ label: 'All customers', href: '/customers' }],
   compliance: [
     { label: 'Overview', href: '/compliance' },
-    { label: 'Certificates', href: '/compliance/certificates' },
-    { label: 'Test certs', href: '/compliance/test-certs' },
+    { label: 'Upload certificate', href: '/compliance/test-certs' },
     { label: 'Trace a batch', href: '/compliance/trace' },
     { label: 'Suppliers', href: '/compliance/suppliers' },
     { label: 'Non-conformance', href: '/compliance/ncr' },

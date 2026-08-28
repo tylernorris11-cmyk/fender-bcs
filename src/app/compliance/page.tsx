@@ -41,7 +41,7 @@ const EXPECTATIONS = [
   {
     title: 'Certificates in date and returns submitted',
     body: 'The register warns ninety days ahead. Tonnage returns are ticked off under Returns and actions. Audits are twice yearly and can be unannounced, so the aim is simple: green banner every day.',
-    href: '/compliance/certificates',
+    href: '/compliance/suppliers',
   },
 ];
 
@@ -103,8 +103,8 @@ export default async function CompliancePage() {
       )}
 
       <StatRow>
-        <Stat value={inDate} label="Certificates in date" tone="good" href="/compliance/certificates" />
-        <Stat value={expiring} label="Expiring within 90 days" tone={expiring ? 'warn' : 'default'} href="/compliance/certificates" />
+        <Stat value={inDate} label="Certificates in date" tone="good" href="/compliance/suppliers" />
+        <Stat value={expiring} label="Expiring within 90 days" tone={expiring ? 'warn' : 'default'} href="/compliance/suppliers" />
         <Stat value={openActions + openNcrs} label="Open actions and NCRs" tone={openActions + openNcrs ? 'warn' : 'default'} href="/compliance/ncr" />
         <Stat value={`${tracedBatches}/${batches}`} label="Batches fully traceable" tone={tracedBatches === batches ? 'good' : 'bad'} href="/compliance/trace" />
       </StatRow>

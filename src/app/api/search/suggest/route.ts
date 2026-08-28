@@ -60,7 +60,7 @@ export async function GET(request: Request) {
     ...products.map((p) => ({ type: 'Product', label: p.code, sublabel: p.name, href: `/stock/${p.id}` })),
     ...batches.map((b) => ({ type: 'Cast', label: b.heatNumber, sublabel: b.product.name, href: `/compliance/trace?q=${b.heatNumber}` })),
     ...suppliers.map((s) => ({ type: 'Supplier', label: s.name, sublabel: s.approvedFor || undefined, href: '/compliance/suppliers' })),
-    ...certificates.map((c) => ({ type: 'Certificate', label: c.title, sublabel: c.holder, href: '/compliance/certificates' })),
+    ...certificates.map((c) => ({ type: 'Certificate', label: c.title, sublabel: c.holder, href: '/compliance/suppliers' })),
     ...ncrs.map((n) => ({ type: 'NCR', label: n.ref, sublabel: n.description.slice(0, 60), href: '/compliance/ncr' })),
     ...assets.map((a) => ({ type: 'Asset', label: a.ref, sublabel: a.name, href: `/assets/${a.id}` })),
   ].slice(0, 8);

@@ -173,7 +173,7 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
           <ul className="divide-y divide-hairline">
             {certificates.map((c) => (
               <li key={c.id} className="py-3 flex flex-wrap items-center gap-3">
-                <Link href="/compliance/certificates" className="font-semibold text-brand-700 hover:underline">{c.title}</Link>
+                <Link href="/compliance/suppliers" className="font-semibold text-brand-700 hover:underline">{c.title}</Link>
                 <span className="text-ink-muted">{c.scheme} · {c.holder}</span>
                 <span className="text-ink-faint ml-auto">expires {shortDate(c.expiresOn)}</span>
               </li>

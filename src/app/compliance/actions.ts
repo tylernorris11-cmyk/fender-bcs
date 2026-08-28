@@ -90,7 +90,6 @@ export async function saveCertificate(formData: FormData) {
   }
 
   await logActivity('Certificate', id || data.title, id ? 'Updated' : 'Added', `${data.scheme} · ${data.holder}`, user.id);
-  revalidatePath('/compliance/certificates');
   revalidatePath('/compliance/suppliers');
   revalidatePath('/compliance');
 }
