@@ -8,6 +8,7 @@ import { assertPermission, hashPassword, logActivity, passwordProblem } from '@/
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { initialsOf } from '@/lib/format';
 import { sendEmail } from '@/lib/email';
+import { TOGGLEABLE_MODULES } from '@/lib/rbac';
 
 // ------------------------------------------------------------- pricing
 
@@ -152,6 +153,27 @@ export async function updateHolidayAllowance(formData: FormData) {
   await logActivity('User', userId, 'Holiday allowance changed', `${days} days a year`, admin.id);
   revalidatePath('/setup/users');
   revalidatePath('/holidays');
+}
+
+/**
+ * The checkboxes on screen are "can see" (positive, easier to read at a
+ * glance) — this inverts that into the "hiddenModules" blocklist can()
+ * actually checks, so unchecking a box removes access everywhere at once:
+ * the home screen, every menu, and the page itself if they type the URL in.
+ */
+export async function updateHiddenModules(formData: FormData) {
+  const admin = await assertPermission('setup.users');
+  const userId = String(formData.get('userId'));
+  const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  assertCanManage(admin, target);
+  if (target.role === 'MASTER_ADMIN') throw new Error('A Master Administrator can always see everything — nothing to hide.');
+
+  const visible = new Set(formData.getAll('visible').map(String));
+  const hiddenModules = TOGGLEABLE_MODULES.map((m) => m.key).filter((key) => !visible.has(key));
+
+  await db.user.update({ where: { id: userId }, data: { hiddenModules } });
+  await logActivity('User', userId, 'Visibility changed', hiddenModules.length ? `Hidden: ${hiddenModules.join(', ')}` : 'Everything visible', admin.id);
+  revalidatePath('/setup/users');
 }
 
 export async function resetPassword(formData: FormData) {

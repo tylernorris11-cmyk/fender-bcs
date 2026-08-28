@@ -73,6 +73,7 @@ model User {
   testCertificatesUploaded TestCertificate[]
   castNumbersConfirmed     ExtractedCastNumber[] @relation("castConfirmedBy")
   holidayAllowanceDays Int              @default(28) // working days a year — editable in Set Up
+  hiddenModules        String[]         @default([]) // module keys hidden for this person regardless of role — never applies to MASTER_ADMIN
   holidaysRequested    HolidayRequest[] @relation("holidayRequestedBy")
   holidaysDecided      HolidayRequest[] @relation("holidayDecidedBy")
 }

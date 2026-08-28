@@ -155,11 +155,19 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
 
 export type SessionUser = {
   id: string; name: string; email: string; role: Role; jobTitle: string; initials: string; colour: string;
-  companies: Company[];
+  companies: Company[]; hiddenModules: string[];
 };
 
-export function can(user: Pick<SessionUser, 'role'> | null | undefined, perm: Permission): boolean {
+/**
+ * A permission's own module ("orders" out of "orders.view") doubles as the
+ * key a Master Administrator can hide for someone in Set Up — hiding it
+ * blocks every permission under that prefix, not just view, so a hidden
+ * module is gone from the page itself, not just the menu. Never applies to
+ * a Master Administrator; there would be no way back in for the last one.
+ */
+export function can(user: Pick<SessionUser, 'role' | 'hiddenModules'> | null | undefined, perm: Permission): boolean {
   if (!user) return false;
+  if (user.role !== 'MASTER_ADMIN' && user.hiddenModules?.includes(perm.split('.')[0])) return false;
   return PERMISSIONS[user.role]?.includes(perm) ?? false;
 }
 
@@ -180,6 +188,9 @@ export const MODULES = [
   { key: 'assets', label: 'Assets', href: '/assets', perm: 'assets.view' as Permission, blurb: 'Manage company assets, equipment and maintenance.' },
   { key: 'checks', label: 'Checks', href: '/checks', perm: 'checks.view' as Permission, blurb: 'Morning checks on machines, lorries and pickups before use.' },
 ] as const;
+
+/** Every module a Master Administrator can hide for someone in Set Up — everything except Set Up itself. */
+export const TOGGLEABLE_MODULES = MODULES.map((m) => ({ key: m.key, label: m.label }));
 
 export const ROLE_LABELS: Record<Role, string> = {
   MASTER_ADMIN: 'Master Administrator',

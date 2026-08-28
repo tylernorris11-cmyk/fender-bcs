@@ -2,12 +2,14 @@ import type { Role } from '@prisma/client';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
-import { PERMISSIONS, ROLE_BLURBS, ROLE_LABELS } from '@/lib/rbac';
+import { PERMISSIONS, ROLE_BLURBS, ROLE_LABELS, TOGGLEABLE_MODULES } from '@/lib/rbac';
 import { shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { COMPANY_LABEL } from '@/lib/company';
 import { Avatar, PageHeader, Pill, SortTh, Table } from '@/components/ui';
-import { createUser, resetPassword, toggleUserActive, updateHolidayAllowance, updateUserCompanies, updateUserRole } from '../actions';
+import {
+  createUser, resetPassword, toggleUserActive, updateHiddenModules, updateHolidayAllowance, updateUserCompanies, updateUserRole,
+} from '../actions';
 
 const COMPANIES = ['FENDER', 'BS_SUPPLIES'] as const;
 
@@ -126,6 +128,48 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
             );
           })}
         </Table>
+      </section>
+
+      <section className="card card-pad mb-6">
+        <h2 className="text-lg font-bold mb-1">Who can see what</h2>
+        <p className="text-sm text-ink-muted mb-4">
+          Untick a module and it disappears for that person everywhere — home screen, menus, search, and the page itself
+          if they go straight to the address. A Master Administrator can always see everything, so they aren&apos;t listed here.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm">
+            <thead>
+              <tr>
+                <th className="th text-left">Person</th>
+                {TOGGLEABLE_MODULES.map((m) => <th key={m.key} className="th text-center whitespace-nowrap px-2">{m.label}</th>)}
+                <th className="th sr-only">Save</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.filter((u) => u.role !== 'MASTER_ADMIN').map((u) => (
+                <tr key={u.id} className="row">
+                  <td className="td font-semibold whitespace-nowrap">{u.name}</td>
+                  {TOGGLEABLE_MODULES.map((m) => (
+                    <td key={m.key} className="td text-center">
+                      <input type="checkbox" form={`vis-${u.id}`} name="visible" value={m.key}
+                             defaultChecked={!u.hiddenModules.includes(m.key)}
+                             className="h-4 w-4 accent-brand" aria-label={`${u.name} can see ${m.label}`} />
+                    </td>
+                  ))}
+                  <td className="td">
+                    <form id={`vis-${u.id}`} action={updateHiddenModules}>
+                      <input type="hidden" name="userId" value={u.id} />
+                      <button className="btn-secondary btn-sm">Save</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+              {users.filter((u) => u.role !== 'MASTER_ADMIN').length === 0 && (
+                <tr><td colSpan={TOGGLEABLE_MODULES.length + 2} className="td text-ink-muted">Nobody else to set this for yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
