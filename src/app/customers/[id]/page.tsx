@@ -63,37 +63,39 @@ export default async function CustomerPage({ params }: { params: { id: string } 
         </div>
       </section>
 
-      <section className="card card-pad mb-6">
-        <h2 className="text-lg font-bold mb-4">Orders</h2>
-        <Table head={<>
-          <th className="th">Order</th><th className="th">Created</th><th className="th">Stage</th>
-          <th className="th text-right">Total (ex VAT)</th><th className="th">Payment</th>
-        </>}>
-          {customer.orders.map((o) => (
-            <tr key={o.id} className="row">
-              <td className="td"><Link href={`/orders/${o.id}`} className="font-semibold text-brand-700 hover:underline">{o.number}</Link></td>
-              <td className="td text-ink-muted">{shortDate(o.createdAt)}</td>
-              <td className="td"><StagePill stage={o.stage} /></td>
-              <td className="td text-right font-semibold tabular-nums">{money(orderTotals(o).net)}</td>
-              <td className="td">
-                {o.paymentStatus === 'PAID' ? (
-                  <span className="flex items-center gap-2">
-                    <Pill tone="good">Paid {shortDate(o.paidAt)}</Pill>
-                    {can(user, 'orders.markPaid') && (
-                      <form action={markPaid}>
-                        <input type="hidden" name="orderId" value={o.id} />
-                        <input type="hidden" name="undo" value="1" />
-                        <button className="text-xs text-ink-faint hover:text-ink underline">undo</button>
-                      </form>
-                    )}
-                  </span>
-                ) : <Pill>Unpaid</Pill>}
-              </td>
-            </tr>
-          ))}
-          {customer.orders.length === 0 && <tr><td colSpan={5} className="td text-ink-muted">No orders yet.</td></tr>}
-        </Table>
-      </section>
+      {can(user, 'orders.view') && (
+        <section className="card card-pad mb-6">
+          <h2 className="text-lg font-bold mb-4">Orders</h2>
+          <Table head={<>
+            <th className="th">Order</th><th className="th">Created</th><th className="th">Stage</th>
+            <th className="th text-right">Total (ex VAT)</th><th className="th">Payment</th>
+          </>}>
+            {customer.orders.map((o) => (
+              <tr key={o.id} className="row">
+                <td className="td"><Link href={`/orders/${o.id}`} className="font-semibold text-brand-700 hover:underline">{o.number}</Link></td>
+                <td className="td text-ink-muted">{shortDate(o.createdAt)}</td>
+                <td className="td"><StagePill stage={o.stage} /></td>
+                <td className="td text-right font-semibold tabular-nums">{money(orderTotals(o).net)}</td>
+                <td className="td">
+                  {o.paymentStatus === 'PAID' ? (
+                    <span className="flex items-center gap-2">
+                      <Pill tone="good">Paid {shortDate(o.paidAt)}</Pill>
+                      {can(user, 'orders.markPaid') && (
+                        <form action={markPaid}>
+                          <input type="hidden" name="orderId" value={o.id} />
+                          <input type="hidden" name="undo" value="1" />
+                          <button className="text-xs text-ink-faint hover:text-ink underline">undo</button>
+                        </form>
+                      )}
+                    </span>
+                  ) : <Pill>Unpaid</Pill>}
+                </td>
+              </tr>
+            ))}
+            {customer.orders.length === 0 && <tr><td colSpan={5} className="td text-ink-muted">No orders yet.</td></tr>}
+          </Table>
+        </section>
+      )}
 
       {customer.ncrs.length > 0 && (
         <section className="card card-pad">

@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { can } from '@/lib/rbac';
 import { COMPANY_LABEL } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
@@ -60,9 +61,9 @@ export default async function PlanningPage({
 
   for (const o of orders) {
     // Both companies share this board because they share lorries — but a
-    // viewer without access to the OTHER company only gets the logistics
-    // (day, town), never the customer or order detail.
-    const visible = user.companies.includes(o.company);
+    // viewer without access to the OTHER company, or without orders.view at
+    // all, only gets the logistics (day, town), never the customer or order detail.
+    const visible = user.companies.includes(o.company) && can(user, 'orders.view');
     entries.push({
       id: `order-${o.id}`,
       date: o.deliveryDate!,
@@ -82,6 +83,10 @@ export default async function PlanningPage({
     // left off the board entirely rather than shown masked.
     if (e.asset?.company && !user.companies.includes(e.asset.company)) continue;
 
+    // Same reasoning as a company mismatch — an asset-linked event isn't
+    // shareable with someone who can't see assets at all.
+    if (e.assetId && !can(user, 'assets.view')) continue;
+
     // An event tied to an order or a depot-based asset belongs to that
     // depot; anything else (a toolbox talk, a general reminder) isn't
     // depot-specific and stays visible whichever depot is selected.
@@ -89,7 +94,7 @@ export default async function PlanningPage({
     if (depot && eventDepot && eventDepot !== depot) continue;
 
     const orderCompany = e.order?.company;
-    const visible = !orderCompany || user.companies.includes(orderCompany);
+    const visible = !orderCompany || (user.companies.includes(orderCompany) && can(user, 'orders.view'));
     entries.push({
       id: `event-${e.id}`,
       date: e.startsAt,
@@ -103,8 +108,9 @@ export default async function PlanningPage({
   }
 
   // Statutory dates from the asset register drop straight onto the calendar,
-  // so nothing sits in a spreadsheet that nobody opens.
-  for (const a of assets) {
+  // so nothing sits in a spreadsheet that nobody opens — but only for
+  // someone who can actually see the asset register in the first place.
+  for (const a of can(user, 'assets.view') ? assets : []) {
     const due: [string, Date | null][] = [
       ['MOT', a.motDue], ['Road tax', a.taxDue], ['Safety inspection', a.weeklyCheckDue],
       ['PUWER inspection', a.puwerDue], ['LOLER exam', a.lolerDue], ['Service', a.serviceDue],
