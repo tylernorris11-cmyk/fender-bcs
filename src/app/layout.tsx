@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   title: 'Fender Steel — Control Centre',
   description: 'Orders, production, stock, customers and CARES compliance for Fender Steel.',
   robots: { index: false, follow: false },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'FenderBCS',
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
