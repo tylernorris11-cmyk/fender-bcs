@@ -15,7 +15,7 @@ import { GlobalSearch } from './GlobalSearch';
 export type NavItem = { label: string; href: string; perm?: Permission; company?: Company };
 
 const MODULE_TITLE: Record<string, string> = {
-  orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Deliveries',
+  orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Deliveries', holidays: 'Holidays',
   customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', setup: 'Set Up',
 };
 
@@ -176,6 +176,10 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'This week', href: '/planning' },
     { label: 'Today', href: '/planning?view=day' },
     { label: 'Month', href: '/planning?view=month' },
+  ],
+  holidays: [
+    { label: 'Requests', href: '/holidays' },
+    { label: 'Calendar', href: '/holidays/calendar' },
   ],
   customers: [{ label: 'All customers', href: '/customers' }],
   compliance: [

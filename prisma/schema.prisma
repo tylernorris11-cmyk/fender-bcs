@@ -72,6 +72,9 @@ model User {
   accessRequestsDecided AccessRequest[] @relation("decidedBy")
   testCertificatesUploaded TestCertificate[]
   castNumbersConfirmed     ExtractedCastNumber[] @relation("castConfirmedBy")
+  holidayAllowanceDays Int              @default(28) // working days a year — editable in Set Up
+  holidaysRequested    HolidayRequest[] @relation("holidayRequestedBy")
+  holidaysDecided      HolidayRequest[] @relation("holidayDecidedBy")
 }
 
 // ------------------------------------------------------------- customers
@@ -818,6 +821,37 @@ model TestCertificate {
   castNumbers ExtractedCastNumber[]
 
   @@index([company])
+}
+
+// ------------------------------------------------------------ holidays
+// Deliberately company-agnostic — same yard, same people, one calendar. A
+// user's own company access already governs whether they can see this at all.
+
+enum HolidayStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model HolidayRequest {
+  id           String        @id @default(cuid())
+  userId       String
+  startDate    DateTime // UTC midnight, inclusive
+  endDate      DateTime // UTC midnight, inclusive
+  workingDays  Int // weekends and bank holidays already excluded
+  note         String        @default("")
+  status       HolidayStatus @default(PENDING)
+  requestedAt  DateTime      @default(now())
+  decidedAt    DateTime?
+  decidedById  String?
+  decisionNote String        @default("")
+
+  user      User  @relation("holidayRequestedBy", fields: [userId], references: [id])
+  decidedBy User? @relation("holidayDecidedBy", fields: [decidedById], references: [id])
+
+  @@index([startDate, endDate])
+  @@index([userId])
 }
 
 model ExtractedCastNumber {

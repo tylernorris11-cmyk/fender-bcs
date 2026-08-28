@@ -7,7 +7,7 @@ import { shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { COMPANY_LABEL } from '@/lib/company';
 import { Avatar, PageHeader, Pill, SortTh, Table } from '@/components/ui';
-import { createUser, resetPassword, toggleUserActive, updateUserCompanies, updateUserRole } from '../actions';
+import { createUser, resetPassword, toggleUserActive, updateHolidayAllowance, updateUserCompanies, updateUserRole } from '../actions';
 
 const COMPANIES = ['FENDER', 'BS_SUPPLIES'] as const;
 
@@ -41,6 +41,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
           <SortTh label="Role" field="role" basePath="/setup/users" searchParams={searchParams} />
           <SortTh label="Last signed in" field="lastLogin" basePath="/setup/users" searchParams={searchParams} />
           <th className="th">Company access</th>
+          <th className="th">Holiday days/yr</th>
           <th className="th">Status</th><th className="th sr-only">Reset password</th>
         </>}>
           {users.map((u) => {
@@ -89,6 +90,14 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
                     {u.role !== 'MASTER_ADMIN' && <button className="btn-secondary btn-sm mt-1 self-start">Save</button>}
                   </form>
                 )}
+              </td>
+              <td className="td">
+                <form action={updateHolidayAllowance} className="flex gap-2 items-center">
+                  <input type="hidden" name="userId" value={u.id} />
+                  <input name="holidayAllowanceDays" type="number" min="0" step="1" defaultValue={u.holidayAllowanceDays}
+                         className="input w-16 py-1.5" aria-label={`Holiday days a year for ${u.name}`} />
+                  <button className="btn-secondary btn-sm">Save</button>
+                </form>
               </td>
               <td className="td">
                 {locked ? (

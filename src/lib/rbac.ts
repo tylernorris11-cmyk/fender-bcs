@@ -45,6 +45,9 @@ export type Permission =
   // Planning
   | 'planning.view'
   | 'planning.edit'
+  // Holidays — request/view is universal; deciding is a Master Admin-only
+  // role check, not a grantable permission (see holidays/actions.ts)
+  | 'holidays.view'
   // Set Up
   | 'setup.view'
   | 'setup.pricing'
@@ -67,6 +70,7 @@ const ALL: Permission[] = [
   'purchaseOrders.view', 'purchaseOrders.create', 'purchaseOrders.edit',
   'checks.view', 'checks.create',
   'planning.view', 'planning.edit',
+  'holidays.view',
   'setup.view', 'setup.pricing', 'setup.users', 'setup.lists', 'setup.backups', 'setup.bugs',
   'finance.costs', 'finance.debtors',
 ];
@@ -93,6 +97,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'purchaseOrders.view', 'purchaseOrders.create', 'purchaseOrders.edit',
     'checks.view', 'checks.create',
     'planning.view', 'planning.edit',
+    'holidays.view',
     'setup.view', 'setup.lists',
     'finance.debtors',
   ],
@@ -105,6 +110,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'stock.view',
     'production.view',
     'planning.view',
+    'holidays.view',
     'compliance.view',
     'finance.debtors',
   ],
@@ -120,6 +126,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'purchaseOrders.view',
     'checks.view',
     'planning.view', 'planning.edit',
+    'holidays.view',
     'setup.view', 'setup.lists',
   ],
 
@@ -133,14 +140,15 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'purchaseOrders.view', 'purchaseOrders.create',
     'checks.view', 'checks.create',
     'planning.view',
+    'holidays.view',
   ],
 
   // Drivers see the run and mark deliveries done.
-  DRIVER: ['orders.view', 'orders.progress', 'planning.view', 'assets.view', 'checks.view', 'checks.create'],
+  DRIVER: ['orders.view', 'orders.progress', 'planning.view', 'holidays.view', 'assets.view', 'checks.view', 'checks.create'],
 
   // Read only — auditors, office cover, new starters.
   VIEWER: [
-    'orders.view', 'customers.view', 'stock.view', 'production.view', 'compliance.view', 'planning.view', 'assets.view',
+    'orders.view', 'customers.view', 'stock.view', 'production.view', 'compliance.view', 'planning.view', 'holidays.view', 'assets.view',
     'purchaseOrders.view', 'checks.view',
   ],
 };
@@ -165,6 +173,7 @@ export const MODULES = [
   { key: 'purchaseOrders', label: 'Purchase Orders', href: '/purchase-orders', perm: 'purchaseOrders.view' as Permission, blurb: 'Raise and track orders placed with suppliers.' },
   { key: 'production', label: 'Production', href: '/production', perm: 'production.view' as Permission, blurb: 'Cutting, bending and dimensional checks to BS 8666.' },
   { key: 'planning', label: 'Deliveries', href: '/planning', perm: 'planning.view' as Permission, blurb: 'View and manage deliveries, collections and site schedules.' },
+  { key: 'holidays', label: 'Holidays', href: '/holidays', perm: 'holidays.view' as Permission, blurb: 'Request time off, approve requests and see who else is away.' },
   { key: 'customers', label: 'Customers', href: '/customers', perm: 'customers.view' as Permission, blurb: 'Manage customer profiles, contacts and history.' },
   { key: 'compliance', label: 'Compliance', href: '/compliance', perm: 'compliance.view' as Permission, blurb: 'CARES approval, certificates and full steel traceability.', company: 'FENDER' as Company },
   { key: 'stock', label: 'Stock', href: '/stock', perm: 'stock.view' as Permission, blurb: 'Track inventory levels, materials and movements.' },

@@ -140,6 +140,20 @@ export async function toggleUserActive(formData: FormData) {
   revalidatePath('/setup/users');
 }
 
+export async function updateHolidayAllowance(formData: FormData) {
+  const admin = await assertPermission('setup.users');
+  const userId = String(formData.get('userId'));
+  const days = Number(formData.get('holidayAllowanceDays'));
+  if (!Number.isInteger(days) || days < 0) throw new Error('Enter a whole number of days.');
+  const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  assertCanManage(admin, target);
+
+  await db.user.update({ where: { id: userId }, data: { holidayAllowanceDays: days } });
+  await logActivity('User', userId, 'Holiday allowance changed', `${days} days a year`, admin.id);
+  revalidatePath('/setup/users');
+  revalidatePath('/holidays');
+}
+
 export async function resetPassword(formData: FormData) {
   const admin = await assertPermission('setup.users');
   const userId = String(formData.get('userId'));
