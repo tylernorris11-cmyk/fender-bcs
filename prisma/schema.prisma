@@ -32,6 +32,7 @@ enum Role {
   ADMIN // Same admin permissions as Master, but locked to a single company.
   MANAGER // Runs the yard day to day. No cost prices.
   SALES // Orders, customers, pricing view
+  OFFICE // General office admin — orders, accounts, assets and checks, no pricing
   QUALITY // Compliance, NCRs, certificates, calibration
   YARD // Goods in, picking, production, delivery progress
   DRIVER // Their own runs and delivery sheets only

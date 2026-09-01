@@ -116,6 +116,21 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'finance.debtors',
   ],
 
+  // General office admin — same ground as Sales (orders, accounts, no
+  // pricing or cost data) plus visibility on vehicles/machinery and checks.
+  OFFICE: [
+    'orders.view', 'orders.create', 'orders.edit', 'orders.export',
+    'customers.view', 'customers.edit',
+    'stock.view',
+    'production.view',
+    'planning.view',
+    'holidays.view',
+    'compliance.view',
+    'finance.debtors',
+    'assets.view',
+    'checks.view',
+  ],
+
   // Quality manager. Owns the audit file.
   QUALITY: [
     'orders.view',
@@ -198,6 +213,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrator',
   MANAGER: 'Yard manager',
   SALES: 'Sales',
+  OFFICE: 'Office',
   QUALITY: 'Quality',
   YARD: 'Yard operative',
   DRIVER: 'Driver',
@@ -209,6 +225,7 @@ export const ROLE_BLURBS: Record<Role, string> = {
   ADMIN: 'Everything, including purchase costs, pricing and user accounts — locked to a single company.',
   MANAGER: 'Runs the yard. No purchase costs, pricing or user management.',
   SALES: 'Orders and customers. Cannot approve over a credit limit.',
+  OFFICE: 'General office admin — orders, accounts, vehicles and checks. No pricing or cost data.',
   QUALITY: 'Owns the audit file — certificates, NCRs, calibration, returns.',
   YARD: 'Goods in, picking, production and delivery progress.',
   DRIVER: 'Their runs and delivery sheets.',
