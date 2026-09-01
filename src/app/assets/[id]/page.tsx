@@ -6,13 +6,14 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { clock, daysUntil, shortDate } from '@/lib/format';
+import { alertWindowDays } from '@/lib/assets';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill } from '@/components/ui';
 import { addAssetChecklistItem, addAssetNote, logInspection, removeAssetChecklistItem, retireAsset } from '../actions';
 
 const KINDS = ['MOT', 'Safety check', 'PUWER', 'LOLER', 'Service', 'Calibration'];
 
-function Due({ label, due }: { label: string; due: Date | null }) {
+function Due({ label, due, windowDays }: { label: string; due: Date | null; windowDays: number }) {
   if (!due) return null;
   const days = daysUntil(due)!;
   return (
@@ -20,7 +21,7 @@ function Due({ label, due }: { label: string; due: Date | null }) {
       <dt className="text-ink-muted">{label}</dt>
       <dd className="font-semibold">
         {days < 0 ? <Pill tone="bad">{shortDate(due)} · overdue</Pill>
-          : days <= 21 ? <Pill tone="warn">{shortDate(due)} · {days}d</Pill>
+          : days <= windowDays ? <Pill tone="warn">{shortDate(due)} · {days}d</Pill>
           : shortDate(due)}
       </dd>
     </div>
@@ -88,13 +89,13 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
         <section className="card card-pad">
           <h2 className="text-lg font-bold mb-3">Next due</h2>
           <dl className="text-sm">
-            <Due label="MOT" due={asset.motDue} />
-            <Due label="Road tax" due={asset.taxDue} />
-            <Due label="Safety inspection" due={asset.weeklyCheckDue} />
-            <Due label="PUWER inspection" due={asset.puwerDue} />
-            <Due label="LOLER thorough examination" due={asset.lolerDue} />
-            <Due label="Service" due={asset.serviceDue} />
-            <Due label="Measurement calibration" due={asset.calibrationDue} />
+            <Due label="MOT" due={asset.motDue} windowDays={alertWindowDays('MOT', asset.category)} />
+            <Due label="Road tax" due={asset.taxDue} windowDays={alertWindowDays('Road tax', asset.category)} />
+            <Due label="Safety inspection" due={asset.weeklyCheckDue} windowDays={alertWindowDays('Safety inspection', asset.category)} />
+            <Due label="PUWER inspection" due={asset.puwerDue} windowDays={alertWindowDays('PUWER inspection', asset.category)} />
+            <Due label="LOLER thorough examination" due={asset.lolerDue} windowDays={alertWindowDays('LOLER exam', asset.category)} />
+            <Due label="Service" due={asset.serviceDue} windowDays={alertWindowDays('Service', asset.category)} />
+            <Due label="Measurement calibration" due={asset.calibrationDue} windowDays={alertWindowDays('Measurement calibration', asset.category)} />
           </dl>
           {asset.calibrationDue && daysUntil(asset.calibrationDue)! < 0 && (
             <p className="banner-bad mt-4">

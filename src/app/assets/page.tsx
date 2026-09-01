@@ -7,17 +7,18 @@ import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
 import { daysUntil, shortDate } from '@/lib/format';
+import { alertWindowDays, type StatutoryCheck } from '@/lib/assets';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, SortSelect, Stat, StatRow } from '@/components/ui';
 
-function DueDate({ label, due }: { label: string; due: Date | null }) {
+function DueDate({ label, due, windowDays }: { label: string; due: Date | null; windowDays: number }) {
   if (!due) return null;
   const days = daysUntil(due)!;
   return (
     <span className="flex items-center gap-1.5 whitespace-nowrap">
       <span className="text-ink-faint">{label}</span>
       {days < 0 ? <Pill tone="bad">{shortDate(due)} · overdue</Pill>
-        : days <= 21 ? <Pill tone="warn">{shortDate(due)} · {days}d</Pill>
+        : days <= windowDays ? <Pill tone="warn">{shortDate(due)} · {days}d</Pill>
         : <span className="font-medium">{shortDate(due)}</span>}
     </span>
   );
@@ -57,9 +58,13 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
   }
 
   const all = await db.asset.findMany({ where: { retired: false, OR: [{ company: null }, { company }] } });
-  const dates = (a: typeof all[number]) => [a.motDue, a.taxDue, a.weeklyCheckDue, a.puwerDue, a.lolerDue, a.serviceDue, a.calibrationDue];
-  const overdue = all.filter((a) => dates(a).some((d) => d && daysUntil(d)! < 0)).length;
-  const soon = all.filter((a) => dates(a).some((d) => d && daysUntil(d)! >= 0 && daysUntil(d)! <= 21)).length;
+  const checksFor = (a: typeof all[number]): [StatutoryCheck, Date | null][] => [
+    ['MOT', a.motDue], ['Road tax', a.taxDue], ['Safety inspection', a.weeklyCheckDue],
+    ['PUWER inspection', a.puwerDue], ['LOLER exam', a.lolerDue], ['Service', a.serviceDue],
+    ['Measurement calibration', a.calibrationDue],
+  ];
+  const overdue = all.filter((a) => checksFor(a).some(([, d]) => d && daysUntil(d)! < 0)).length;
+  const soon = all.filter((a) => checksFor(a).some(([label, d]) => d && daysUntil(d)! >= 0 && daysUntil(d)! <= alertWindowDays(label, a.category))).length;
 
   const title = retired ? 'Retired assets' : type === 'MACHINE' ? 'Machinery' : type === 'VEHICLE' ? 'Vehicles' : 'Vehicles & machinery';
 
@@ -77,7 +82,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
         <Stat value={all.filter((a) => a.type === 'VEHICLE').length} label="Vehicles" href="/assets?type=VEHICLE" />
         <Stat value={all.filter((a) => a.type === 'MACHINE').length} label="Machinery" href="/assets?type=MACHINE" />
         <Stat value={overdue} label="Checks overdue" tone={overdue ? 'bad' : 'default'} />
-        <Stat value={soon} label="Due within 3 weeks" tone={soon ? 'warn' : 'default'} />
+        <Stat value={soon} label="Due soon" tone={soon ? 'warn' : 'default'} />
       </StatRow>
 
       <form className="mb-5 flex flex-wrap gap-3">
@@ -105,13 +110,13 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
                 <p className="text-xs text-ink-faint">{a.ref} · {a.category} · {a.depot}</p>
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm flex-1">
-                <DueDate label="MOT" due={a.motDue} />
-                <DueDate label="Tax" due={a.taxDue} />
-                <DueDate label="Safety check" due={a.weeklyCheckDue} />
-                <DueDate label="PUWER" due={a.puwerDue} />
-                <DueDate label="LOLER" due={a.lolerDue} />
-                <DueDate label="Service" due={a.serviceDue} />
-                <DueDate label="Calibration" due={a.calibrationDue} />
+                <DueDate label="MOT" due={a.motDue} windowDays={alertWindowDays('MOT', a.category)} />
+                <DueDate label="Tax" due={a.taxDue} windowDays={alertWindowDays('Road tax', a.category)} />
+                <DueDate label="Safety check" due={a.weeklyCheckDue} windowDays={alertWindowDays('Safety inspection', a.category)} />
+                <DueDate label="PUWER" due={a.puwerDue} windowDays={alertWindowDays('PUWER inspection', a.category)} />
+                <DueDate label="LOLER" due={a.lolerDue} windowDays={alertWindowDays('LOLER exam', a.category)} />
+                <DueDate label="Service" due={a.serviceDue} windowDays={alertWindowDays('Service', a.category)} />
+                <DueDate label="Calibration" due={a.calibrationDue} windowDays={alertWindowDays('Measurement calibration', a.category)} />
               </div>
               <ChevronRight size={18} className="text-ink-faint" aria-hidden />
             </Link>

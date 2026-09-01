@@ -4,6 +4,7 @@ import { db } from './db';
 import { daysUntil } from './format';
 import { can, type SessionUser } from './rbac';
 import { getActiveCompany } from './company';
+import { alertWindowDays, type StatutoryCheck } from './assets';
 
 export type Alert = {
   id: string;
@@ -27,7 +28,6 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
   const out: Alert[] = [];
   const company = getActiveCompany(user);
   const in90 = new Date(Date.now() + 90 * 86_400_000);
-  const in21 = new Date(Date.now() + 21 * 86_400_000);
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -137,13 +137,15 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
   }
 
   for (const a of assets) {
-    const checks: [string, Date | null][] = [
+    const checks: [StatutoryCheck, Date | null][] = [
       ['MOT', a.motDue], ['Road tax', a.taxDue], ['Safety inspection', a.weeklyCheckDue],
       ['PUWER inspection', a.puwerDue], ['LOLER exam', a.lolerDue], ['Service', a.serviceDue],
       ['Measurement calibration', a.calibrationDue],
     ];
     for (const [label, due] of checks) {
-      if (!due || due > in21) continue;
+      if (!due) continue;
+      const cutoff = new Date(Date.now() + alertWindowDays(label, a.category) * 86_400_000);
+      if (due > cutoff) continue;
       const days = daysUntil(due)!;
       out.push({
         id: `asset-${a.id}-${label}`,
