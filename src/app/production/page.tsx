@@ -19,16 +19,14 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
   const company = getActiveCompany(user);
   const isFender = company === 'FENDER';
 
-  const activeJob = isFender
-    ? await db.productionJob.findFirst({
-        where: { userId: user.id, finishedAt: null },
-        include: { rows: { orderBy: { sortOrder: 'asc' } }, order: true },
-      })
-    : null;
+  const activeJob = await db.productionJob.findFirst({
+    where: { userId: user.id, finishedAt: null },
+    include: { rows: { orderBy: { sortOrder: 'asc' } }, order: true },
+  });
 
   const openOtherWork = await db.otherWorkTask.count({ where: { company, status: 'Open' } });
 
-  const orders = isFender && activeJob ? [] : await db.order.findMany({
+  const orders = activeJob ? [] : await db.order.findMany({
     where: { company, archived: false, stage: { in: ['APPROVED', 'IN_PRODUCTION', 'READY_FOR_DELIVERY'] } },
     include: {
       customer: true,
@@ -45,8 +43,10 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
   return (
     <Shell user={user} module="production" nav={NAV.production} current="/production" alerts={alerts.length}>
       <OtherWorkCallout openCount={openOtherWork} />
-      {isFender ? (
-        activeJob ? <CurrentJobView job={activeJob} /> : <FenderView orders={orders} sort={searchParams.sort} user={user} />
+      {activeJob ? (
+        <CurrentJobView job={activeJob} />
+      ) : isFender ? (
+        <FenderView orders={orders} sort={searchParams.sort} user={user} />
       ) : (
         <BcsView orders={orders} sort={searchParams.sort} user={user} company={company} />
       )}
@@ -152,15 +152,26 @@ function FenderView({ orders, sort, user }: { orders: any[]; sort?: string; user
 
 // ------------------------------------------------------- current tally job
 
-function CurrentJobView({ job }: { job: any }) {
+async function CurrentJobView({ job }: { job: any }) {
+  const isFenderJob = job.company === 'FENDER';
   const totalWeight = job.rows.reduce((s: number, r: any) => s + Number(r.tallyWeightKg), 0);
   const lastCastNumber = job.rows.length > 0 ? job.rows[job.rows.length - 1].castNumber : '';
+
+  const machines = isFenderJob ? [] : await db.asset.findMany({
+    where: { type: 'MACHINE', retired: false, OR: [{ company: null }, { company: job.company }] },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true },
+  });
 
   return (
     <>
       <PageHeader
         title={`Job ${job.jobNumber}`}
-        blurb={`${PROCESS_LABEL[job.process]}${job.order ? ` · linked to order ${job.order.number}` : ''}`}
+        blurb={
+          isFenderJob
+            ? `${PROCESS_LABEL[job.process]}${job.order ? ` · linked to order ${job.order.number}` : ''}`
+            : `Fence post cutting${job.order ? ` · linked to order ${job.order.number}` : ''}`
+        }
         actions={(
           <form action={finishProductionJob}>
             <input type="hidden" name="jobId" value={job.id} />
@@ -171,44 +182,74 @@ function CurrentJobView({ job }: { job: any }) {
 
       <StatRow>
         <Stat value={job.rows.length} label="Rows logged" />
-        <Stat value={tonnes(totalWeight)} label="Tally weight so far" />
+        <Stat value={tonnes(totalWeight)} label={isFenderJob ? 'Tally weight so far' : 'Bundle weight so far'} />
       </StatRow>
 
       <div className="card card-pad mb-6">
         <h2 className="text-lg font-bold mb-3">Add a row</h2>
         <form action={addProductionJobRow} className="flex flex-wrap items-end gap-3">
           <input type="hidden" name="jobId" value={job.id} />
-          <div>
-            <label className="label text-xs" htmlFor="diaMm">Diameter</label>
-            <select id="diaMm" name="diaMm" className="input w-24">
-              <option value="">—</option>
-              {BAR_SIZES.map((s) => <option key={s} value={s}>{s} mm</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="label text-xs" htmlFor="barMark">Bar mark</label>
-            <input id="barMark" name="barMark" className="input w-24" placeholder="B01" />
-          </div>
-          <div className="w-40">
-            <CastNumberField defaultValue={lastCastNumber} />
-          </div>
-          <div>
-            <label className="label text-xs" htmlFor="mill">Mill</label>
-            <input id="mill" name="mill" className="input w-32" />
-          </div>
-          <div>
-            <label className="label text-xs" htmlFor="tallyWeightKg">Tally weight (kg)</label>
-            <input id="tallyWeightKg" name="tallyWeightKg" type="number" step="0.1" min="0" className="input w-28" />
-          </div>
-          <div className="flex-1 min-w-[160px]">
-            <label className="label text-xs" htmlFor="comments">Comments</label>
-            <input id="comments" name="comments" className="input" />
-          </div>
+          {isFenderJob ? (
+            <>
+              <div>
+                <label className="label text-xs" htmlFor="diaMm">Diameter</label>
+                <select id="diaMm" name="diaMm" className="input w-24">
+                  <option value="">—</option>
+                  {BAR_SIZES.map((s) => <option key={s} value={s}>{s} mm</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label text-xs" htmlFor="barMark">Bar mark</label>
+                <input id="barMark" name="barMark" className="input w-24" placeholder="B01" />
+              </div>
+              <div className="w-40">
+                <CastNumberField defaultValue={lastCastNumber} />
+              </div>
+              <div>
+                <label className="label text-xs" htmlFor="mill">Mill</label>
+                <input id="mill" name="mill" className="input w-32" />
+              </div>
+              <div>
+                <label className="label text-xs" htmlFor="tallyWeightKg">Tally weight (kg)</label>
+                <input id="tallyWeightKg" name="tallyWeightKg" type="number" step="0.1" min="0" className="input w-28" />
+              </div>
+              <div className="flex-1 min-w-[160px]">
+                <label className="label text-xs" htmlFor="comments">Comments</label>
+                <input id="comments" name="comments" className="input" />
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="label text-xs" htmlFor="machine">Machine used</label>
+                <select id="machine" name="machine" className="input w-40">
+                  <option value="">—</option>
+                  {machines.map((m) => <option key={m.id} value={m.name}>{m.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label text-xs" htmlFor="steelGrade">Carbon / Soft</label>
+                <select id="steelGrade" name="steelGrade" className="input w-32">
+                  <option value="">—</option>
+                  <option value="Carbon">Carbon</option>
+                  <option value="Soft">Soft</option>
+                </select>
+              </div>
+              <div>
+                <label className="label text-xs" htmlFor="diaMm">Diameter (mm)</label>
+                <input id="diaMm" name="diaMm" type="number" min="0" className="input w-24" />
+              </div>
+              <div>
+                <label className="label text-xs" htmlFor="tallyWeightKg">Weight of bundle (kg)</label>
+                <input id="tallyWeightKg" name="tallyWeightKg" type="number" step="0.1" min="0" className="input w-32" />
+              </div>
+            </>
+          )}
           <button className="btn-primary">Add row</button>
         </form>
       </div>
 
-      {job.rows.length === 0 ? <Empty title="No rows logged yet." /> : (
+      {job.rows.length === 0 ? <Empty title="No rows logged yet." /> : isFenderJob ? (
         <Table head={<>
           <th className="th">Dia</th><th className="th">Bar mark</th><th className="th">Cast number</th>
           <th className="th">Mill</th><th className="th">Weight</th><th className="th">Comments</th>
@@ -221,6 +262,20 @@ function CurrentJobView({ job }: { job: any }) {
               <td className="td">{r.mill || '—'}</td>
               <td className="td">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
               <td className="td text-ink-muted">{r.comments || '—'}</td>
+            </tr>
+          ))}
+        </Table>
+      ) : (
+        <Table head={<>
+          <th className="th">Machine used</th><th className="th">Carbon / Soft</th>
+          <th className="th">Diameter</th><th className="th">Weight of bundle</th>
+        </>}>
+          {job.rows.map((r: any) => (
+            <tr key={r.id} className="row">
+              <td className="td">{r.machine || '—'}</td>
+              <td className="td">{r.steelGrade || '—'}</td>
+              <td className="td">{r.diaMm ? `${r.diaMm} mm` : '—'}</td>
+              <td className="td">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
             </tr>
           ))}
         </Table>
@@ -248,6 +303,19 @@ async function BcsView({ orders, sort, user, company }: { orders: any[]; sort?: 
   return (
     <>
       <PageHeader title="Production" blurb="What still needs cutting to length, and what's already off the straightening line." />
+
+      {can(user, 'production.progress') && (
+        <div className="card card-pad mb-6">
+          <h2 className="text-lg font-bold mb-3">Add a job</h2>
+          <form action={startProductionJob} className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="label" htmlFor="jobNumber">Job number</label>
+              <input id="jobNumber" name="jobNumber" required className="input w-40" />
+            </div>
+            <button className="btn-primary">Start job</button>
+          </form>
+        </div>
+      )}
 
       <StatRow>
         <Stat value={orders.length} label="Orders in production" />

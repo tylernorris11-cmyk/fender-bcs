@@ -511,11 +511,13 @@ model ProductionJob {
 model ProductionJobRow {
   id            String   @id @default(cuid())
   jobId         String
-  diaMm         Int?
-  barMark       String   @default("")
-  castNumber    String   @default("")
-  mill          String   @default("")
-  tallyWeightKg Decimal  @default(0) @db.Decimal(12, 3)
+  diaMm         Int? // Fender: bar diameter. BCS: fence post/wire diameter.
+  barMark       String   @default("") // Fender only
+  castNumber    String   @default("") // Fender only
+  mill          String   @default("") // Fender only
+  machine       String   @default("") // BCS only — which machine cut this bundle
+  steelGrade    String   @default("") // BCS only — Carbon | Soft
+  tallyWeightKg Decimal  @default(0) @db.Decimal(12, 3) // Fender: tally weight. BCS: weight of bundle.
   comments      String   @default("")
   sortOrder     Int      @default(0)
   at            DateTime @default(now())

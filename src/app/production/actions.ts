@@ -71,17 +71,23 @@ export async function recordCheck(formData: FormData) {
 
 const PROCESSES = ['CUTTING', 'BENDING', 'STEMA'];
 
-/** Start a tally-sheet job. Fender only — the fields (bar mark, mill) are rebar concepts. */
+/**
+ * Start a tally-sheet job. Fender picks a process (cutting/bending/Stema) —
+ * BCS only ever cuts fence post to length from coil, so that choice doesn't
+ * apply and is set automatically.
+ */
 export async function startProductionJob(formData: FormData) {
   const user = await assertPermission('production.progress');
-  if (getActiveCompany(user) !== 'FENDER') {
-    throw new Error('Starting a job only applies to Fender Steel production.');
-  }
+  const company = getActiveCompany(user);
 
   const jobNumber = String(formData.get('jobNumber') ?? '').trim();
   if (!jobNumber) throw new Error('Enter a job number.');
-  const process = String(formData.get('process')) as ProductionProcess;
-  if (!PROCESSES.includes(process)) throw new Error('Choose cutting, bending or Stema.');
+
+  let process: ProductionProcess = 'CUTTING';
+  if (company === 'FENDER') {
+    process = String(formData.get('process')) as ProductionProcess;
+    if (!PROCESSES.includes(process)) throw new Error('Choose cutting, bending or Stema.');
+  }
 
   const existing = await db.productionJob.findFirst({ where: { userId: user.id, finishedAt: null } });
   if (existing) {
@@ -89,10 +95,10 @@ export async function startProductionJob(formData: FormData) {
     return;
   }
 
-  const matchedOrder = await db.order.findFirst({ where: { company: 'FENDER', number: jobNumber } });
+  const matchedOrder = await db.order.findFirst({ where: { company, number: jobNumber } });
 
   const job = await db.productionJob.create({
-    data: { company: 'FENDER', jobNumber, process, orderId: matchedOrder?.id ?? null, userId: user.id },
+    data: { company, jobNumber, process, orderId: matchedOrder?.id ?? null, userId: user.id },
   });
 
   await logActivity('ProductionJob', job.id, 'Started job', `${jobNumber} · ${process}`, user.id);
@@ -127,6 +133,8 @@ export async function addProductionJobRow(formData: FormData) {
       barMark: String(formData.get('barMark') ?? '').trim(),
       castNumber: String(formData.get('castNumber') ?? '').trim(),
       mill: String(formData.get('mill') ?? '').trim(),
+      machine: String(formData.get('machine') ?? '').trim(),
+      steelGrade: String(formData.get('steelGrade') ?? '').trim(),
       tallyWeightKg: Number(formData.get('tallyWeightKg') || 0),
       comments: String(formData.get('comments') ?? '').trim(),
       sortOrder: job.rows.length,
