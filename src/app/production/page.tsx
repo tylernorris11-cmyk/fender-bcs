@@ -155,7 +155,10 @@ function FenderView({ orders, sort, user }: { orders: any[]; sort?: string; user
 async function CurrentJobView({ job }: { job: any }) {
   const isFenderJob = job.company === 'FENDER';
   const totalWeight = job.rows.reduce((s: number, r: any) => s + Number(r.tallyWeightKg), 0);
-  const lastCastNumber = job.rows.length > 0 ? job.rows[job.rows.length - 1].castNumber : '';
+  const lastRow = job.rows.length > 0 ? job.rows[job.rows.length - 1] : null;
+  const lastCastNumber = lastRow?.castNumber ?? '';
+  const lastSteelGrade = lastRow?.steelGrade ?? '';
+  const lastDiaMm = lastRow?.diaMm ?? '';
 
   const machines = isFenderJob ? [] : await db.asset.findMany({
     where: { type: 'MACHINE', retired: false, OR: [{ company: null }, { company: job.company }] },
@@ -229,15 +232,11 @@ async function CurrentJobView({ job }: { job: any }) {
               </div>
               <div>
                 <label className="label text-xs" htmlFor="steelGrade">Carbon / Soft</label>
-                <select id="steelGrade" name="steelGrade" className="input w-32">
-                  <option value="">—</option>
-                  <option value="Carbon">Carbon</option>
-                  <option value="Soft">Soft</option>
-                </select>
+                <input id="steelGrade" name="steelGrade" className="input w-32" defaultValue={lastSteelGrade} />
               </div>
               <div>
                 <label className="label text-xs" htmlFor="diaMm">Diameter (mm)</label>
-                <input id="diaMm" name="diaMm" type="number" min="0" className="input w-24" />
+                <input id="diaMm" name="diaMm" type="number" min="0" className="input w-24" defaultValue={lastDiaMm} />
               </div>
               <div>
                 <label className="label text-xs" htmlFor="tallyWeightKg">Weight of bundle (kg)</label>
