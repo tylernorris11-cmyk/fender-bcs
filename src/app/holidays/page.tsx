@@ -3,23 +3,25 @@ import { AlertTriangle } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
-import { shortDate } from '@/lib/format';
+import { shortDate, clock } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { Avatar, Empty, PageHeader, Pill, Stat, StatRow } from '@/components/ui';
-import { cancelHoliday, decideHoliday } from './actions';
+import { Avatar, Empty, PageHeader, Pill, Stat, StatRow, Table } from '@/components/ui';
+import { adjustHolidayBalance, cancelHoliday, decideHoliday } from './actions';
 import { RequestHolidayForm } from './RequestHolidayForm';
 
 export default async function HolidaysPage() {
   const user = await requirePermission('holidays.view');
   const alerts = await getAlerts(user);
   const isMaster = user.role === 'MASTER_ADMIN';
+  const currentYear = new Date().getUTCFullYear();
 
-  const yearStart = new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1));
-  const yearEnd = new Date(Date.UTC(new Date().getUTCFullYear(), 11, 31));
+  const yearStart = new Date(Date.UTC(currentYear, 0, 1));
+  const yearEnd = new Date(Date.UTC(currentYear, 11, 31));
 
-  const [myRequests, myRecord, pending, activeLive] = await Promise.all([
+  const [myRequests, myRecord, myAdjustments, pending, activeLive, everyone, recentAdjustments] = await Promise.all([
     db.holidayRequest.findMany({ where: { userId: user.id }, orderBy: { startDate: 'desc' } }),
     db.user.findUniqueOrThrow({ where: { id: user.id }, select: { holidayAllowanceDays: true } }),
+    db.holidayAdjustment.findMany({ where: { userId: user.id, year: currentYear }, orderBy: { createdAt: 'desc' } }),
     isMaster
       ? db.holidayRequest.findMany({
           where: { status: 'PENDING' },
@@ -35,6 +37,16 @@ export default async function HolidaysPage() {
           include: { user: { select: { name: true, colour: true } } },
         })
       : Promise.resolve([]),
+    isMaster
+      ? db.user.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+    isMaster
+      ? db.holidayAdjustment.findMany({
+          include: { user: { select: { name: true } }, createdBy: { select: { name: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+        })
+      : Promise.resolve([]),
   ]);
 
   const used = myRequests
@@ -43,7 +55,8 @@ export default async function HolidaysPage() {
   const awaiting = myRequests
     .filter((r) => r.status === 'PENDING' && r.startDate >= yearStart && r.startDate <= yearEnd)
     .reduce((s, r) => s + r.workingDays, 0);
-  const remaining = myRecord.holidayAllowanceDays - used;
+  const adjustmentTotal = myAdjustments.reduce((s, a) => s + a.days, 0);
+  const remaining = myRecord.holidayAllowanceDays - used + adjustmentTotal;
 
   const conflictsFor = (reqId: string, requesterUserId: string, start: Date, end: Date) =>
     activeLive.filter((r) => r.id !== reqId && r.userId !== requesterUserId && r.startDate <= end && r.endDate >= start);
@@ -62,6 +75,19 @@ export default async function HolidaysPage() {
         <Stat value={awaiting} label="Awaiting a decision" tone={awaiting ? 'warn' : 'default'} />
         <Stat value={remaining} label="Remaining" tone={remaining < 0 ? 'bad' : 'default'} />
       </StatRow>
+
+      {myAdjustments.length > 0 && (
+        <div className="card card-pad mb-6 text-sm">
+          <p className="font-semibold mb-2">
+            {adjustmentTotal > 0 ? '+' : ''}{adjustmentTotal} day{Math.abs(adjustmentTotal) === 1 ? '' : 's'} adjusted for {currentYear} — already folded into your remaining total above.
+          </p>
+          <ul className="space-y-1 text-ink-muted">
+            {myAdjustments.map((a) => (
+              <li key={a.id}>{a.days > 0 ? '+' : ''}{a.days} day{Math.abs(a.days) === 1 ? '' : 's'} — {a.reason}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
         <section className="card card-pad">
@@ -149,6 +175,56 @@ export default async function HolidaysPage() {
                 );
               })}
             </div>
+          )}
+        </section>
+      )}
+
+      {isMaster && (
+        <section className="card card-pad mt-6">
+          <h2 className="text-lg font-bold mb-1">Add or take away holiday</h2>
+          <p className="text-sm text-ink-muted mb-4">
+            For days already taken before this system existed, or to correct a mistake. Positive adds days, negative takes them away — it applies to one calendar year and never overwrites anything, so the history below stays honest.
+          </p>
+          <form action={adjustHolidayBalance} className="flex flex-wrap items-end gap-3 mb-6">
+            <div>
+              <label className="label text-xs" htmlFor="userId">Person</label>
+              <select id="userId" name="userId" required className="input w-48">
+                {everyone.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label text-xs" htmlFor="year">Year</label>
+              <input id="year" name="year" type="number" required defaultValue={currentYear} className="input w-24" />
+            </div>
+            <div>
+              <label className="label text-xs" htmlFor="days">Days (+ to add, − to take away)</label>
+              <input id="days" name="days" type="number" required placeholder="-6" className="input w-32" />
+            </div>
+            <div className="flex-1 min-w-[220px]">
+              <label className="label text-xs" htmlFor="reason">Reason</label>
+              <input id="reason" name="reason" required className="input" placeholder="Took 6 days in Feb, before go-live" />
+            </div>
+            <button className="btn-primary">Save</button>
+          </form>
+
+          {recentAdjustments.length === 0 ? <Empty title="No adjustments made yet." /> : (
+            <Table head={<>
+              <th className="th">Person</th><th className="th">Year</th><th className="th">Days</th>
+              <th className="th">Reason</th><th className="th">By</th><th className="th">When</th>
+            </>}>
+              {recentAdjustments.map((a) => (
+                <tr key={a.id} className="row">
+                  <td className="td font-semibold">{a.user.name}</td>
+                  <td className="td">{a.year}</td>
+                  <td className="td">
+                    <Pill tone={a.days > 0 ? 'good' : 'bad'}>{a.days > 0 ? '+' : ''}{a.days}</Pill>
+                  </td>
+                  <td className="td text-ink-muted">{a.reason}</td>
+                  <td className="td">{a.createdBy.name}</td>
+                  <td className="td text-ink-faint whitespace-nowrap">{shortDate(a.createdAt)} {clock(a.createdAt)}</td>
+                </tr>
+              ))}
+            </Table>
           )}
         </section>
       )}

@@ -92,3 +92,31 @@ export async function decideHoliday(formData: FormData) {
   revalidatePath('/holidays');
   revalidatePath('/holidays/calendar');
 }
+
+/**
+ * A manual correction to someone's balance for one calendar year — the main
+ * use is going live partway through the year, when days already taken (on
+ * paper, before this system existed) need to come off. Master Admin only,
+ * same as deciding a request — not delegable to a company-scoped Admin.
+ */
+export async function adjustHolidayBalance(formData: FormData) {
+  const admin = await requireUser();
+  if (admin.role !== 'MASTER_ADMIN') throw new Error('Only a Master Administrator can add or take away someone’s holiday.');
+
+  const userId = String(formData.get('userId'));
+  const year = Number(formData.get('year'));
+  const days = Number(formData.get('days'));
+  const reason = String(formData.get('reason') ?? '').trim();
+
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) throw new Error('Enter a valid year.');
+  if (!Number.isInteger(days) || days === 0) throw new Error('Enter a number of days — positive to add, negative to take away.');
+  if (!reason) throw new Error('Say why, so it’s on record.');
+
+  await db.user.findUniqueOrThrow({ where: { id: userId } });
+
+  await db.holidayAdjustment.create({ data: { userId, year, days, reason, createdById: admin.id } });
+  await logActivity('User', userId, days > 0 ? 'Holiday days added' : 'Holiday days taken away',
+    `${days > 0 ? '+' : ''}${days} for ${year} — ${reason}`, admin.id);
+
+  revalidatePath('/holidays');
+}

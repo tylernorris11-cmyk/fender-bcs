@@ -80,6 +80,8 @@ model User {
   hiddenModules        String[]         @default([]) // module keys hidden for this person regardless of role — never applies to MASTER_ADMIN
   holidaysRequested    HolidayRequest[] @relation("holidayRequestedBy")
   holidaysDecided      HolidayRequest[] @relation("holidayDecidedBy")
+  holidayAdjustmentsReceived HolidayAdjustment[] @relation("holidayAdjustmentFor")
+  holidayAdjustmentsMade     HolidayAdjustment[] @relation("holidayAdjustmentBy")
 }
 
 // ------------------------------------------------------------- customers
@@ -933,6 +935,24 @@ model HolidayRequest {
 
   @@index([startDate, endDate])
   @@index([userId])
+}
+
+// A manual correction to someone's balance for one calendar year — going
+// live partway through the year, or fixing a mistake. Master Admin only.
+// Additive and never edited or deleted, so the history stays honest.
+model HolidayAdjustment {
+  id          String   @id @default(cuid())
+  userId      String
+  year        Int
+  days        Int // positive = added, negative = taken away
+  reason      String
+  createdAt   DateTime @default(now())
+  createdById String
+
+  user      User @relation("holidayAdjustmentFor", fields: [userId], references: [id])
+  createdBy User @relation("holidayAdjustmentBy", fields: [createdById], references: [id])
+
+  @@index([userId, year])
 }
 
 model ExtractedCastNumber {
