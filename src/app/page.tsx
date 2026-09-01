@@ -56,7 +56,7 @@ export default async function Launcher() {
         </div>
         <div className="relative max-w-[1200px] mx-auto px-6 py-5 flex items-center gap-3">
           {isBsSupplies ? (
-            <span className="text-xl font-bold tracking-tight shrink-0">BCS<span className="text-white/60 font-medium"> Products</span></span>
+            <Image src="/bcs-logo.png" alt="BCS Products" width={60} height={48} priority className="w-[60px] h-auto shrink-0" />
           ) : (
             <span className="inline-block bg-white rounded-lg px-2 py-1.5 shrink-0">
               <Image src="/fender-logo.png" alt="Fender" width={56} height={39} priority className="w-[56px] h-auto" />

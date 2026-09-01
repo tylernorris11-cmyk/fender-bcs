@@ -45,7 +45,7 @@ export function Shell({
         <div className="relative flex lg:block items-center justify-between p-4 lg:p-0">
           <Link href="/" className="block lg:px-5 lg:pt-6 lg:pb-4">
             {isBsSupplies ? (
-              <span className="text-xl font-bold tracking-tight">BCS<span className="text-white/60 font-medium"> Products</span></span>
+              <Image src="/bcs-logo.png" alt="BCS Products" width={148} height={119} priority className="w-[148px] h-auto" />
             ) : (
               <span className="inline-block bg-white rounded-xl px-3 py-2 shadow-pop">
                 <Image src="/fender-logo.png" alt="Fender" width={140} height={98} priority className="w-[140px] h-auto" />

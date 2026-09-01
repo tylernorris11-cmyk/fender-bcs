@@ -20,16 +20,13 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
       <div className="relative bg-forest text-white overflow-hidden flex flex-col justify-between p-8 sm:p-12 min-h-[280px]">
         <div className="absolute inset-0 mesh-bg pointer-events-none" aria-hidden />
         <div className="relative flex items-start justify-between gap-4">
-          <div className="inline-block rounded-2xl bg-white/95 px-7 py-6 shadow-pop">
-            {isBsSupplies ? (
-              <>
-                <p className="text-3xl font-bold tracking-tight text-forest">BCS <span className="text-signal">Products</span></p>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-brand-700 mt-1.5">Steel & building supplies</p>
-              </>
-            ) : (
+          {isBsSupplies ? (
+            <Image src="/bcs-logo.png" alt="BCS Products" width={220} height={176} priority className="w-[220px] h-auto" />
+          ) : (
+            <div className="inline-block rounded-2xl bg-white/95 px-7 py-6 shadow-pop">
               <Image src="/fender-logo.png" alt="Fender" width={260} height={181} priority className="w-[260px] h-auto" />
-            )}
-          </div>
+            </div>
+          )}
 
           <div className="flex items-center rounded-xl bg-white/10 p-1 text-xs font-semibold shrink-0">
             <form action={setLoginBrand}>
