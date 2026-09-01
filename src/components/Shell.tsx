@@ -167,6 +167,7 @@ export const NAV: Record<string, NavItem[]> = {
   ],
   production: [
     { label: 'Work in progress', href: '/production' },
+    { label: 'Other work', href: '/production/other-work' },
     // Bending and BS 8666 dimensional tolerances are rebar-specific — BCS
     // Products cuts fence post to length from coil, nothing to bend or check.
     { label: 'Bending schedules', href: '/production/schedules', company: 'FENDER' },

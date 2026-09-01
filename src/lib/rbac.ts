@@ -28,6 +28,7 @@ export type Permission =
   | 'production.view'
   | 'production.progress'
   | 'production.qc'
+  | 'production.assign' // post an "other work" task for someone else — Master Admin/Admin only
   // Compliance
   | 'compliance.view'
   | 'compliance.edit' // certificates, suppliers, returns
@@ -64,7 +65,7 @@ const ALL: Permission[] = [
   'orders.archive', 'orders.markPaid', 'orders.export',
   'customers.view', 'customers.edit', 'customers.credit',
   'stock.view', 'stock.goodsIn', 'stock.pick', 'stock.adjust',
-  'production.view', 'production.progress', 'production.qc',
+  'production.view', 'production.progress', 'production.qc', 'production.assign',
   'compliance.view', 'compliance.edit', 'compliance.ncr',
   'assets.view', 'assets.edit',
   'purchaseOrders.view', 'purchaseOrders.create', 'purchaseOrders.edit',

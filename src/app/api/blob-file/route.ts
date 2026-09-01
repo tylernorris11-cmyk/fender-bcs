@@ -1,13 +1,13 @@
 import { get } from '@vercel/blob';
 import { NextResponse } from 'next/server';
-import { assertPermission } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
+import { can } from '@/lib/rbac';
 import { isPrivateBlobUrl } from '@/lib/blob';
 
 /** Streams a private Blob file back to a signed-in, permitted user. */
 export async function GET(request: Request) {
-  try {
-    await assertPermission('compliance.view');
-  } catch {
+  const user = await getCurrentUser();
+  if (!user || !(can(user, 'compliance.view') || can(user, 'production.view'))) {
     return new NextResponse('Not authorized', { status: 403 });
   }
 

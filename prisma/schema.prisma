@@ -65,6 +65,9 @@ model User {
   assetNotes       AssetNote[]
   qcChecks         QcCheck[]
   productionEvents ProductionEvent[]
+  productionJobs        ProductionJob[]
+  otherWorkTasksCreated OtherWorkTask[] @relation("otherWorkCreatedBy")
+  otherWorkTasksDone    OtherWorkTask[] @relation("otherWorkDoneBy")
   purchaseOrdersRaised PurchaseOrder[] @relation("poRaisedBy")
   assetChecks      AssetCheck[]
   notes            Note[]
@@ -305,6 +308,7 @@ model Order {
   events    PlanningEvent[]
   ncrs      Ncr[]
   production ProductionEvent[]
+  productionJobs ProductionJob[]
 
   @@index([stage, deliveryDate])
   @@index([company])
@@ -469,6 +473,79 @@ model QcCheck {
 
   barMark   BarMark @relation(fields: [barMarkId], references: [id], onDelete: Cascade)
   checkedBy User?   @relation(fields: [checkedById], references: [id])
+}
+
+// ------------------------------------------------ production tally sheets
+// Fender-only. A tally sheet is a person clocking onto a job (cutting,
+// bending, or the Stema stirrup bender) and logging pieces as they go — not
+// to be confused with ProductionEvent (append-only history against an
+// Order) or BarMark (the customer's bending schedule). One person can only
+// have one active job at a time — enforced in the action, not the schema.
+
+enum ProductionProcess {
+  CUTTING
+  BENDING
+  STEMA
+}
+
+model ProductionJob {
+  id         String            @id @default(cuid())
+  company    Company           @default(FENDER)
+  jobNumber  String
+  process    ProductionProcess
+  orderId    String? // best-effort match against Order.number — never required, never blocks starting
+  userId     String
+  startedAt  DateTime          @default(now())
+  finishedAt DateTime?
+
+  order Order?             @relation(fields: [orderId], references: [id])
+  user  User               @relation(fields: [userId], references: [id])
+  rows  ProductionJobRow[]
+
+  @@index([userId, finishedAt])
+  @@index([company])
+}
+
+// One tallied piece (or bundle) against a ProductionJob.
+model ProductionJobRow {
+  id            String   @id @default(cuid())
+  jobId         String
+  diaMm         Int?
+  barMark       String   @default("")
+  castNumber    String   @default("")
+  mill          String   @default("")
+  tallyWeightKg Decimal  @default(0) @db.Decimal(12, 3)
+  comments      String   @default("")
+  sortOrder     Int      @default(0)
+  at            DateTime @default(now())
+
+  job ProductionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+}
+
+// "Other work" — both admin-posted jobs that need doing, and staff logging
+// work they've already done that isn't tied to a customer order. Same shape
+// either way, distinguished only by status: an admin creates one Open;
+// staff either mark an Open one Done, or create their own already Done
+// (createdBy and doneBy are the same person, doneAt equals createdAt).
+model OtherWorkTask {
+  id          String    @id @default(cuid())
+  company     Company   @default(FENDER)
+  title       String
+  description String    @default("")
+  photoUrl    String?
+  createdById String
+  createdAt   DateTime  @default(now())
+  status      String    @default("Open") // Open | Done
+  doneById    String?
+  doneAt      DateTime?
+  doneNote    String    @default("")
+
+  createdBy User  @relation("otherWorkCreatedBy", fields: [createdById], references: [id])
+  doneBy    User? @relation("otherWorkDoneBy", fields: [doneById], references: [id])
+
+  @@index([company, status])
 }
 
 // --------------------------------------------------------- compliance
