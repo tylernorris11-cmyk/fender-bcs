@@ -9,6 +9,7 @@ import { getActiveCompany } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, Empty, PageHeader, Pill, SortTh, Stat, StatRow, Table } from '@/components/ui';
+import { resolveAssetIssue } from './actions';
 
 export default async function ChecksPage({
   searchParams,
@@ -27,7 +28,7 @@ export default async function ChecksPage({
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const [checks, activeAssets, checkedTodayIds] = await Promise.all([
+  const [checks, activeAssets, checkedTodayIds, openIssues] = await Promise.all([
     db.assetCheck.findMany({
       where: {
         asset: {
@@ -42,11 +43,15 @@ export default async function ChecksPage({
     }),
     db.asset.findMany({ where: { retired: false, OR: [{ company: null }, { company }] } }),
     db.assetCheck.findMany({ where: { performedAt: { gte: startOfToday } }, select: { assetId: true } }),
+    db.assetIssue.findMany({
+      where: { resolved: false, asset: { OR: [{ company: null }, { company }] } },
+      include: { asset: true, reportedBy: true },
+      orderBy: { reportedAt: 'asc' },
+    }),
   ]);
 
   const checkedToday = new Set(checkedTodayIds.map((c) => c.assetId));
   const notCheckedToday = activeAssets.filter((a) => !checkedToday.has(a.id));
-  const failCount = checks.filter((c) => c.result === 'FAIL').length;
 
   return (
     <Shell user={user} module="checks" nav={NAV.checks} current="/checks" alerts={alerts.length}>
@@ -63,9 +68,37 @@ export default async function ChecksPage({
       <StatRow>
         <Stat value={activeAssets.length - notCheckedToday.length} label="Checked today" tone="good" />
         <Stat value={notCheckedToday.length} label="Not checked today" tone={notCheckedToday.length ? 'warn' : 'default'} />
-        <Stat value={failCount} label="Issues flagged (shown below)" tone={failCount ? 'bad' : 'default'} />
+        <Stat value={openIssues.length} label="Open issues" tone={openIssues.length ? 'bad' : 'default'} />
         <Stat value={activeAssets.length} label="Active assets" href="/assets" />
       </StatRow>
+
+      {openIssues.length > 0 && (
+        <section className="card card-pad mb-6 border-2 border-signal/30">
+          <h2 className="text-lg font-bold mb-1">Open issues</h2>
+          <p className="text-sm text-ink-muted mb-4">Reported separately from the daily checklist — stays here until someone marks it fixed.</p>
+          <ul className="divide-y divide-hairline">
+            {openIssues.map((issue) => (
+              <li key={issue.id} className="py-3 flex flex-wrap items-center gap-3">
+                <div className="flex-1 min-w-[220px]">
+                  <Link href={`/assets/${issue.assetId}`} className="font-semibold text-brand-700 hover:underline">{issue.asset.name}</Link>
+                  <span className="text-xs text-ink-faint"> {issue.asset.ref}</span>
+                  <p className="text-sm mt-0.5">{issue.description}</p>
+                  <p className="text-xs text-ink-faint mt-0.5">
+                    {issue.reportedBy?.name ?? 'Unknown'} · {shortDate(issue.reportedAt)} {clock(issue.reportedAt)}
+                  </p>
+                </div>
+                {can(user, 'checks.create') && (
+                  <form action={resolveAssetIssue} className="flex items-end gap-2">
+                    <input type="hidden" name="issueId" value={issue.id} />
+                    <input name="resolutionNote" className="input w-48" placeholder="How was it fixed? (optional)" aria-label="Resolution note" />
+                    <button className="btn-secondary btn-sm">Mark fixed</button>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {notCheckedToday.length > 0 && (
         <div className="banner-warn mb-6">

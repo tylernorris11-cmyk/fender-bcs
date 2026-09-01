@@ -45,3 +45,41 @@ export async function logAssetCheck(formData: FormData) {
   revalidatePath('/');
   redirect('/checks');
 }
+
+// ------------------------------------------------------------------ issues
+// Separate from the pass/fail checklist above — something spotted that
+// isn't necessarily one of the fixed checklist items, and stays visible
+// until someone actually fixes it, not just until the next check is logged.
+
+export async function reportAssetIssue(formData: FormData) {
+  const user = await assertPermission('checks.create');
+  const assetId = String(formData.get('assetId') ?? '');
+  if (!assetId) throw new Error('Choose an asset before reporting an issue.');
+  const description = String(formData.get('description') ?? '').trim();
+  if (!description) throw new Error('Say what the issue is.');
+
+  const issue = await db.assetIssue.create({ data: { assetId, description, reportedById: user.id } });
+
+  await logActivity('Asset', assetId, 'Issue reported', description, user.id);
+  revalidatePath('/checks');
+  revalidatePath('/checks/new');
+  revalidatePath(`/assets/${assetId}`);
+}
+
+export async function resolveAssetIssue(formData: FormData) {
+  const user = await assertPermission('checks.create');
+  const id = String(formData.get('issueId'));
+  const resolutionNote = String(formData.get('resolutionNote') ?? '').trim();
+
+  const issue = await db.assetIssue.findUniqueOrThrow({ where: { id } });
+  if (issue.resolved) return;
+
+  await db.assetIssue.update({
+    where: { id },
+    data: { resolved: true, resolvedById: user.id, resolvedAt: new Date(), resolutionNote },
+  });
+
+  await logActivity('Asset', issue.assetId, 'Issue resolved', resolutionNote, user.id);
+  revalidatePath('/checks');
+  revalidatePath(`/assets/${issue.assetId}`);
+}

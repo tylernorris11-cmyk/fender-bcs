@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Camera, X } from 'lucide-react';
 import type { AssetType } from '@prisma/client';
 import { resizeImageToDataUrl } from '@/lib/image';
-import { logAssetCheck } from '../actions';
+import { logAssetCheck, reportAssetIssue } from '../actions';
 
 type Asset = { id: string; name: string; ref: string; type: AssetType; checklistItems: { label: string }[] };
 
@@ -33,7 +33,7 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
   const machines = assets.filter((a) => a.type === 'MACHINE');
 
   return (
-    <form action={logAssetCheck} className="space-y-6">
+    <div className="space-y-6">
       <section className="card card-pad">
         <label className="label" htmlFor="assetId">Asset</label>
         <select id="assetId" name="assetId" required value={assetId}
@@ -51,6 +51,24 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
         </select>
       </section>
 
+      <section className="card card-pad border-2 border-signal/30">
+        <h2 className="text-lg font-bold mb-1">Report an issue</h2>
+        <p className="text-sm text-ink-muted mb-3">
+          Spotted something wrong with {asset ? asset.name : 'this asset'}? Report it here — it stays on the main checks
+          screen for everyone to see until someone marks it fixed, separate from the checklist below.
+        </p>
+        <form action={reportAssetIssue} className="flex flex-wrap items-end gap-3">
+          <input type="hidden" name="assetId" value={assetId} />
+          <div className="flex-1 min-w-[240px]">
+            <label className="label text-xs" htmlFor="description">What&apos;s wrong</label>
+            <input id="description" name="description" required className="input" placeholder="Nearside indicator not working" />
+          </div>
+          <button type="submit" className="btn-secondary" disabled={!asset}>Report issue</button>
+        </form>
+      </section>
+
+      <form action={logAssetCheck} className="space-y-6">
+      <input type="hidden" name="assetId" value={assetId} />
       {asset && (
         <section className="card card-pad">
           <h2 className="text-lg font-bold mb-1">Checklist</h2>
@@ -124,6 +142,7 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
 
         <button type="submit" className="btn-primary mt-4" disabled={!asset}>Save check</button>
       </section>
-    </form>
+      </form>
+    </div>
   );
 }

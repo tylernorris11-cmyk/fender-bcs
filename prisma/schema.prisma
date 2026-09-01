@@ -82,6 +82,8 @@ model User {
   holidaysDecided      HolidayRequest[] @relation("holidayDecidedBy")
   holidayAdjustmentsReceived HolidayAdjustment[] @relation("holidayAdjustmentFor")
   holidayAdjustmentsMade     HolidayAdjustment[] @relation("holidayAdjustmentBy")
+  assetIssuesReported        AssetIssue[]        @relation("assetIssueReportedBy")
+  assetIssuesResolved        AssetIssue[]        @relation("assetIssueResolvedBy")
 }
 
 // ------------------------------------------------------------- customers
@@ -676,6 +678,30 @@ model Asset {
   production     ProductionEvent[]
   checks         AssetCheck[]
   checklistItems AssetChecklistItem[]
+  issues         AssetIssue[]
+}
+
+// Something wrong with a vehicle or machine, reported on the spot — separate
+// from the pass/fail checklist so it stays visible on the main checks screen
+// until someone actually fixes it and marks it resolved, not just until the
+// next check is logged.
+model AssetIssue {
+  id             String    @id @default(cuid())
+  assetId        String
+  description    String
+  reportedById   String?
+  reportedAt     DateTime  @default(now())
+  resolved       Boolean   @default(false)
+  resolvedById   String?
+  resolvedAt     DateTime?
+  resolutionNote String    @default("")
+
+  asset      Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  reportedBy User? @relation("assetIssueReportedBy", fields: [reportedById], references: [id])
+  resolvedBy User? @relation("assetIssueResolvedBy", fields: [resolvedById], references: [id])
+
+  @@index([assetId])
+  @@index([resolved])
 }
 
 // The pre-use checklist for one specific vehicle or machine — starts from a
