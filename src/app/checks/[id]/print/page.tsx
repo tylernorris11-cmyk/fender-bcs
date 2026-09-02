@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getActiveCompany } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
+import { PrintActions } from '@/components/PrintActions';
 
 /**
  * A printable copy of one pre-use check — the paper record for the file. A
@@ -24,7 +25,9 @@ export default async function CheckPrint({ params }: { params: { id: string } })
   const failed = check.items.filter((i) => !i.ok);
 
   return (
-    <div className="bg-white min-h-screen p-10 max-w-[820px] mx-auto text-[13px] text-black">
+    <div className="bg-white min-h-screen">
+      <PrintActions maxWidth={820} />
+      <div className="p-10 max-w-[820px] mx-auto text-[13px] text-black">
       <div
         className="flex justify-between items-start border-b-2 pb-4 mb-6"
         style={{ borderColor: isFender ? 'rgb(13,74,66)' : 'rgb(230,126,34)' }}
@@ -91,6 +94,7 @@ export default async function CheckPrint({ params }: { params: { id: string } })
         Printed {shortDate(new Date())} {clock(new Date())}. Any item marked with a cross must be actioned before this
         asset goes back into use.
       </p>
+      </div>
     </div>
   );
 }

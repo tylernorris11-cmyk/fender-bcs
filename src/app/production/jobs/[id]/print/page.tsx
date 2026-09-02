@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { clock, shortDate, tonnes } from '@/lib/format';
+import { PrintActions } from '@/components/PrintActions';
 
 const PROCESS_LABEL: Record<string, string> = { CUTTING: 'Cutting', BENDING: 'Bending', STEMA: 'Stema' };
 
@@ -24,7 +25,9 @@ export default async function ProductionJobPrint({ params }: { params: { id: str
   const totalWeight = job.rows.reduce((s, r) => s + Number(r.tallyWeightKg), 0);
 
   return (
-    <div className="bg-white min-h-screen p-10 max-w-[900px] mx-auto text-[13px] text-black">
+    <div className="bg-white min-h-screen">
+      <PrintActions maxWidth={900} />
+      <div className="p-10 max-w-[900px] mx-auto text-[13px] text-black">
       <div
         className="flex justify-between items-start border-b-2 pb-4 mb-6"
         style={{ borderColor: isFender ? 'rgb(13,74,66)' : 'rgb(230,126,34)' }}
@@ -102,6 +105,7 @@ export default async function ProductionJobPrint({ params }: { params: { id: str
       <p className="text-[11px] text-ink-muted mt-8">
         Printed {shortDate(new Date())} {clock(new Date())}. Figures as logged on the day.
       </p>
+      </div>
     </div>
   );
 }
