@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Printer } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
@@ -26,6 +27,13 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
 
   const openOtherWork = await db.otherWorkTask.count({ where: { company, status: 'Open' } });
 
+  const finishedJobs = await db.productionJob.findMany({
+    where: { company, finishedAt: { not: null } },
+    include: { user: true, rows: true },
+    orderBy: { finishedAt: 'desc' },
+    take: 20,
+  });
+
   const orders = activeJob ? [] : await db.order.findMany({
     where: { company, archived: false, stage: { in: ['APPROVED', 'IN_PRODUCTION', 'READY_FOR_DELIVERY'] } },
     include: {
@@ -50,7 +58,41 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
       ) : (
         <BcsView orders={orders} sort={searchParams.sort} user={user} company={company} />
       )}
+
+      <RecentJobs jobs={finishedJobs} isFender={isFender} />
     </Shell>
+  );
+}
+
+function RecentJobs({ jobs, isFender }: { jobs: any[]; isFender: boolean }) {
+  if (jobs.length === 0) return null;
+  return (
+    <section className="card card-pad mt-6">
+      <h2 className="text-lg font-bold mb-1">Recent jobs</h2>
+      <p className="text-sm text-ink-muted mb-4">Finished tally sheets — print a copy for the file.</p>
+      <Table head={<>
+        <th className="th">Job</th><th className="th">{isFender ? 'Process' : 'Rows'}</th>
+        <th className="th">Weight</th><th className="th">Finished</th><th className="th">By</th><th className="th sr-only">Print</th>
+      </>}>
+        {jobs.map((j) => {
+          const weight = j.rows.reduce((s: number, r: any) => s + Number(r.tallyWeightKg), 0);
+          return (
+            <tr key={j.id} className="row">
+              <td className="td font-semibold">{j.jobNumber}</td>
+              <td className="td">{isFender ? PROCESS_LABEL[j.process] : `${j.rows.length} row${j.rows.length === 1 ? '' : 's'}`}</td>
+              <td className="td">{tonnes(weight)}</td>
+              <td className="td text-ink-muted whitespace-nowrap">{shortDate(j.finishedAt)}</td>
+              <td className="td text-ink-muted">{j.user?.name ?? '—'}</td>
+              <td className="td text-right">
+                <a href={`/production/jobs/${j.id}/print`} className="btn-secondary btn-sm">
+                  <Printer size={14} /> Print
+                </a>
+              </td>
+            </tr>
+          );
+        })}
+      </Table>
+    </section>
   );
 }
 

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Printer } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
@@ -28,7 +28,12 @@ export default async function CheckDetailPage({ params }: { params: { id: string
       <PageHeader
         title={check.asset.name}
         blurb={`${check.asset.ref} · ${shortDate(check.performedAt)} at ${clock(check.performedAt)}${check.user ? ` · ${check.user.name}` : ''}`}
-        actions={<Pill tone={check.result === 'PASS' ? 'good' : 'bad'}>{check.result === 'PASS' ? 'Pass' : 'Issue flagged'}</Pill>}
+        actions={(
+          <>
+            <a href={`/checks/${check.id}/print`} className="btn-secondary"><Printer size={16} /> Print</a>
+            <Pill tone={check.result === 'PASS' ? 'good' : 'bad'}>{check.result === 'PASS' ? 'Pass' : 'Issue flagged'}</Pill>
+          </>
+        )}
       />
 
       <section className="card card-pad mb-6">
