@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  ArrowRight, Bell, Bug, CalendarDays, CalendarHeart, ClipboardCheck, ClipboardList, Factory, Layers,
+  ArrowRight, Bell, Bug, CalendarDays, CalendarHeart, ClipboardCheck, ClipboardList, Droplet, Factory, Layers,
   LogOut, Settings, ShieldCheck, ShoppingCart, Truck, Users,
 } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
@@ -14,7 +14,7 @@ import { GlobalSearch } from '@/components/GlobalSearch';
 
 const ICONS = {
   orders: ClipboardList, purchaseOrders: ShoppingCart, production: Factory, planning: CalendarDays, customers: Users,
-  compliance: ShieldCheck, stock: Layers, assets: Truck, checks: ClipboardCheck, holidays: CalendarHeart,
+  compliance: ShieldCheck, stock: Layers, assets: Truck, checks: ClipboardCheck, fuel: Droplet, holidays: CalendarHeart,
 } as const;
 
 // Each tile gets its own accent so people learn the colour before the label.
@@ -28,6 +28,7 @@ const TONES = {
   stock: { icon: 'bg-amber-100 text-amber-700', bar: 'bg-amber-500', arrow: 'border-amber-500 text-amber-600' },
   assets: { icon: 'bg-indigo-100 text-indigo-700', bar: 'bg-indigo-500', arrow: 'border-indigo-500 text-indigo-600' },
   checks: { icon: 'bg-lime-100 text-lime-700', bar: 'bg-lime-500', arrow: 'border-lime-500 text-lime-600' },
+  fuel: { icon: 'bg-orange-100 text-orange-700', bar: 'bg-orange-500', arrow: 'border-orange-500 text-orange-600' },
   holidays: { icon: 'bg-rose-100 text-rose-700', bar: 'bg-rose-500', arrow: 'border-rose-500 text-rose-600' },
 } as const;
 

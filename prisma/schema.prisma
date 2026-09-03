@@ -84,6 +84,7 @@ model User {
   holidayAdjustmentsMade     HolidayAdjustment[] @relation("holidayAdjustmentBy")
   assetIssuesReported        AssetIssue[]        @relation("assetIssueReportedBy")
   assetIssuesResolved        AssetIssue[]        @relation("assetIssueResolvedBy")
+  fuelEntriesLogged          FuelEntry[]
 }
 
 // ------------------------------------------------------------- customers
@@ -679,6 +680,27 @@ model Asset {
   checks         AssetCheck[]
   checklistItems AssetChecklistItem[]
   issues         AssetIssue[]
+  fuelEntries    FuelEntry[]
+}
+
+// One fill-up against the yard's bulk tank meter — litres used is the
+// current reading minus the last one, not stored separately, so it can
+// never drift out of sync with the two readings it comes from.
+model FuelEntry {
+  id           String   @id @default(cuid())
+  assetId      String
+  mileage      Int
+  driverName   String
+  litresBefore Decimal  @db.Decimal(10, 2)
+  litresAfter  Decimal  @db.Decimal(10, 2)
+  loggedById   String?
+  loggedAt     DateTime @default(now())
+
+  asset    Asset @relation(fields: [assetId], references: [id])
+  loggedBy User? @relation(fields: [loggedById], references: [id])
+
+  @@index([assetId])
+  @@index([loggedAt])
 }
 
 // Something wrong with a vehicle or machine, reported on the spot — separate

@@ -43,6 +43,9 @@ export type Permission =
   // Checks — morning pre-use checks on vehicles and machines
   | 'checks.view'
   | 'checks.create'
+  // Fuel — logging fill-ups against the yard tank meter
+  | 'fuel.view'
+  | 'fuel.create'
   // Planning
   | 'planning.view'
   | 'planning.edit'
@@ -70,6 +73,7 @@ const ALL: Permission[] = [
   'assets.view', 'assets.edit',
   'purchaseOrders.view', 'purchaseOrders.create', 'purchaseOrders.edit',
   'checks.view', 'checks.create',
+  'fuel.view', 'fuel.create',
   'planning.view', 'planning.edit',
   'holidays.view',
   'setup.view', 'setup.pricing', 'setup.users', 'setup.lists', 'setup.backups', 'setup.bugs',
@@ -97,6 +101,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'assets.view', 'assets.edit',
     'purchaseOrders.view', 'purchaseOrders.create', 'purchaseOrders.edit',
     'checks.view', 'checks.create',
+    'fuel.view', 'fuel.create',
     'planning.view', 'planning.edit',
     'holidays.view',
     'setup.view', 'setup.lists',
@@ -129,6 +134,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'finance.debtors',
     'assets.view',
     'checks.view',
+    'fuel.view',
   ],
 
   // Quality manager. Owns the audit file.
@@ -141,6 +147,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'assets.view', 'assets.edit',
     'purchaseOrders.view',
     'checks.view',
+    'fuel.view',
     'planning.view', 'planning.edit',
     'holidays.view',
     'setup.view', 'setup.lists',
@@ -155,17 +162,18 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'assets.view',
     'purchaseOrders.view', 'purchaseOrders.create',
     'checks.view', 'checks.create',
+    'fuel.view', 'fuel.create',
     'planning.view',
     'holidays.view',
   ],
 
   // Drivers see the run and mark deliveries done.
-  DRIVER: ['orders.view', 'orders.progress', 'planning.view', 'holidays.view', 'assets.view', 'checks.view', 'checks.create'],
+  DRIVER: ['orders.view', 'orders.progress', 'planning.view', 'holidays.view', 'assets.view', 'checks.view', 'checks.create', 'fuel.view', 'fuel.create'],
 
   // Read only — auditors, office cover, new starters.
   VIEWER: [
     'orders.view', 'customers.view', 'stock.view', 'production.view', 'compliance.view', 'planning.view', 'holidays.view', 'assets.view',
-    'purchaseOrders.view', 'checks.view',
+    'purchaseOrders.view', 'checks.view', 'fuel.view',
   ],
 };
 
@@ -203,6 +211,7 @@ export const MODULES = [
   { key: 'stock', label: 'Stock', href: '/stock', perm: 'stock.view' as Permission, blurb: 'Track inventory levels, materials and movements.' },
   { key: 'assets', label: 'Assets', href: '/assets', perm: 'assets.view' as Permission, blurb: 'Manage company assets, equipment and maintenance.' },
   { key: 'checks', label: 'Checks', href: '/checks', perm: 'checks.view' as Permission, blurb: 'Morning checks on machines, lorries and pickups before use.' },
+  { key: 'fuel', label: 'Fuel', href: '/fuel', perm: 'fuel.view' as Permission, blurb: 'Log fuel taken from the yard tank against each vehicle.' },
 ] as const;
 
 /** Every module a Master Administrator can hide for someone in Set Up — everything except Set Up itself. */
