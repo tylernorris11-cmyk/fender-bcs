@@ -31,14 +31,16 @@ export async function submitAccessRequest(formData: FormData) {
   const name = String(formData.get('name') ?? '').trim();
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   const jobTitle = String(formData.get('jobTitle') ?? '').trim();
-  const company = String(formData.get('company') ?? '') as Company;
+  const companies = formData.getAll('companies').map(String) as Company[];
   const password = String(formData.get('password') ?? '');
   const confirm = String(formData.get('confirm') ?? '');
 
   const fail = (message: string) => redirect(`/request-access?error=${encodeURIComponent(message)}`);
 
   if (!name || !email) fail('Enter your name and email.');
-  if (company !== 'FENDER' && company !== 'BS_SUPPLIES') fail('Choose which company you need access to.');
+  if (companies.length === 0 || companies.some((c) => c !== 'FENDER' && c !== 'BS_SUPPLIES')) {
+    fail('Choose which company (or companies) you need access to.');
+  }
   if (password !== confirm) fail('Those passwords do not match.');
   const problem = passwordProblem(password);
   if (problem) fail(problem);
@@ -53,19 +55,20 @@ export async function submitAccessRequest(formData: FormData) {
   if (existingPending) fail('A request for that email is already waiting for approval.');
 
   await db.accessRequest.create({
-    data: { name, email, jobTitle, company, passwordHash: hashPassword(password) },
+    data: { name, email, jobTitle, companies, passwordHash: hashPassword(password) },
   });
 
   // Best-effort — the request is already saved regardless of whether this send works.
   const admins = await db.user.findMany({ where: { role: 'MASTER_ADMIN', active: true } });
   const h = headers();
   const origin = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host')}`;
+  const companyText = companies.map((c) => COMPANY_LABEL[c]).join(' and ');
   for (const admin of admins) {
     await sendEmail({
       to: admin.email,
       subject: `Access request — ${name}`,
       text: [
-        `${name} (${email}) has asked for access to ${COMPANY_LABEL[company]}${jobTitle ? ` as ${jobTitle}` : ''}.`,
+        `${name} (${email}) has asked for access to ${companyText}${jobTitle ? ` as ${jobTitle}` : ''}.`,
         '',
         `Review it here: ${origin}/setup/access-requests`,
       ].join('\n'),

@@ -42,12 +42,18 @@ export default async function RequestAccessPage({ searchParams }: { searchParams
             </div>
 
             <div>
-              <label className="label" htmlFor="company">Which company?</label>
-              <select id="company" name="company" required defaultValue="" className="input">
-                <option value="" disabled>Choose one…</option>
-                <option value="FENDER">Fender Steel</option>
-                <option value="BS_SUPPLIES">BCS Products</option>
-              </select>
+              <span className="label">Which company?</span>
+              <div className="flex gap-4 mt-1">
+                <label className="flex items-center gap-1.5 text-sm">
+                  <input type="checkbox" name="companies" value="FENDER" className="h-4 w-4 accent-brand" />
+                  Fender Steel
+                </label>
+                <label className="flex items-center gap-1.5 text-sm">
+                  <input type="checkbox" name="companies" value="BS_SUPPLIES" className="h-4 w-4 accent-brand" />
+                  BCS Products
+                </label>
+              </div>
+              <p className="hint">Tick both if you need to work across both businesses.</p>
             </div>
 
             <div>

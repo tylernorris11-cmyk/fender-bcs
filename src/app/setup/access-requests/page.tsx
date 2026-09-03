@@ -51,7 +51,7 @@ export default async function AccessRequestsPage() {
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   <span className="font-semibold">{r.name}</span>
                   <span className="text-sm text-ink-muted">{r.email}{r.jobTitle && ` · ${r.jobTitle}`}</span>
-                  <Pill>{COMPANY_LABEL[r.company]}</Pill>
+                  <Pill>{r.companies.map((c) => COMPANY_LABEL[c]).join(' & ') || 'No company chosen'}</Pill>
                   <span className="text-xs text-ink-faint ml-auto">Asked {shortDate(r.requestedAt)}</span>
                 </div>
 
@@ -69,7 +69,7 @@ export default async function AccessRequestsPage() {
                       <div className="flex gap-3">
                         {COMPANIES.map((c) => (
                           <label key={c} className="flex items-center gap-1.5 text-xs">
-                            <input type="checkbox" name="companies" value={c} defaultChecked={c === r.company} className="h-3.5 w-3.5 accent-brand" />
+                            <input type="checkbox" name="companies" value={c} defaultChecked={r.companies.includes(c)} className="h-3.5 w-3.5 accent-brand" />
                             {COMPANY_LABEL[c]}
                           </label>
                         ))}

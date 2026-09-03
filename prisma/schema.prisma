@@ -920,7 +920,7 @@ model AccessRequest {
   email        String
   passwordHash String
   jobTitle     String              @default("")
-  company      Company
+  companies    Company[]           @default([])
   status       AccessRequestStatus @default(PENDING)
   note         String              @default("") // reason given if rejected
   requestedAt  DateTime            @default(now())
