@@ -8,8 +8,19 @@ import { assertPermission, logActivity } from '@/lib/auth';
 export async function logFuelEntry(formData: FormData) {
   const user = await assertPermission('fuel.create');
 
+  const notOnSystem = formData.get('notOnSystem') === '1';
   const assetId = String(formData.get('assetId') ?? '');
-  if (!assetId) throw new Error('Choose a vehicle.');
+  const otherVehicle = String(formData.get('otherVehicle') ?? '').trim();
+
+  let vehicleLabel: string;
+  if (notOnSystem) {
+    if (!otherVehicle) throw new Error('Enter the vehicle’s reg or name.');
+    vehicleLabel = otherVehicle;
+  } else {
+    if (!assetId) throw new Error('Choose a vehicle.');
+    const asset = await db.asset.findUniqueOrThrow({ where: { id: assetId } });
+    vehicleLabel = asset.name;
+  }
 
   const mileage = Number(formData.get('mileage'));
   if (!Number.isInteger(mileage) || mileage < 0) throw new Error('Enter the mileage as a whole number.');
@@ -24,13 +35,15 @@ export async function logFuelEntry(formData: FormData) {
     throw new Error('The new reading should be higher than the current reading — check you haven’t swapped them round.');
   }
 
-  const asset = await db.asset.findUniqueOrThrow({ where: { id: assetId } });
-
   const entry = await db.fuelEntry.create({
-    data: { assetId, mileage, driverName, litresBefore, litresAfter, loggedById: user.id },
+    data: {
+      assetId: notOnSystem ? null : assetId,
+      otherVehicle: notOnSystem ? otherVehicle : '',
+      mileage, driverName, litresBefore, litresAfter, loggedById: user.id,
+    },
   });
 
-  await logActivity('Asset', assetId, 'Fuel logged', `${(litresAfter - litresBefore).toFixed(2)} L for ${asset.name}`, user.id);
+  await logActivity('FuelEntry', entry.id, 'Fuel logged', `${(litresAfter - litresBefore).toFixed(2)} L for ${vehicleLabel}`, user.id);
   revalidatePath('/fuel');
   redirect('/fuel');
 }

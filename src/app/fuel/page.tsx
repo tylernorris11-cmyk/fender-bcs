@@ -15,7 +15,7 @@ export default async function FuelPage() {
   const company = getActiveCompany(user);
 
   const entries = await db.fuelEntry.findMany({
-    where: { asset: { OR: [{ company: null }, { company }] } },
+    where: { OR: [{ assetId: null }, { asset: { OR: [{ company: null }, { company }] } }] },
     include: { asset: true, loggedBy: true },
     orderBy: { loggedAt: 'desc' },
     take: 200,
@@ -64,8 +64,17 @@ export default async function FuelPage() {
             {entries.map((e) => (
               <tr key={e.id} className="row">
                 <td className="td">
-                  <Link href={`/assets/${e.assetId}`} className="font-semibold text-brand-700 hover:underline">{e.asset.name}</Link>
-                  <span className="block text-xs text-ink-faint">{e.asset.ref}</span>
+                  {e.asset ? (
+                    <>
+                      <Link href={`/assets/${e.assetId}`} className="font-semibold text-brand-700 hover:underline">{e.asset.name}</Link>
+                      <span className="block text-xs text-ink-faint">{e.asset.ref}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold">{e.otherVehicle}</span>
+                      <span className="block text-xs text-ink-faint">Not on system</span>
+                    </>
+                  )}
                 </td>
                 <td className="td">{e.mileage.toLocaleString('en-GB')}</td>
                 <td className="td">{e.driverName}</td>

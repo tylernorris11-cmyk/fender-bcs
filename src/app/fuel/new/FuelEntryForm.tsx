@@ -6,6 +6,7 @@ import { logFuelEntry } from '../actions';
 type Asset = { id: string; name: string; ref: string };
 
 export function FuelEntryForm({ assets, defaultDriverName }: { assets: Asset[]; defaultDriverName: string }) {
+  const [notOnSystem, setNotOnSystem] = useState(false);
   const [litresBefore, setLitresBefore] = useState('');
   const [litresAfter, setLitresAfter] = useState('');
 
@@ -16,12 +17,27 @@ export function FuelEntryForm({ assets, defaultDriverName }: { assets: Asset[]; 
 
   return (
     <form action={logFuelEntry} className="card card-pad space-y-4 max-w-xl">
-      <div>
-        <label className="label" htmlFor="assetId">Vehicle name or reg</label>
-        <select id="assetId" name="assetId" required className="input">
-          {assets.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.ref})</option>)}
-        </select>
-      </div>
+      {notOnSystem ? (
+        <div>
+          <label className="label" htmlFor="otherVehicle">Vehicle reg or name</label>
+          <input id="otherVehicle" name="otherVehicle" required className="input" placeholder="e.g. hired flatbed, KX21 ABC" />
+        </div>
+      ) : (
+        <div>
+          <label className="label" htmlFor="assetId">Vehicle name or reg</label>
+          <select id="assetId" name="assetId" required className="input">
+            {assets.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.ref})</option>)}
+          </select>
+        </div>
+      )}
+
+      <label className="flex items-center gap-2 text-sm -mt-2">
+        <input
+          type="checkbox" name="notOnSystem" value="1" checked={notOnSystem}
+          onChange={(e) => setNotOnSystem(e.target.checked)} className="h-4 w-4 accent-brand"
+        />
+        Vehicle not on the system
+      </label>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
