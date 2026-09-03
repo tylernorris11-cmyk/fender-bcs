@@ -69,7 +69,11 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
   const title = retired ? 'Retired assets' : type === 'MACHINE' ? 'Machinery' : type === 'VEHICLE' ? 'Vehicles' : 'Vehicles & machinery';
 
   return (
-    <Shell user={user} module="assets" nav={NAV.assets} current={retired ? '/assets?retired=1' : type === 'MACHINE' ? '/assets?type=MACHINE' : '/assets'} alerts={alerts.length}>
+    <Shell
+      user={user} module="assets" nav={NAV.assets}
+      current={retired ? '/assets?retired=1' : type === 'MACHINE' ? '/assets?type=MACHINE' : type === 'VEHICLE' ? '/assets?type=VEHICLE' : '/assets'}
+      alerts={alerts.length}
+    >
       <PageHeader
         title={title}
         blurb="Tap a vehicle or machine to see its full record."

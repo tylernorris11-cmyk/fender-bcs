@@ -197,7 +197,8 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'Movements', href: '/stock/movements' },
   ],
   assets: [
-    { label: 'Vehicles', href: '/assets' },
+    { label: 'Both', href: '/assets' },
+    { label: 'Vehicles', href: '/assets?type=VEHICLE' },
     { label: 'Machinery', href: '/assets?type=MACHINE' },
     { label: 'Retired', href: '/assets?retired=1' },
   ],
