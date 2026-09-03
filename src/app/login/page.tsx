@@ -92,7 +92,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
           </form>
 
           <p className="text-center text-sm text-ink-faint mt-4">
-            Still stuck? Ask John or Claire to reset it for you.
+            Still stuck? Ask Lee or Tyler to reset it for you.
           </p>
           <p className="text-center text-sm text-ink-faint mt-2">
             New here? <Link href="/request-access" className="font-semibold text-brand-700 hover:underline">Request access</Link>

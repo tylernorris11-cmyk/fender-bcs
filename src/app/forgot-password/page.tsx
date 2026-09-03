@@ -18,7 +18,7 @@ export default async function ForgotPasswordPage({ searchParams }: { searchParam
               If that email has an account, a reset link is on its way. It works once and expires in an hour.
             </p>
             <p className="text-sm text-ink-muted mt-4">
-              No email arrived after a few minutes? Check junk mail, or ask John or Claire to reset it for you.
+              No email arrived after a few minutes? Check junk mail, or ask Lee or Tyler to reset it for you.
             </p>
           </div>
         ) : (

@@ -41,7 +41,7 @@ export async function signIn(formData: FormData) {
   if (!email || !password) fail('Enter your email and password.');
 
   if (throttled(email)) {
-    fail('Too many attempts. Wait fifteen minutes, or ask John or Claire to reset your password.');
+    fail('Too many attempts. Wait fifteen minutes, or ask Lee or Tyler to reset your password.');
   }
 
   const user = await db.user.findUnique({ where: { email } });

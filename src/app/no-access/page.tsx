@@ -12,7 +12,7 @@ export default async function NoAccess({ searchParams }: { searchParams: { neede
           You are signed in as <strong>{user.name}</strong> with the {ROLE_LABELS[user.role].toLowerCase()} role.
           {searchParams.needed && <> This screen needs the <code className="text-ink">{searchParams.needed}</code> permission.</>}
         </p>
-        <p className="text-ink-muted mt-3">Ask John or Claire if you need it adding.</p>
+        <p className="text-ink-muted mt-3">Ask Lee or Tyler if you need it adding.</p>
         <Link href="/" className="btn-primary mt-6 w-full">Back to the control centre</Link>
       </div>
     </div>

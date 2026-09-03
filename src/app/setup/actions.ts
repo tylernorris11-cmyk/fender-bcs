@@ -360,7 +360,7 @@ export async function rejectAccessRequest(formData: FormData) {
   await sendEmail({
     to: request.email,
     subject: 'Your Fender BCS access request',
-    text: `Hi ${request.name},\n\nYour request for access wasn't approved${note ? `: ${note}` : '.'}\n\nIf you think this is a mistake, contact John or Claire.\n\n— Fender BCS`,
+    text: `Hi ${request.name},\n\nYour request for access wasn't approved${note ? `: ${note}` : '.'}\n\nIf you think this is a mistake, contact Lee or Tyler.\n\n— Fender BCS`,
   });
 
   revalidatePath('/setup/access-requests');
