@@ -1,21 +1,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-  ArrowRight, Bell, Bug, CalendarDays, CalendarHeart, ClipboardCheck, ClipboardList, Droplet, Factory, Layers,
-  LogOut, Settings, ShieldCheck, ShoppingCart, Truck, Users,
-} from 'lucide-react';
+import { ArrowRight, Bell, Bug, CalendarDays, LogOut, Settings } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { can, MODULES, ROLE_LABELS } from '@/lib/rbac';
 import { getAlerts } from '@/lib/alerts';
 import { longDate } from '@/lib/format';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
+import { MODULE_ICONS } from '@/lib/moduleIcons';
 import { Avatar } from '@/components/ui';
 import { GlobalSearch } from '@/components/GlobalSearch';
-
-const ICONS = {
-  orders: ClipboardList, purchaseOrders: ShoppingCart, production: Factory, planning: CalendarDays, customers: Users,
-  compliance: ShieldCheck, stock: Layers, assets: Truck, checks: ClipboardCheck, fuel: Droplet, holidays: CalendarHeart,
-} as const;
 
 // Each tile gets its own accent so people learn the colour before the label.
 const TONES = {
@@ -136,7 +129,7 @@ export default async function Launcher() {
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {tiles.map((m) => {
-            const Icon = ICONS[m.key];
+            const Icon = MODULE_ICONS[m.key];
             const tone = TONES[m.key];
             return (
               <Link key={m.key} href={m.href} className="card relative overflow-hidden p-6 pb-8 group hover:shadow-pop transition-shadow">

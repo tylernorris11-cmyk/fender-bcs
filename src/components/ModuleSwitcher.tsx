@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { MODULE_COLORS, MODULE_ICONS } from '@/lib/moduleIcons';
 
 export type SwitcherItem = { key: string; label: string; href: string };
 
@@ -30,6 +31,8 @@ export function ModuleSwitcher({
     };
   }, [open]);
 
+  const CurrentIcon = MODULE_ICONS[current];
+
   return (
     <div className="relative shrink-0" ref={ref}>
       <button
@@ -39,6 +42,7 @@ export function ModuleSwitcher({
         aria-haspopup="true"
         aria-expanded={open}
       >
+        {CurrentIcon && <CurrentIcon size={16} aria-hidden />}
         {currentLabel} <ChevronDown size={16} className={`transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
       </button>
 
@@ -47,20 +51,25 @@ export function ModuleSwitcher({
           role="menu"
           className="absolute left-0 top-full mt-2 w-56 max-h-[70vh] overflow-y-auto rounded-xl border border-hairline bg-white shadow-pop py-1.5 z-30"
         >
-          {items.map((item) => (
-            <Link
-              key={item.key}
-              href={item.href}
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              aria-current={item.key === current ? 'page' : undefined}
-              className={`block px-4 py-2.5 text-sm transition-colors ${
-                item.key === current ? 'bg-brand-50 text-forest font-semibold' : 'text-ink hover:bg-canvas'
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {items.map((item) => {
+            const Icon = MODULE_ICONS[item.key];
+            const color = MODULE_COLORS[item.key] ?? 'text-ink-muted';
+            return (
+              <Link
+                key={item.key}
+                href={item.href}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                aria-current={item.key === current ? 'page' : undefined}
+                className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${
+                  item.key === current ? 'bg-brand-50 text-forest font-semibold' : 'text-ink hover:bg-canvas'
+                }`}
+              >
+                {Icon && <Icon size={16} className={`shrink-0 ${item.key === current ? '' : color}`} aria-hidden />}
+                {item.label}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
