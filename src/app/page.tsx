@@ -20,6 +20,7 @@ const TONES = {
   customers: { icon: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500', arrow: 'border-emerald-500 text-emerald-600' },
   compliance: { icon: 'bg-signal/10 text-signal', bar: 'bg-signal', arrow: 'border-signal text-signal' },
   stock: { icon: 'bg-amber-100 text-amber-700', bar: 'bg-amber-500', arrow: 'border-amber-500 text-amber-600' },
+  barCounter: { icon: 'bg-fuchsia-100 text-fuchsia-700', bar: 'bg-fuchsia-500', arrow: 'border-fuchsia-500 text-fuchsia-600' },
   assets: { icon: 'bg-indigo-100 text-indigo-700', bar: 'bg-indigo-500', arrow: 'border-indigo-500 text-indigo-600' },
   checks: { icon: 'bg-lime-100 text-lime-700', bar: 'bg-lime-500', arrow: 'border-lime-500 text-lime-600' },
   fuel: { icon: 'bg-orange-100 text-orange-700', bar: 'bg-orange-500', arrow: 'border-orange-500 text-orange-600' },
