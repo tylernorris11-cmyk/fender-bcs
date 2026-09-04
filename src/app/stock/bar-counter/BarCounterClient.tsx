@@ -93,8 +93,12 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
           <label className="label" htmlFor="photo">Photo of the bundle end</label>
           <input
             ref={fileInputRef} id="photo" type="file" accept="image/png,image/jpeg,image/webp"
-            capture="environment" className="input" onChange={onPhotoChosen}
+            capture="environment" className="sr-only" onChange={onPhotoChosen}
           />
+          <button type="button" className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
+            <Camera size={16} /> Take Picture
+          </button>
+          {file && <span className="block text-xs text-ink-muted mt-1.5">{file.name}</span>}
         </div>
         {file && (
           <div className="flex gap-2">
