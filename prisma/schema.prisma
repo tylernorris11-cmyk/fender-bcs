@@ -78,6 +78,11 @@ model User {
   accessRequestsDecided AccessRequest[] @relation("decidedBy")
   testCertificatesUploaded TestCertificate[]
   castNumbersConfirmed     ExtractedCastNumber[] @relation("castConfirmedBy")
+  hseDocumentsUploaded   HseDocument[]
+  trainingModulesCreated TrainingModule[]
+  trainingCompletions    TrainingCompletion[]
+  trainingAssignedTo     UserTrainingAssignment[] @relation("trainingAssignedTo")
+  trainingAssignedBy     UserTrainingAssignment[] @relation("trainingAssignedBy")
   holidayAllowanceDays Int              @default(28) // working days a year — editable in Set Up
   hiddenModules        String[]         @default([]) // module keys hidden for this person regardless of role — never applies to MASTER_ADMIN
   holidaysRequested    HolidayRequest[] @relation("holidayRequestedBy")
@@ -1074,4 +1079,96 @@ model ActivityLog {
   user User? @relation(fields: [userId], references: [id])
 
   @@index([entity, entityId])
+}
+
+// ------------------------------------------------------- health & safety
+
+enum HseDocumentCategory {
+  POLICY
+  RAMS
+  COSHH
+  METHOD_STATEMENT
+  OTHER
+}
+
+model HseDocument {
+  id           String              @id @default(cuid())
+  company      Company?            // null = shared across both companies, same pattern as Asset.company
+  category     HseDocumentCategory @default(OTHER)
+  title        String
+  fileUrl      String
+  fileName     String
+  uploadedById String?
+  uploadedAt   DateTime            @default(now())
+  archived     Boolean             @default(false)
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id])
+
+  @@index([company])
+  @@index([category])
+}
+
+enum TrainingCategory {
+  GENERAL // required for everyone
+  PPE     // required for everyone
+  MACHINE // required only for people this module is assigned to — machineName names the machine
+}
+
+// A named training unit — Yard H&S, PPE, or a specific machine. Content
+// lives directly on this row and is always current; a TrainingCompletion
+// always checks against whatever this row currently says, never a snapshot.
+model TrainingModule {
+  id          String           @id @default(cuid())
+  company     Company?         // null = shared across both companies
+  category    TrainingCategory
+  machineName String           @default("") // only meaningful when category = MACHINE, e.g. "Power Bender"
+  title       String
+  summary     String           @default("")
+  content     String[]         @default([]) // ordered bullet points
+  active      Boolean          @default(true)
+  sortOrder   Int              @default(0)
+  createdById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  createdBy   User?                     @relation(fields: [createdById], references: [id])
+  completions TrainingCompletion[]
+  assignments UserTrainingAssignment[]
+
+  @@index([company])
+  @@index([category, active])
+}
+
+// The "I have read and understood this" record — didn't exist anywhere in
+// the app before this. Always checked live against the module's current
+// content, never snapshotted at completion time.
+model TrainingCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  moduleId    String
+  completedAt DateTime @default(now())
+
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module TrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
+  @@index([moduleId])
+}
+
+// Which MACHINE-category modules apply to which person. Only ever holds rows
+// for category = MACHINE modules — an app-level rule enforced in the action,
+// not a DB constraint (same approach as assertCaresApplies in lib/company.ts).
+model UserTrainingAssignment {
+  id           String   @id @default(cuid())
+  userId       String
+  moduleId     String
+  assignedById String?
+  assignedAt   DateTime @default(now())
+
+  user       User           @relation("trainingAssignedTo", fields: [userId], references: [id], onDelete: Cascade)
+  module     TrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  assignedBy User?          @relation("trainingAssignedBy", fields: [assignedById], references: [id])
+
+  @@unique([userId, moduleId])
+  @@index([moduleId])
 }

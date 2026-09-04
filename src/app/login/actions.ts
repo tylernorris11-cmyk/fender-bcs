@@ -6,6 +6,8 @@ import type { Company } from '@prisma/client';
 import { db } from '@/lib/db';
 import { setSessionCookie, verifyPassword } from '@/lib/auth';
 import { COMPANY_COOKIE } from '@/lib/company';
+import { can } from '@/lib/rbac';
+import { hasIncompleteRequiredTraining } from '@/lib/training';
 
 /**
  * Crude in-memory throttle. Good enough to stop someone sitting in the car park
@@ -59,6 +61,11 @@ export async function signIn(formData: FormData) {
   // A password set by someone else (admin reset, approved access request)
   // means straight to a dedicated reset screen — not wherever they were headed.
   if (user!.mustReset) redirect('/change-password');
+
+  // Soft gate, not a hard block elsewhere in the app — same spirit as the
+  // mustReset redirect above, just for mandatory H&S training instead of a
+  // password. Skipped entirely if this person has the module hidden.
+  if (can(user!, 'hs.view') && await hasIncompleteRequiredTraining(user!)) redirect('/hs/training');
 
   // Only ever send people to a path inside this app.
   redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/');

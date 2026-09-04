@@ -52,6 +52,10 @@ export type Permission =
   // Holidays — request/view is universal; deciding is a Master Admin-only
   // role check, not a grantable permission (see holidays/actions.ts)
   | 'holidays.view'
+  // Health & Safety — HSE documents and mandatory training. view is universal.
+  | 'hs.view'
+  | 'hs.edit' // upload/archive HSE documents
+  | 'hs.manageTraining' // author training modules, assign machine training
   // Set Up
   | 'setup.view'
   | 'setup.pricing'
@@ -76,6 +80,7 @@ const ALL: Permission[] = [
   'fuel.view', 'fuel.create',
   'planning.view', 'planning.edit',
   'holidays.view',
+  'hs.view', 'hs.edit', 'hs.manageTraining',
   'setup.view', 'setup.pricing', 'setup.users', 'setup.lists', 'setup.backups', 'setup.bugs',
   'finance.costs', 'finance.debtors',
 ];
@@ -104,6 +109,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'fuel.view', 'fuel.create',
     'planning.view', 'planning.edit',
     'holidays.view',
+    'hs.view', 'hs.edit', 'hs.manageTraining',
     'setup.view', 'setup.lists',
     'finance.debtors',
   ],
@@ -118,6 +124,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'planning.view',
     'holidays.view',
     'compliance.view',
+    'hs.view',
     'finance.debtors',
   ],
 
@@ -135,6 +142,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'assets.view',
     'checks.view',
     'fuel.view',
+    'hs.view',
   ],
 
   // Quality manager. Owns the audit file.
@@ -150,6 +158,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'fuel.view',
     'planning.view', 'planning.edit',
     'holidays.view',
+    'hs.view',
     'setup.view', 'setup.lists',
   ],
 
@@ -165,15 +174,16 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'fuel.view', 'fuel.create',
     'planning.view',
     'holidays.view',
+    'hs.view',
   ],
 
   // Drivers see the run and mark deliveries done.
-  DRIVER: ['orders.view', 'orders.progress', 'planning.view', 'holidays.view', 'assets.view', 'checks.view', 'checks.create', 'fuel.view', 'fuel.create'],
+  DRIVER: ['orders.view', 'orders.progress', 'planning.view', 'holidays.view', 'assets.view', 'checks.view', 'checks.create', 'fuel.view', 'fuel.create', 'hs.view'],
 
   // Read only — auditors, office cover, new starters.
   VIEWER: [
     'orders.view', 'customers.view', 'stock.view', 'production.view', 'compliance.view', 'planning.view', 'holidays.view', 'assets.view',
-    'purchaseOrders.view', 'checks.view', 'fuel.view',
+    'purchaseOrders.view', 'checks.view', 'fuel.view', 'hs.view',
   ],
 };
 
@@ -212,6 +222,7 @@ export const MODULES = [
   { key: 'assets', label: 'Assets', href: '/assets', perm: 'assets.view' as Permission, blurb: 'Manage company assets, equipment and maintenance.' },
   { key: 'checks', label: 'Checks', href: '/checks', perm: 'checks.view' as Permission, blurb: 'Morning checks on machines, lorries and pickups before use.' },
   { key: 'fuel', label: 'Fuel', href: '/fuel', perm: 'fuel.view' as Permission, blurb: 'Log fuel taken from the yard tank against each vehicle.' },
+  { key: 'hs', label: 'Health & Safety', href: '/hs', perm: 'hs.view' as Permission, blurb: 'HSE documents, RAMS and mandatory training.' },
 ] as const;
 
 /** Every module a Master Administrator can hide for someone in Set Up — everything except Set Up itself. */

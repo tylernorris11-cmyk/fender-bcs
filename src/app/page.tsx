@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Bell, Bug, CalendarDays, LogOut, Settings } from 'lucide-react';
+import { ArrowRight, Bell, Bug, CalendarDays, HardHat, LogOut, Settings } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { can, MODULES, ROLE_LABELS } from '@/lib/rbac';
 import { getAlerts } from '@/lib/alerts';
+import { incompleteRequiredModulesFor } from '@/lib/training';
 import { longDate } from '@/lib/format';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
 import { MODULE_ICONS } from '@/lib/moduleIcons';
@@ -23,6 +24,7 @@ const TONES = {
   checks: { icon: 'bg-lime-100 text-lime-700', bar: 'bg-lime-500', arrow: 'border-lime-500 text-lime-600' },
   fuel: { icon: 'bg-orange-100 text-orange-700', bar: 'bg-orange-500', arrow: 'border-orange-500 text-orange-600' },
   holidays: { icon: 'bg-rose-100 text-rose-700', bar: 'bg-rose-500', arrow: 'border-rose-500 text-rose-600' },
+  hs: { icon: 'bg-teal-100 text-teal-700', bar: 'bg-teal-500', arrow: 'border-teal-500 text-teal-600' },
 } as const;
 
 function greeting() {
@@ -33,6 +35,7 @@ function greeting() {
 export default async function Launcher() {
   const user = await requireUser();
   const alerts = await getAlerts(user);
+  const incompleteTraining = can(user, 'hs.view') ? await incompleteRequiredModulesFor(user) : [];
   const active = getActiveCompany(user);
   const tiles = MODULES.filter((m) => can(user, m.perm) && (!('company' in m) || m.company === active));
   const isBsSupplies = active === 'BS_SUPPLIES';
@@ -123,6 +126,17 @@ export default async function Launcher() {
               <strong>{alerts.length} {alerts.length === 1 ? 'thing needs' : 'things need'} attention.</strong>{' '}
               {alerts[0].title}
               {alerts.length > 1 && <> and {alerts.length - 1} more.</>}
+            </span>
+          </Link>
+        )}
+
+        {incompleteTraining.length > 0 && (
+          <Link href="/hs/training" className="banner-warn mb-8 hover:bg-amber-100 transition-colors">
+            <HardHat size={18} className="shrink-0 mt-0.5" aria-hidden />
+            <span>
+              <strong>{incompleteTraining.length} required training {incompleteTraining.length === 1 ? 'module' : 'modules'} still to complete.</strong>{' '}
+              {incompleteTraining[0].title}
+              {incompleteTraining.length > 1 && <> and {incompleteTraining.length - 1} more.</>}
             </span>
           </Link>
         )}

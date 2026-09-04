@@ -94,6 +94,10 @@ async function main() {
   await db.town.deleteMany();
   await db.location.deleteMany();
   await db.driver.deleteMany();
+  await db.trainingCompletion.deleteMany();
+  await db.userTrainingAssignment.deleteMany();
+  await db.trainingModule.deleteMany();
+  await db.hseDocument.deleteMany();
   await db.user.deleteMany();
 
   // ------------------------------------------------------------- people
@@ -120,6 +124,113 @@ async function main() {
   // businesses — everyone else defaults to Fender only.
   await db.user.update({ where: { id: users['John Davies'] }, data: { companies: ['FENDER', 'BS_SUPPLIES'] } });
   await db.user.update({ where: { id: users['Tyler Norris'] }, data: { companies: ['FENDER', 'BS_SUPPLIES'] } });
+
+  // -------------------------------------------------------- health & safety
+  const trainingModules = [
+    {
+      category: 'GENERAL' as const,
+      title: 'Yard Health & Safety Induction',
+      summary: 'The basics everyone needs before setting foot on the yard.',
+      content: [
+        'Purpose of this induction, and who to speak to for site H&S matters',
+        'PPE required at all times in the yard — see the PPE module',
+        'Pedestrian and vehicle segregation — walkways, marked exclusion zones around loading and machinery',
+        'No unauthorised use of machinery — only trained, assigned operators',
+        'Manual handling basics — assess before lifting, team-lift heavy or awkward bar stock',
+        'Fire and emergency procedures, and the assembly point location',
+        'Reporting hazards, near misses and incidents — how, and to whom, with no blame for reporting',
+        'Where to find the H&S document library, and how it is kept up to date',
+      ],
+    },
+    {
+      category: 'PPE' as const,
+      title: 'Personal Protective Equipment',
+      summary: 'What to wear, when, and who to ask for a replacement.',
+      content: [
+        'The employer provides suitable PPE free of charge; the employee must use it (PPE at Work Regulations 1992)',
+        'Minimum PPE in the yard at all times — hi-vis, safety boots with a steel toe-cap',
+        'Gloves when handling bar or steel',
+        'Eye protection when cutting, bending or grinding — swarf and sparks',
+        'Hearing protection near the shear line and benders',
+        'Hard hats where overhead work or lifting is in progress',
+        'Inspect PPE before each use — damaged PPE is replaced, not used',
+        'Who to ask for replacement PPE',
+      ],
+    },
+    {
+      category: 'MACHINE' as const,
+      machineName: 'Power Bender',
+      title: 'Power Bender — safe operation',
+      summary: 'Bar-bending machine safety, in line with PUWER 1998.',
+      content: [
+        'Authorised, trained operators only',
+        'Guarding hierarchy under PUWER 1998 Regulation 11 — fixed guards enclosing dangerous parts where practicable, otherwise other guards or protective devices, otherwise jigs, holders or push-sticks',
+        'Crush and nip hazards at the bending head and between the bar and bending pins',
+        'Two-hand or foot-pedal controls — never bypassed or defeated',
+        'Locate and test the emergency stop before every use',
+        'Exclusion zone while bending — nobody within the swing radius of the bending arm',
+        'Secure clamping of the bar before starting a cycle',
+        'Manual handling of bar stock — correct technique, team-lift where needed',
+        'No loose clothing, dangling gloves or jewellery near moving parts',
+        'Isolate and lock out before clearing jams, adjusting, or any maintenance',
+        'Report near misses, damage or guard defects immediately, before further use',
+      ],
+    },
+    {
+      category: 'MACHINE' as const,
+      machineName: 'Pedax Stema',
+      title: 'Pedax Stema — safe operation',
+      summary: 'Automatic coil-fed stirrup bender — the same bending-head hazards as any bar bender, plus feed-related risks.',
+      content: [
+        'Same crush and nip hazards at the bending head as any bar bender',
+        'Entanglement hazard at the coil feed and straightening rollers specifically — keep hands, hair and loose items well clear of the draw-in point',
+        'Coil loading — use proper lifting equipment for coil reels, never manual-lift alone',
+        'Auto-cycle awareness — in programmed mode the machine can start without warning; know how to confirm it is stopped before approaching',
+        'Locate and test the emergency stop for this machine, and know the safe jam-clearing procedure — isolate first',
+        'Authorised, trained operators only; exclusion zone during the automatic cycle',
+        'Same PPE as general operation, with particular attention to loose clothing near the feed rollers',
+        'Report faults immediately — do not attempt to work around them',
+        'Where this content and the manufacturer’s manual differ, the manual and your employer’s risk assessment take precedence',
+      ],
+    },
+  ];
+
+  const trainingModuleIds: Record<string, string> = {};
+  for (const [i, m] of trainingModules.entries()) {
+    const created = await db.trainingModule.create({
+      data: {
+        category: m.category, machineName: 'machineName' in m ? m.machineName : '',
+        title: m.title, summary: m.summary, content: m.content, sortOrder: i,
+        createdById: users['Tyler Norris'],
+      },
+    });
+    trainingModuleIds[m.title] = created.id;
+  }
+
+  // Martin runs the yard day to day, so he is the one assigned the
+  // machine-specific modules for now — a realistic starting point, not a
+  // rule (assigning training to anyone else is an admin action away).
+  await db.userTrainingAssignment.createMany({
+    data: [
+      { userId: users['Martin Miller'], moduleId: trainingModuleIds['Power Bender — safe operation'], assignedById: users['Tyler Norris'] },
+      { userId: users['Martin Miller'], moduleId: trainingModuleIds['Pedax Stema — safe operation'], assignedById: users['Tyler Norris'] },
+    ],
+  });
+
+  // Everyone already established has done their induction — except Dave,
+  // an HGV driver who spends most of his time off-site, left honestly
+  // incomplete so there is something real for the training reminder to show.
+  const inductionDone = Object.values(users).filter((id) => id !== users['Dave Wilson']);
+  const generalModuleIds = [trainingModuleIds['Yard Health & Safety Induction'], trainingModuleIds['Personal Protective Equipment']];
+  await db.trainingCompletion.createMany({
+    data: inductionDone.flatMap((userId) => generalModuleIds.map((moduleId) => ({ userId, moduleId }))),
+  });
+  await db.trainingCompletion.createMany({
+    data: [
+      { userId: users['Martin Miller'], moduleId: trainingModuleIds['Power Bender — safe operation'] },
+      { userId: users['Martin Miller'], moduleId: trainingModuleIds['Pedax Stema — safe operation'] },
+    ],
+  });
 
   // -------------------------------------------------------------- towns
   const towns = [

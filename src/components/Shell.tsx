@@ -16,7 +16,7 @@ export type NavItem = { label: string; href: string; perm?: Permission; company?
 
 const MODULE_TITLE: Record<string, string> = {
   orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Deliveries', holidays: 'Holidays',
-  customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', fuel: 'Fuel', setup: 'Set Up',
+  customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', fuel: 'Fuel', hs: 'Health & Safety', setup: 'Set Up',
 };
 
 export function Shell({
@@ -211,6 +211,12 @@ export const NAV: Record<string, NavItem[]> = {
   fuel: [
     { label: 'Fuel log', href: '/fuel' },
     { label: 'Add entry', href: '/fuel/new', perm: 'fuel.create' },
+  ],
+  hs: [
+    { label: 'Overview', href: '/hs' },
+    { label: 'Documents', href: '/hs/documents' },
+    { label: 'My training', href: '/hs/training' },
+    { label: 'Manage training', href: '/hs/training/manage', perm: 'hs.manageTraining' },
   ],
   setup: [
     { label: 'Pricing', href: '/setup/pricing', perm: 'setup.pricing' },
