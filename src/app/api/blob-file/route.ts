@@ -7,7 +7,7 @@ import { isPrivateBlobUrl } from '@/lib/blob';
 /** Streams a private Blob file back to a signed-in, permitted user. */
 export async function GET(request: Request) {
   const user = await getCurrentUser();
-  if (!user || !(can(user, 'compliance.view') || can(user, 'production.view'))) {
+  if (!user || !(can(user, 'compliance.view') || can(user, 'production.view') || can(user, 'stock.view'))) {
     return new NextResponse('Not authorized', { status: 403 });
   }
 

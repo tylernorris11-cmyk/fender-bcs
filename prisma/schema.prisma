@@ -69,6 +69,7 @@ model User {
   productionJobs        ProductionJob[]
   otherWorkTasksCreated OtherWorkTask[] @relation("otherWorkCreatedBy")
   otherWorkTasksDone    OtherWorkTask[] @relation("otherWorkDoneBy")
+  barCountsCreated      BarCount[]      @relation("barCountCreatedBy")
   driver                Driver?
   purchaseOrdersRaised PurchaseOrder[] @relation("poRaisedBy")
   assetChecks      AssetCheck[]
@@ -263,6 +264,42 @@ model StockMovement {
   @@index([productId, at])
 }
 
+enum BarCountMode {
+  CIRCLE_DETECTOR
+  AI_ESTIMATE
+  BOTH
+}
+
+// A worker's photo of a bundle's cut end, counted by Hough Circle Transform
+// and/or a Claude vision estimate, then corrected/confirmed by the worker.
+// Both the Hough-detected circles and the worker's corrected circles are kept
+// so the detection parameters can be retuned by hand later by comparing what
+// workers added/removed — see src/lib/barDetection.ts.
+model BarCount {
+  id               String       @id @default(cuid())
+  company          Company      @default(FENDER)
+  mode             BarCountMode
+  photoUrl         String
+  photoWidth       Int?
+  photoHeight      Int?
+  orderId          String?
+  detectedCount    Int? // raw Hough count — null in AI_ESTIMATE-only mode
+  detectedCircles  Json? // Hough's untouched [{x,y,r}], 0–1 normalized — null in AI_ESTIMATE-only mode
+  aiEstimateCount  Int? // Claude's rough total — null unless mode is AI_ESTIMATE or BOTH, or the call failed
+  aiEstimateError  String       @default("")
+  confirmedCount   Int // the worker's final number — always set
+  confirmedCircles Json? // worker-corrected [{x,y,r}] — null in AI_ESTIMATE-only mode (no overlay to correct)
+  notes            String       @default("")
+  createdById      String
+  createdAt        DateTime     @default(now())
+
+  order     Order? @relation(fields: [orderId], references: [id])
+  createdBy User   @relation("barCountCreatedBy", fields: [createdById], references: [id])
+
+  @@index([company, createdAt])
+  @@index([orderId])
+}
+
 // ------------------------------------------------------------- ordering
 
 enum OrderStage {
@@ -316,6 +353,7 @@ model Order {
   ncrs      Ncr[]
   production ProductionEvent[]
   productionJobs ProductionJob[]
+  barCounts BarCount[]
 
   @@index([stage, deliveryDate])
   @@index([company])
