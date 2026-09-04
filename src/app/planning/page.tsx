@@ -8,6 +8,8 @@ import { COMPANY_LABEL } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
+import { advanceStage } from '@/app/orders/actions';
+import { markEventDelivered } from './actions';
 
 type View = 'day' | 'week' | 'month';
 
@@ -15,6 +17,9 @@ type Entry = {
   id: string; time: string; title: string; detail: string;
   group: 'Deliveries' | 'Vehicles & machinery' | 'Other';
   href?: string; town?: string; date: Date;
+  delivered?: boolean;
+  markDelivered?: { orderId: string } | { eventId: string };
+  driver?: string;
 };
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -73,6 +78,8 @@ export default async function PlanningPage({
       group: 'Deliveries',
       href: visible ? `/orders/${o.id}` : undefined,
       town: o.town,
+      delivered: o.stage === 'DELIVERED' || o.stage === 'COMPLETED',
+      markDelivered: visible && o.stage === 'OUT_FOR_DELIVERY' && can(user, 'orders.progress') ? { orderId: o.id } : undefined,
     });
   }
 
@@ -95,15 +102,19 @@ export default async function PlanningPage({
 
     const orderCompany = e.order?.company;
     const visible = !orderCompany || (user.companies.includes(orderCompany) && can(user, 'orders.view'));
+    const group: Entry['group'] = e.type === 'INSPECTION' || e.type === 'SERVICE' ? 'Vehicles & machinery' : e.type === 'DELIVERY' ? 'Deliveries' : 'Other';
     entries.push({
       id: `event-${e.id}`,
       date: e.startsAt,
       time: e.allDay ? '' : clock(e.startsAt),
       title: visible ? e.title : `${COMPANY_LABEL[orderCompany!]} delivery`,
       detail: visible ? (e.detail || e.assignedTo) : (e.town || ''),
-      group: e.type === 'INSPECTION' || e.type === 'SERVICE' ? 'Vehicles & machinery' : e.type === 'DELIVERY' ? 'Deliveries' : 'Other',
+      group,
       href: visible ? (e.orderId ? `/orders/${e.orderId}` : e.assetId ? `/assets/${e.assetId}` : undefined) : undefined,
       town: e.town,
+      delivered: group === 'Deliveries' ? e.done : undefined,
+      markDelivered: group === 'Deliveries' && visible && !e.done && can(user, 'orders.progress') ? { eventId: e.id } : undefined,
+      driver: group === 'Deliveries' && visible ? (e.assignedTo || undefined) : undefined,
     });
   }
 
@@ -193,19 +204,21 @@ export default async function PlanningPage({
           return (
             <div key={day.toISOString()}
                  className={`card p-3 min-h-[150px] ${isToday ? 'ring-2 ring-brand' : ''} ${outOfMonth ? 'opacity-50' : ''}`}>
-              <div className="flex items-baseline justify-between mb-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-                  {day.toLocaleDateString('en-GB', { weekday: 'short' })}
-                </span>
-                {isToday && <span className="text-[10px] font-bold text-brand uppercase">Today</span>}
-              </div>
-              <p className="font-bold mb-2">{day.getDate()} {day.toLocaleDateString('en-GB', { month: 'short' })}</p>
+              <div className="sticky top-0 bg-white pb-2 z-10">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                    {day.toLocaleDateString('en-GB', { weekday: 'short' })}
+                  </span>
+                  {isToday && <span className="text-[10px] font-bold text-brand uppercase">Today</span>}
+                </div>
+                <p className="font-bold">{day.getDate()} {day.toLocaleDateString('en-GB', { month: 'short' })}</p>
 
-              {towns.length > 0 && (
-                <p className="flex items-center gap-1 text-xs text-brand-700 font-medium bg-brand-50 rounded-md px-2 py-1 mb-2">
-                  <MapPin size={11} aria-hidden /> {towns.join(', ')}
-                </p>
-              )}
+                {towns.length > 0 && (
+                  <p className="flex items-center gap-1 text-xs text-brand-700 font-medium bg-brand-50 rounded-md px-2 py-1 mt-2">
+                    <MapPin size={11} aria-hidden /> {towns.join(', ')}
+                  </p>
+                )}
+              </div>
 
               {dayEntries.length === 0 ? (
                 <p className="text-ink-faint text-sm">—</p>
@@ -213,13 +226,29 @@ export default async function PlanningPage({
                 <ul className="space-y-2">
                   {dayEntries.map((e) => {
                     const body = (
-                      <div className={`border-l-[3px] rounded-r-md px-2 py-1.5 ${GROUP_TONE[e.group]}`}>
-                        {e.time && <span className="text-xs font-semibold text-forest">{e.time} </span>}
-                        <span className="text-xs font-medium">{e.title}</span>
+                      <div className={`border-l-[3px] rounded-r-md px-2 py-1.5 ${e.delivered ? 'border-hairline bg-canvas' : GROUP_TONE[e.group]} ${e.delivered ? 'opacity-60' : ''}`}>
+                        {e.group === 'Deliveries'
+                          ? e.driver && <span className="text-xs font-semibold text-forest">{e.driver} </span>
+                          : e.time && <span className="text-xs font-semibold text-forest">{e.time} </span>}
+                        <span className={`text-xs font-medium ${e.delivered ? 'line-through text-ink-faint' : ''}`}>{e.title}</span>
+                        {e.delivered && <span className="ml-1.5 text-[10px] font-bold text-ink-faint uppercase tracking-wide">Delivered</span>}
                         {e.detail && <span className="block text-[11px] text-ink-muted mt-0.5">{e.detail}</span>}
                       </div>
                     );
-                    return <li key={e.id}>{e.href ? <Link href={e.href} className="block hover:opacity-80">{body}</Link> : body}</li>;
+                    return (
+                      <li key={e.id}>
+                        {e.href ? <Link href={e.href} className="block hover:opacity-80">{body}</Link> : body}
+                        {e.markDelivered && (
+                          <form action={'orderId' in e.markDelivered ? advanceStage : markEventDelivered} className="mt-1">
+                            <input type="hidden" name={'orderId' in e.markDelivered ? 'orderId' : 'eventId'}
+                                   value={'orderId' in e.markDelivered ? e.markDelivered.orderId : e.markDelivered.eventId} />
+                            <button type="submit" className="text-[10px] font-semibold text-brand-700 hover:underline">
+                              Mark delivered
+                            </button>
+                          </form>
+                        )}
+                      </li>
+                    );
                   })}
                 </ul>
               )}

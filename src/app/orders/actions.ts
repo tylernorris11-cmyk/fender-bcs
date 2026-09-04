@@ -177,6 +177,7 @@ export async function advanceStage(formData: FormData) {
 
   revalidatePath(`/orders/${orderId}`);
   revalidatePath('/orders');
+  revalidatePath('/planning');
 }
 
 export async function setStage(formData: FormData) {
