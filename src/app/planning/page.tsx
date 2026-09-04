@@ -73,7 +73,7 @@ export default async function PlanningPage({
       id: `order-${o.id}`,
       date: o.deliveryDate!,
       time: clock(o.deliveryDate) === '00:00' ? '' : clock(o.deliveryDate),
-      title: visible ? `Deliver ${o.number} — ${o.customer.name}` : `${COMPANY_LABEL[o.company]} delivery`,
+      title: visible ? `${o.number} — ${o.customer.name}` : `${COMPANY_LABEL[o.company]} delivery`,
       detail: visible ? `${o.customer.contactName} · ${o.town}` : (o.town || ''),
       group: 'Deliveries',
       href: visible ? `/orders/${o.id}` : undefined,
@@ -103,11 +103,12 @@ export default async function PlanningPage({
     const orderCompany = e.order?.company;
     const visible = !orderCompany || (user.companies.includes(orderCompany) && can(user, 'orders.view'));
     const group: Entry['group'] = e.type === 'INSPECTION' || e.type === 'SERVICE' ? 'Vehicles & machinery' : e.type === 'DELIVERY' ? 'Deliveries' : 'Other';
+    const rawTitle = visible ? e.title : `${COMPANY_LABEL[orderCompany!]} delivery`;
     entries.push({
       id: `event-${e.id}`,
       date: e.startsAt,
       time: e.allDay ? '' : clock(e.startsAt),
-      title: visible ? e.title : `${COMPANY_LABEL[orderCompany!]} delivery`,
+      title: group === 'Deliveries' ? rawTitle.replace(/^Deliver(?:y)?\s+to\s+/i, '') : rawTitle,
       detail: visible ? (e.detail || e.assignedTo) : (e.town || ''),
       group,
       href: visible ? (e.orderId ? `/orders/${e.orderId}` : e.assetId ? `/assets/${e.assetId}` : undefined) : undefined,
