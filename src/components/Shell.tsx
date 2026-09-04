@@ -181,7 +181,6 @@ export const NAV: Record<string, NavItem[]> = {
   ],
   holidays: [
     { label: 'Requests', href: '/holidays' },
-    { label: 'Calendar', href: '/holidays/calendar' },
   ],
   customers: [{ label: 'All customers', href: '/customers' }],
   compliance: [

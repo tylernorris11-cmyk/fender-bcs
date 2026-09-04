@@ -39,7 +39,7 @@ export async function requestHoliday(formData: FormData) {
   })));
 
   revalidatePath('/holidays');
-  revalidatePath('/holidays/calendar');
+  revalidatePath('/planning');
 }
 
 export async function cancelHoliday(formData: FormData) {
@@ -55,7 +55,7 @@ export async function cancelHoliday(formData: FormData) {
   await db.holidayRequest.update({ where: { id }, data: { status: 'CANCELLED' } });
   await logActivity('HolidayRequest', id, 'Withdrawn', '', user.id);
   revalidatePath('/holidays');
-  revalidatePath('/holidays/calendar');
+  revalidatePath('/planning');
 }
 
 export async function decideHoliday(formData: FormData) {
@@ -90,7 +90,7 @@ export async function decideHoliday(formData: FormData) {
   });
 
   revalidatePath('/holidays');
-  revalidatePath('/holidays/calendar');
+  revalidatePath('/planning');
 }
 
 /**

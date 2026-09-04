@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { HolidayStatus } from '@prisma/client';
 import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -6,8 +7,9 @@ import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { COMPANY_LABEL } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
+import { bankHolidayName, eachDayInclusive, isoDay, utcDay } from '@/lib/holidays';
 import { NAV, Shell } from '@/components/Shell';
-import { PageHeader } from '@/components/ui';
+import { Avatar, PageHeader } from '@/components/ui';
 import { advanceStage } from '@/app/orders/actions';
 import { markEventDelivered } from './actions';
 
@@ -21,6 +23,12 @@ type Entry = {
   markDelivered?: { orderId: string } | { eventId: string };
   driver?: string;
 };
+
+// Holiday/leave is a third data source, not folded into Entry[]: it isn't a
+// point-in-time list item like a delivery or inspection, it's "who's away on
+// this calendar day", derived from a UTC-midnight date *range*
+// (HolidayRequest.startDate/endDate) rather than a single instant.
+type HolidayEntry = { id: string; name: string; colour: string; status: HolidayStatus };
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
@@ -49,7 +57,13 @@ export default async function PlanningPage({
   const days = view === 'month' ? 42 : view === 'day' ? 1 : 7;
   const to = addDays(from, days);
 
-  const [orders, events, assets, locations] = await Promise.all([
+  // from/to are local-midnight, correct for Order/PlanningEvent instants.
+  // HolidayRequest is UTC-midnight — rebuild the same calendar boundary in
+  // UTC terms from from/to's own y/m/d (never from the instant itself).
+  const holidayFrom = utcDay(from.getFullYear(), from.getMonth(), from.getDate());
+  const holidayTo = utcDay(to.getFullYear(), to.getMonth(), to.getDate());
+
+  const [orders, events, assets, locations, holidayRequests] = await Promise.all([
     db.order.findMany({
       where: {
         archived: false, deliveryDate: { gte: from, lt: to }, stage: { notIn: ['CANCELLED', 'DRAFT'] },
@@ -60,6 +74,16 @@ export default async function PlanningPage({
     db.planningEvent.findMany({ where: { startsAt: { gte: from, lt: to } }, include: { asset: true, order: true } }),
     db.asset.findMany({ where: { retired: false, OR: [{ company: null }, { company: { in: user.companies } }], ...(depot ? { depot } : {}) } }),
     db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    // Deliberately no company/depot filter — holidays.view is company-agnostic
+    // (same yard, same people, one calendar), matching the retired
+    // /holidays/calendar page, which never filtered this query either.
+    can(user, 'holidays.view')
+      ? db.holidayRequest.findMany({
+          where: { status: { in: ['PENDING', 'APPROVED'] }, startDate: { lt: holidayTo }, endDate: { gte: holidayFrom } },
+          include: { user: { select: { name: true, colour: true } } },
+          orderBy: { startDate: 'asc' },
+        })
+      : Promise.resolve([]),
   ]);
 
   const entries: Entry[] = [];
@@ -140,6 +164,20 @@ export default async function PlanningPage({
 
   entries.sort((a, b) => a.date.getTime() - b.date.getTime() || a.time.localeCompare(b.time));
 
+  // Built entirely in ISO-string ("yyyy-mm-dd") space — never compare a
+  // HolidayRequest Date (UTC-midnight) against a Planning `day` Date
+  // (local-midnight) directly, since a direct comparison is only safe when
+  // both sides are the same kind.
+  const holidaysByDay = new Map<string, HolidayEntry[]>();
+  for (const r of holidayRequests) {
+    for (const day of eachDayInclusive(r.startDate, r.endDate)) {
+      const key = isoDay(day);
+      const entry: HolidayEntry = { id: r.id, name: r.user.name, colour: r.user.colour, status: r.status };
+      const list = holidaysByDay.get(key);
+      if (list) list.push(entry); else holidaysByDay.set(key, [entry]);
+    }
+  }
+
   const heading = view === 'month'
     ? anchor.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
     : view === 'day' ? shortDate(anchor) : `Week of ${shortDate(from)}`;
@@ -200,7 +238,14 @@ export default async function PlanningPage({
           const outOfMonth = view === 'month' && day.getMonth() !== anchor.getMonth();
           const towns = [...new Set(dayEntries.filter((e) => e.town).map((e) => e.town))];
 
-          if (outOfMonth && dayEntries.length === 0) return <div key={day.toISOString()} />;
+          // day is local-midnight — convert via its own y/m/d (not the
+          // instant) so this always reconstructs the same calendar date
+          // regardless of the server's timezone.
+          const dayUtc = utcDay(day.getFullYear(), day.getMonth(), day.getDate());
+          const bankHoliday = bankHolidayName(dayUtc);
+          const away = holidaysByDay.get(isoDay(dayUtc)) ?? [];
+
+          if (outOfMonth && dayEntries.length === 0 && away.length === 0 && !bankHoliday) return <div key={day.toISOString()} />;
 
           return (
             <div key={day.toISOString()}
@@ -218,6 +263,24 @@ export default async function PlanningPage({
                   <p className="flex items-center gap-1 text-xs text-brand-700 font-medium bg-brand-50 rounded-md px-2 py-1 mt-2">
                     <MapPin size={11} aria-hidden /> {towns.join(', ')}
                   </p>
+                )}
+
+                {bankHoliday && (
+                  <p className="text-[10px] text-signal font-medium leading-tight mt-2">{bankHoliday}</p>
+                )}
+
+                {away.length > 0 && (
+                  <ul className="flex flex-wrap gap-1 mt-2">
+                    {away.map((h) => (
+                      <li key={h.id}
+                          className={`flex items-center gap-1 text-[11px] rounded px-1 py-0.5 ${h.status === 'PENDING' ? 'border border-dashed border-hairline' : ''}`}
+                          style={{ background: h.status === 'APPROVED' ? `${h.colour}22` : undefined }}
+                          title={`${h.name}${h.status === 'PENDING' ? ' (pending)' : ''}`}>
+                        <Avatar name={h.name} colour={h.colour} size={14} />
+                        <span className="truncate">{h.name.split(' ')[0]}</span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
 

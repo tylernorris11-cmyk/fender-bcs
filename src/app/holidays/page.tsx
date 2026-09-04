@@ -66,7 +66,7 @@ export default async function HolidaysPage() {
       <PageHeader
         title="Holidays"
         blurb="Request time off, see who else is away, and — if you're a Master Administrator — decide what's outstanding."
-        actions={<Link href="/holidays/calendar" className="btn-secondary">Open calendar</Link>}
+        actions={<Link href="/planning?view=month" className="btn-secondary">Open calendar</Link>}
       />
 
       <StatRow>
