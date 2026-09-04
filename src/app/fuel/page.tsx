@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, Printer } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
@@ -31,9 +31,12 @@ export default async function FuelPage() {
         title="Fuel"
         blurb="Fill-ups against the yard tank meter, by vehicle."
         actions={
-          can(user, 'fuel.create') && (
-            <Link href="/fuel/new" className="btn-primary"><Plus size={16} /> Add entry</Link>
-          )
+          <>
+            <Link href="/fuel/print" className="btn-secondary"><Printer size={16} /> Print</Link>
+            {can(user, 'fuel.create') && (
+              <Link href="/fuel/new" className="btn-primary"><Plus size={16} /> Add entry</Link>
+            )}
+          </>
         }
       />
 
