@@ -1,7 +1,9 @@
+import { AlertTriangle } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { daysUntil, shortDate } from '@/lib/format';
+import { ensureDriverRecords } from '@/lib/drivers';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortTh, Table } from '@/components/ui';
 import { addDriver } from '../actions';
@@ -9,6 +11,7 @@ import { addDriver } from '../actions';
 export default async function DriversPage({ searchParams }: { searchParams: { sort?: string; dir?: string } }) {
   const user = await requirePermission('setup.lists');
   const alerts = await getAlerts(user);
+  await ensureDriverRecords();
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
   const [drivers, locations] = await Promise.all([
     db.driver.findMany({
@@ -30,9 +33,16 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
         </>}>
           {drivers.map((d) => {
             const days = d.cpcExpiry ? daysUntil(d.cpcExpiry)! : null;
+            const incomplete = d.userId && (!d.phone || !d.licence || !d.depot);
             return (
               <tr key={d.id} className="row">
-                <td className="td font-semibold">{d.name}</td>
+                <td className="td font-semibold">
+                  <span className="inline-flex items-center gap-1.5" title={incomplete ? 'Added from their user account — details not on file yet' : undefined}>
+                    {d.name}
+                    {incomplete && <AlertTriangle size={14} className="text-amber-600 shrink-0" aria-hidden />}
+                  </span>
+                  {incomplete && <span className="block text-[11px] font-normal text-amber-600">Not on file yet</span>}
+                </td>
                 <td className="td text-ink-muted">{d.phone}</td>
                 <td className="td text-ink-muted">{d.licence}</td>
                 <td className="td text-ink-muted">{d.depot}</td>

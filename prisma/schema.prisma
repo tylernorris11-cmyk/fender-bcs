@@ -69,6 +69,7 @@ model User {
   productionJobs        ProductionJob[]
   otherWorkTasksCreated OtherWorkTask[] @relation("otherWorkCreatedBy")
   otherWorkTasksDone    OtherWorkTask[] @relation("otherWorkDoneBy")
+  driver                Driver?
   purchaseOrdersRaised PurchaseOrder[] @relation("poRaisedBy")
   assetChecks      AssetCheck[]
   notes            Note[]
@@ -883,6 +884,9 @@ model Driver {
   cpcExpiry DateTime?
   depot    String  @default("Scunthorpe")
   active   Boolean @default(true)
+  userId   String? @unique // set when this row was auto-created from a User with role DRIVER
+
+  user User? @relation(fields: [userId], references: [id])
 }
 
 model Setting {
