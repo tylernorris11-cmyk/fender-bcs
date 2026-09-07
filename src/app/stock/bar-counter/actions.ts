@@ -47,12 +47,18 @@ export async function runBarDetection(formData: FormData): Promise<BarDetectResu
   const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '-');
   const blob = await put(`bar-counts/${Date.now()}-${safeName}`, buffer, { access: 'private' });
 
+  // The worker drags across one bar end before running a mode that needs it
+  // — the fixed size range this used to fall back to alone assumed every
+  // photo was framed about the same way, which real photos don't respect.
+  const calibratedRadiusRaw = formData.get('calibratedRadius');
+  const calibratedRadius = calibratedRadiusRaw ? Number(calibratedRadiusRaw) : undefined;
+
   let detectedCount: number | null = null;
   let circles: DetectedCircle[] = [];
   let photoWidth = 0;
   let photoHeight = 0;
   if (mode === 'CIRCLE_DETECTOR' || mode === 'BOTH') {
-    const result = await detectBarCircles(buffer, file.type);
+    const result = await detectBarCircles(buffer, file.type, calibratedRadius);
     if (result.error) return { ok: false, error: result.error };
     circles = result.circles;
     detectedCount = result.circles.length;

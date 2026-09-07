@@ -4,23 +4,38 @@ import { PNG } from 'pngjs';
 
 export type DetectedCircle = { x: number; y: number; r: number }; // all 0–1, normalized by width (r too, so it never distorts into an ellipse)
 
-// Retuned against a real yard photo with a genuine, verified ground-truth
-// count: 112 bar ends, counted by a dedicated object-counting app ("Count
-// This") and confirmed by the person who took the photo. These values land
-// at 110 on that exact photo — a first pass tuned only against a clean
-// synthetic image had over-detected the same bundle by roughly 2x (228).
-// Calibrated against a single real photo, not a general solution — a real
-// ground-truth count is rare enough that this is still worth keeping over
-// the earlier guess, but expect this to keep moving as more corrections
-// come in from real use (see the Bar Counter plan's note on retuning from
-// logged corrections).
+// Fallback only, used when the worker's own bar-size calibration (see
+// below) isn't available for some reason. Tuned against one real yard photo
+// with a genuine, verified ground-truth count (112, via a dedicated
+// object-counting app). That tuning turned out to be specific to how that
+// one photo happened to be framed — a second, more tightly cropped photo of
+// the exact same bundle (same true count, 112) came out at 17 with these
+// same numbers, because the bars occupy a very different fraction of the
+// frame once the crop changes. A fixed size-fraction assumption can't
+// account for that, which is why calibration exists at all now.
 const DP = 1;
 const BLUR_KERNEL = 7; // a touch more smoothing to suppress rust/dirt texture noise
 const PARAM1 = 50; // Canny high threshold
-const PARAM2 = 27; // accumulator threshold — higher is stricter; 15 was far too permissive on a busy real photo
+const PARAM2 = 27; // accumulator threshold — higher is stricter
 const MIN_DIST_FRACTION = 0.04; // min gap between circle centers, as a fraction of the smaller image dimension
 const MIN_RADIUS_FRACTION = 0.014;
 const MAX_RADIUS_FRACTION = 0.065;
+
+// Used instead of the fixed fractions above whenever the worker has dragged
+// across one bar end to show its size. Validated against two real photos of
+// the same bundle (same true count, very different framing/crop): with the
+// actual bar radius as the input, this combination lands at 131 and 67
+// respectively against a true count of 112 on each — not exact, but in the
+// right ballpark on both, unlike any single fixed-fraction setting tried
+// (which ranged from a 2x overcount to an 85% undercount depending which
+// photo). Bars naturally vary somewhat in apparent size even within one
+// photo (real diameter variation, perspective, imperfect edges), so the
+// search band is deliberately wide around the calibrated point rather than
+// tight — a tight band around the same center undercounted badly in testing.
+const CALIB_PARAM2 = 26;
+const CALIB_MIN_RADIUS_MULT = 0.3;
+const CALIB_MAX_RADIUS_MULT = 1.75;
+const CALIB_MIN_DIST_MULT = 1.2;
 
 // HoughCircles' cost blows up with edge count × radius search range — fine
 // on a clean synthetic test image, but a real yard photo (rust texture,
@@ -71,7 +86,9 @@ function decodeToRgba(bytes: Buffer, mimeType: string): { data: Uint8Array; widt
   throw new Error(`Unsupported image type for detection: ${mimeType}. Upload a JPEG or PNG.`);
 }
 
-async function runDetection(bytes: Buffer, mimeType: string): Promise<{ circles: DetectedCircle[]; width: number; height: number }> {
+async function runDetection(
+  bytes: Buffer, mimeType: string, calibratedRadiusFraction?: number,
+): Promise<{ circles: DetectedCircle[]; width: number; height: number }> {
   const { data, width, height } = decodeToRgba(bytes, mimeType);
   const cv = await getCv();
 
@@ -96,15 +113,25 @@ async function runDetection(bytes: Buffer, mimeType: string): Promise<{ circles:
     cv.medianBlur(gray, blurred, BLUR_KERNEL);
 
     const minDim = Math.min(workW, workH);
-    cv.HoughCircles(
-      blurred, detected, cv.HOUGH_GRADIENT,
-      DP,
-      Math.max(1, Math.round(minDim * MIN_DIST_FRACTION)),
-      PARAM1,
-      PARAM2,
-      Math.max(1, Math.round(minDim * MIN_RADIUS_FRACTION)),
-      Math.max(2, Math.round(minDim * MAX_RADIUS_FRACTION)),
-    );
+    if (calibratedRadiusFraction && calibratedRadiusFraction > 0) {
+      const calibR = calibratedRadiusFraction * workW;
+      const minR = Math.max(1, Math.round(calibR * CALIB_MIN_RADIUS_MULT));
+      const maxR = Math.max(minR + 1, Math.round(calibR * CALIB_MAX_RADIUS_MULT));
+      cv.HoughCircles(
+        blurred, detected, cv.HOUGH_GRADIENT,
+        DP, Math.max(1, Math.round(calibR * CALIB_MIN_DIST_MULT)), PARAM1, CALIB_PARAM2, minR, maxR,
+      );
+    } else {
+      cv.HoughCircles(
+        blurred, detected, cv.HOUGH_GRADIENT,
+        DP,
+        Math.max(1, Math.round(minDim * MIN_DIST_FRACTION)),
+        PARAM1,
+        PARAM2,
+        Math.max(1, Math.round(minDim * MIN_RADIUS_FRACTION)),
+        Math.max(2, Math.round(minDim * MAX_RADIUS_FRACTION)),
+      );
+    }
 
     const circles: DetectedCircle[] = [];
     for (let i = 0; i < detected.cols; i++) {
@@ -119,14 +146,18 @@ async function runDetection(bytes: Buffer, mimeType: string): Promise<{ circles:
   }
 }
 
+/** calibratedRadiusFraction, when given, is the radius the worker indicated
+ * by dragging across one bar end, as a fraction of the photo's own width —
+ * same normalization as a DetectedCircle's own x/y/r. Falls back to the
+ * fixed-fraction defaults above if omitted. */
 export async function detectBarCircles(
-  bytes: Buffer, mimeType: string,
+  bytes: Buffer, mimeType: string, calibratedRadiusFraction?: number,
 ): Promise<{ circles: DetectedCircle[]; width: number; height: number; error?: string }> {
   try {
     const timeout = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Detection took too long on this photo — try Both/AI estimate, or crop closer to the bundle end and retake it.')), DETECTION_TIMEOUT_MS);
     });
-    return await Promise.race([runDetection(bytes, mimeType), timeout]);
+    return await Promise.race([runDetection(bytes, mimeType, calibratedRadiusFraction), timeout]);
   } catch (err) {
     return { circles: [], width: 0, height: 0, error: err instanceof Error ? err.message : 'Unknown error detecting circles.' };
   }

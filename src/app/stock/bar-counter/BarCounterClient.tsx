@@ -26,11 +26,23 @@ function medianRadius(circles: Circle[]): number {
   return sorted[Math.floor(sorted.length / 2)];
 }
 
+type Point = { x: number; y: number };
+
 export function BarCounterClient({ orders }: { orders: Order[] }) {
   const [file, setFile] = useState<File | null>(null);
   const [previewSrc, setPreviewSrc] = useState('');
   const [detecting, startDetect] = useTransition();
   const [detectError, setDetectError] = useState('');
+
+  // Bar size, shown to the worker as a line drawn across one bar-end before
+  // detection runs. The fixed-fraction defaults assumed every photo was
+  // framed about the same way — a more tightly cropped or more distant shot
+  // makes bars a very different fraction of the frame, and no single fixed
+  // range covers both well. Letting the worker show the actual size directly
+  // sidesteps that entirely, rather than trying to guess it algorithmically.
+  const [calibStart, setCalibStart] = useState<Point | null>(null);
+  const [calibEnd, setCalibEnd] = useState<Point | null>(null);
+  const [calibratedRadius, setCalibratedRadius] = useState<number | null>(null);
 
   const [result, setResult] = useState<Extract<BarDetectResult, { ok: true }> | null>(null);
   const [circles, setCircles] = useState<Circle[]>([]);
@@ -50,10 +62,41 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
     setResult(null);
     setCircles([]);
     setDetectError('');
+    setCalibStart(null);
+    setCalibEnd(null);
+    setCalibratedRadius(null);
+  }
+
+  function pointFromEvent(e: React.PointerEvent<HTMLDivElement>): Point {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
+      y: Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
+    };
+  }
+
+  function onCalibDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const p = pointFromEvent(e);
+    setCalibStart(p);
+    setCalibEnd(p);
+    setCalibratedRadius(null);
+  }
+  function onCalibMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!calibStart) return;
+    setCalibEnd(pointFromEvent(e));
+  }
+  function onCalibUp() {
+    if (!calibStart || !calibEnd) return;
+    const dx = calibEnd.x - calibStart.x;
+    const dy = calibEnd.y - calibStart.y;
+    const diameter = Math.sqrt(dx * dx + dy * dy);
+    if (diameter > 0.003) setCalibratedRadius(diameter / 2); // ignore an accidental tap with no real drag
   }
 
   function runMode(mode: BarCountMode) {
     if (!file) return;
+    if (mode !== 'AI_ESTIMATE' && !calibratedRadius) return;
     setDetectError('');
     startDetect(async () => {
       try {
@@ -61,6 +104,7 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
         const formData = new FormData();
         formData.set('photo', resized);
         formData.set('mode', mode);
+        if (calibratedRadius) formData.set('calibratedRadius', String(calibratedRadius));
         const res = await runBarDetection(formData);
         if (!res.ok) { setDetectError(res.error); return; }
         setResult(res);
@@ -112,13 +156,21 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
         </div>
         {file && (
           <div className="flex gap-2">
-            <button type="button" className="btn-secondary" disabled={detecting} onClick={() => runMode('CIRCLE_DETECTOR')}>
+            <button
+              type="button" className="btn-secondary" disabled={detecting || !calibratedRadius}
+              title={calibratedRadius ? undefined : 'Drag across one bar end below first, to show its size'}
+              onClick={() => runMode('CIRCLE_DETECTOR')}
+            >
               {detecting ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} Circle detector
             </button>
             <button type="button" className="btn-secondary" disabled={detecting} onClick={() => runMode('AI_ESTIMATE')}>
               AI estimate
             </button>
-            <button type="button" className="btn-secondary" disabled={detecting} onClick={() => runMode('BOTH')}>
+            <button
+              type="button" className="btn-secondary" disabled={detecting || !calibratedRadius}
+              title={calibratedRadius ? undefined : 'Drag across one bar end below first, to show its size'}
+              onClick={() => runMode('BOTH')}
+            >
               Both
             </button>
           </div>
@@ -130,7 +182,39 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
       )}
 
       {!result && previewSrc && (
-        <img src={previewSrc} alt="" className="max-w-md rounded-lg border border-hairline mb-4" />
+        <div className="mb-4">
+          <p className="text-sm text-ink-muted mb-2">
+            {calibratedRadius
+              ? 'Bar size set — drag again to redo it, or run a mode above.'
+              : 'Drag across one bar end below to show how big it looks, so the circle detector knows what size to look for.'}
+          </p>
+          <div
+            className="relative inline-block max-w-md w-full select-none touch-none"
+            onPointerDown={onCalibDown} onPointerMove={onCalibMove} onPointerUp={onCalibUp} onPointerCancel={onCalibUp}
+          >
+            <img src={previewSrc} alt="" className="block w-full h-auto rounded-lg border border-hairline" draggable={false} />
+            {calibStart && calibEnd && (
+              <>
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden>
+                  <line
+                    x1={`${calibStart.x * 100}%`} y1={`${calibStart.y * 100}%`}
+                    x2={`${calibEnd.x * 100}%`} y2={`${calibEnd.y * 100}%`}
+                    stroke="rgb(197,48,48)" strokeWidth={2}
+                  />
+                </svg>
+                {calibratedRadius && (
+                  <span
+                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-signal bg-signal/20 pointer-events-none"
+                    style={{
+                      left: `${((calibStart.x + calibEnd.x) / 2) * 100}%`, top: `${((calibStart.y + calibEnd.y) / 2) * 100}%`,
+                      width: `${calibratedRadius * 2 * 100}%`, aspectRatio: '1 / 1',
+                    }}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {result?.ok && (
@@ -175,7 +259,7 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
           )}
 
           <form
-            action={(formData) => startSave(async () => { await confirmBarCount(formData); setFile(null); setPreviewSrc(''); setResult(null); setCircles([]); setManualCount(''); setOrderId(''); setNotes(''); if (fileInputRef.current) fileInputRef.current.value = ''; if (uploadInputRef.current) uploadInputRef.current.value = ''; })}
+            action={(formData) => startSave(async () => { await confirmBarCount(formData); setFile(null); setPreviewSrc(''); setResult(null); setCircles([]); setManualCount(''); setOrderId(''); setNotes(''); setCalibStart(null); setCalibEnd(null); setCalibratedRadius(null); if (fileInputRef.current) fileInputRef.current.value = ''; if (uploadInputRef.current) uploadInputRef.current.value = ''; })}
             className="flex flex-wrap items-end gap-3 pt-2 border-t border-hairline"
           >
             <input type="hidden" name="mode" value={result.mode} />
