@@ -91,6 +91,7 @@ model User {
   holidayAdjustmentsMade     HolidayAdjustment[] @relation("holidayAdjustmentBy")
   assetIssuesReported        AssetIssue[]        @relation("assetIssueReportedBy")
   assetIssuesResolved        AssetIssue[]        @relation("assetIssueResolvedBy")
+  assetChecksResolved        AssetCheck[]        @relation("assetCheckResolvedBy")
   fuelEntriesLogged          FuelEntry[]
 }
 
@@ -811,19 +812,25 @@ enum CheckResult {
 }
 
 model AssetCheck {
-  id          String      @id @default(cuid())
-  assetId     String
-  userId      String?
-  performedAt DateTime    @default(now())
-  result      CheckResult @default(PASS)
-  notes       String      @default("")
-  photo       String?     @db.Text // a data URL attached to the overall notes — resized client-side before upload
+  id             String      @id @default(cuid())
+  assetId        String
+  userId         String?
+  performedAt    DateTime    @default(now())
+  result         CheckResult @default(PASS)
+  notes          String      @default("")
+  photo          String?     @db.Text // a data URL attached to the overall notes — resized client-side before upload
+  resolved       Boolean     @default(false) // a FAIL that's been actioned — see AssetIssue for the same pattern
+  resolvedById   String?
+  resolvedAt     DateTime?
+  resolutionNote String      @default("")
 
-  asset Asset            @relation(fields: [assetId], references: [id])
-  user  User?            @relation(fields: [userId], references: [id])
-  items AssetCheckItem[]
+  asset      Asset            @relation(fields: [assetId], references: [id])
+  user       User?            @relation(fields: [userId], references: [id])
+  resolvedBy User?            @relation("assetCheckResolvedBy", fields: [resolvedById], references: [id])
+  items      AssetCheckItem[]
 
   @@index([assetId, performedAt])
+  @@index([resolved])
 }
 
 model AssetCheckItem {

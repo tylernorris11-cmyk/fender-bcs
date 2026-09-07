@@ -139,7 +139,17 @@ export default async function ChecksPage({
                 <td className="td text-ink-muted whitespace-nowrap">
                   <Link href={`/checks/${c.id}`} className="hover:text-ink hover:underline">{shortDate(c.performedAt)} {clock(c.performedAt)}</Link>
                 </td>
-                <td className="td"><Pill tone={c.result === 'PASS' ? 'good' : 'bad'}>{c.result === 'PASS' ? 'Pass' : 'Issue flagged'}</Pill></td>
+                <td className="td">
+                  {c.result === 'FAIL' && !c.resolved && can(user, 'checks.create') ? (
+                    <Link href={`/checks/${c.id}/resolve`} className="hover:opacity-80">
+                      <Pill tone="bad">Issue flagged</Pill>
+                    </Link>
+                  ) : (
+                    <Pill tone={c.result === 'PASS' || c.resolved ? 'good' : 'bad'}>
+                      {c.result === 'PASS' ? 'Pass' : c.resolved ? 'Resolved' : 'Issue flagged'}
+                    </Pill>
+                  )}
+                </td>
                 <td className="td">
                   {c.user && (
                     <span className="flex items-center gap-2">

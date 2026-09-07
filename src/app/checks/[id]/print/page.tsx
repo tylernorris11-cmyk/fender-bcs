@@ -15,7 +15,7 @@ export default async function CheckPrint({ params }: { params: { id: string } })
   const user = await requirePermission('checks.view');
   const check = await db.assetCheck.findUnique({
     where: { id: params.id },
-    include: { asset: true, user: true, items: true },
+    include: { asset: true, user: true, resolvedBy: true, items: true },
   });
   if (!check) notFound();
   if (check.asset.company && !user.companies.includes(check.asset.company)) notFound();
@@ -45,8 +45,8 @@ export default async function CheckPrint({ params }: { params: { id: string } })
           <h1 className="text-xl font-bold">Pre-use check</h1>
           <p className="font-semibold">{check.asset.name} · {check.asset.ref}</p>
           <p>{shortDate(check.performedAt)} {clock(check.performedAt)}</p>
-          <p className="font-bold" style={{ color: check.result === 'PASS' ? 'rgb(13,74,66)' : '#C0392B' }}>
-            {check.result === 'PASS' ? 'Pass' : 'Issue flagged'}
+          <p className="font-bold" style={{ color: check.result === 'PASS' || check.resolved ? 'rgb(13,74,66)' : '#C0392B' }}>
+            {check.result === 'PASS' ? 'Pass' : check.resolved ? 'Resolved' : 'Issue flagged'}
           </p>
         </div>
       </div>
@@ -85,14 +85,24 @@ export default async function CheckPrint({ params }: { params: { id: string } })
 
       <p className="mb-6">Logged by {check.user?.name ?? 'Unknown'}</p>
 
+      {check.resolved && (
+        <div className="mb-6">
+          <p className="font-bold mb-1">Resolved</p>
+          <p>{check.resolutionNote}</p>
+          <p className="text-ink-muted mt-1">
+            {check.resolvedBy?.name ?? 'Unknown'} · {check.resolvedAt ? `${shortDate(check.resolvedAt)} ${clock(check.resolvedAt)}` : ''}
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-10 pt-6 border-t border-black/20">
         <div><p className="mb-10 font-bold">Actioned by (print name)</p><div className="border-b border-black/40" /></div>
         <div><p className="mb-10 font-bold">Signature &amp; date</p><div className="border-b border-black/40" /></div>
       </div>
 
       <p className="text-[11px] text-ink-muted mt-8">
-        Printed {shortDate(new Date())} {clock(new Date())}. Any item marked with a cross must be actioned before this
-        asset goes back into use.
+        Printed {shortDate(new Date())} {clock(new Date())}.
+        {check.resolved ? '' : ' Any item marked with a cross must be actioned before this asset goes back into use.'}
       </p>
       </div>
     </div>

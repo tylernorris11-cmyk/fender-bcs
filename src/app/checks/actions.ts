@@ -83,3 +83,30 @@ export async function resolveAssetIssue(formData: FormData) {
   revalidatePath('/checks');
   revalidatePath(`/assets/${issue.assetId}`);
 }
+
+// ------------------------------------------------------------------ resolving a flagged check
+// A FAIL result on the pass/fail checklist itself (not an AssetIssue) — same
+// resolve pattern, reached via its own page so the fix can be described.
+
+export async function resolveAssetCheck(formData: FormData) {
+  const user = await assertPermission('checks.create');
+  const id = String(formData.get('checkId') ?? '');
+  const check = await db.assetCheck.findUniqueOrThrow({ where: { id } });
+  if (check.result !== 'FAIL') throw new Error('Only a flagged check can be resolved.');
+  if (check.resolved) redirect(`/checks/${id}`);
+
+  const resolutionNote = String(formData.get('resolutionNote') ?? '').trim();
+  if (!resolutionNote) throw new Error('Say what was done to fix it.');
+
+  await db.assetCheck.update({
+    where: { id },
+    data: { resolved: true, resolvedById: user.id, resolvedAt: new Date(), resolutionNote },
+  });
+
+  await logActivity('AssetCheck', check.id, 'Issue resolved', resolutionNote, user.id);
+  revalidatePath('/checks');
+  revalidatePath(`/checks/${check.id}`);
+  revalidatePath(`/checks/${check.id}/print`);
+  revalidatePath(`/assets/${check.assetId}`);
+  redirect(`/checks/${check.id}`);
+}

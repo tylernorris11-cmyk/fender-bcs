@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
+import { can } from '@/lib/rbac';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { clock, shortDate } from '@/lib/format';
@@ -15,10 +16,13 @@ export default async function CheckDetailPage({ params }: { params: { id: string
 
   const check = await db.assetCheck.findUnique({
     where: { id: params.id },
-    include: { asset: true, user: true, items: true },
+    include: { asset: true, user: true, resolvedBy: true, items: true },
   });
   if (!check) notFound();
   if (check.asset.company && !user.companies.includes(check.asset.company)) notFound();
+
+  const needsResolving = check.result === 'FAIL' && !check.resolved;
+  const resultPill = <Pill tone={check.result === 'PASS' || check.resolved ? 'good' : 'bad'}>{check.result === 'PASS' ? 'Pass' : check.resolved ? 'Resolved' : 'Issue flagged'}</Pill>;
 
   return (
     <Shell user={user} module="checks" nav={NAV.checks} current="/checks" alerts={alerts.length}>
@@ -32,10 +36,22 @@ export default async function CheckDetailPage({ params }: { params: { id: string
         actions={(
           <>
             <a href={`/checks/${check.id}/print`} className="btn-secondary"><Printer size={16} /> Print</a>
-            <Pill tone={check.result === 'PASS' ? 'good' : 'bad'}>{check.result === 'PASS' ? 'Pass' : 'Issue flagged'}</Pill>
+            {needsResolving && can(user, 'checks.create')
+              ? <Link href={`/checks/${check.id}/resolve`} className="hover:opacity-80">{resultPill}</Link>
+              : resultPill}
           </>
         )}
       />
+
+      {check.resolved && (
+        <section className="card card-pad mb-6 border-2 border-brand/30">
+          <h2 className="text-lg font-bold mb-2">Resolved</h2>
+          <p className="text-sm">{check.resolutionNote}</p>
+          <p className="text-xs text-ink-faint mt-2">
+            {check.resolvedBy?.name ?? 'Unknown'} · {check.resolvedAt ? `${shortDate(check.resolvedAt)} ${clock(check.resolvedAt)}` : ''}
+          </p>
+        </section>
+      )}
 
       <section className="card card-pad mb-6">
         <h2 className="text-lg font-bold mb-4">Checklist</h2>

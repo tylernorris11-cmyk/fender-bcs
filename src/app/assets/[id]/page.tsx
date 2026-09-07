@@ -179,7 +179,9 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
               <Link href={`/checks/${c.id}`} className="text-ink-muted w-40 hover:text-ink hover:underline">
                 {shortDate(c.performedAt)} {clock(c.performedAt)}
               </Link>
-              <Pill tone={c.result === 'PASS' ? 'good' : 'bad'}>{c.result === 'PASS' ? 'Pass' : 'Issue flagged'}</Pill>
+              <Pill tone={c.result === 'PASS' || c.resolved ? 'good' : 'bad'}>
+                {c.result === 'PASS' ? 'Pass' : c.resolved ? 'Resolved' : 'Issue flagged'}
+              </Pill>
               <span className="text-ink-muted">{c.user?.name ?? 'Unknown'}</span>
               {c.items.some((i) => !i.ok) && (
                 <span className="text-signal w-full text-sm">{c.items.filter((i) => !i.ok).map((i) => i.label).join(', ')}</span>
