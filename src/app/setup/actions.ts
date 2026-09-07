@@ -160,19 +160,32 @@ export async function updateHolidayAllowance(formData: FormData) {
  * glance) — this inverts that into the "hiddenModules" blocklist can()
  * actually checks, so unchecking a box removes access everywhere at once:
  * the home screen, every menu, and the page itself if they type the URL in.
+ *
+ * One "Save all" button covers the whole table rather than a Save per row —
+ * every row's checkboxes live in the same form, keyed by userId, and a
+ * hidden "userIds" input per row (independent of any checkbox state) is
+ * what tells this which people were on screen to save at all.
  */
-export async function updateHiddenModules(formData: FormData) {
+export async function updateAllHiddenModules(formData: FormData) {
   const admin = await assertPermission('setup.users');
-  const userId = String(formData.get('userId'));
-  const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
-  assertCanManage(admin, target);
-  if (target.role === 'MASTER_ADMIN') throw new Error('A Master Administrator can always see everything — nothing to hide.');
+  const userIds = formData.getAll('userIds').map(String);
+  const targets = await db.user.findMany({ where: { id: { in: userIds } } });
 
-  const visible = new Set(formData.getAll('visible').map(String));
-  const hiddenModules = TOGGLEABLE_MODULES.map((m) => m.key).filter((key) => !visible.has(key));
+  const changes = targets.map((target) => {
+    assertCanManage(admin, target);
+    if (target.role === 'MASTER_ADMIN') throw new Error('A Master Administrator can always see everything — nothing to hide.');
+    const visible = new Set(formData.getAll(`visible_${target.id}`).map(String));
+    const hiddenModules = TOGGLEABLE_MODULES.map((m) => m.key).filter((key) => !visible.has(key));
+    return { target, hiddenModules };
+  });
 
-  await db.user.update({ where: { id: userId }, data: { hiddenModules } });
-  await logActivity('User', userId, 'Visibility changed', hiddenModules.length ? `Hidden: ${hiddenModules.join(', ')}` : 'Everything visible', admin.id);
+  await db.$transaction(changes.map(({ target, hiddenModules }) =>
+    db.user.update({ where: { id: target.id }, data: { hiddenModules } }),
+  ));
+
+  for (const { target, hiddenModules } of changes) {
+    await logActivity('User', target.id, 'Visibility changed', hiddenModules.length ? `Hidden: ${hiddenModules.join(', ')}` : 'Everything visible', admin.id);
+  }
   revalidatePath('/setup/users');
 }
 

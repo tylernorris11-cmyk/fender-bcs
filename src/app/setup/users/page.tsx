@@ -8,7 +8,7 @@ import { NAV, Shell } from '@/components/Shell';
 import { COMPANY_LABEL } from '@/lib/company';
 import { Avatar, PageHeader, Pill, SortTh, Table } from '@/components/ui';
 import {
-  createUser, resetPassword, toggleUserActive, updateHiddenModules, updateHolidayAllowance, updateUserCompanies, updateUserRole,
+  createUser, resetPassword, toggleUserActive, updateAllHiddenModules, updateHolidayAllowance, updateUserCompanies, updateUserRole,
 } from '../actions';
 
 const COMPANIES = ['FENDER', 'BS_SUPPLIES'] as const;
@@ -136,40 +136,41 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
           Untick a module and it disappears for that person everywhere — home screen, menus, search, and the page itself
           if they go straight to the address. A Master Administrator can always see everything, so they aren&apos;t listed here.
         </p>
+        <form action={updateAllHiddenModules}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
             <thead>
               <tr>
                 <th className="th text-left">Person</th>
                 {TOGGLEABLE_MODULES.map((m) => <th key={m.key} className="th text-center whitespace-nowrap px-2">{m.label}</th>)}
-                <th className="th sr-only">Save</th>
               </tr>
             </thead>
             <tbody>
               {users.filter((u) => u.role !== 'MASTER_ADMIN').map((u) => (
                 <tr key={u.id} className="row">
-                  <td className="td font-semibold whitespace-nowrap">{u.name}</td>
+                  <td className="td font-semibold whitespace-nowrap">
+                    {u.name}
+                    <input type="hidden" name="userIds" value={u.id} />
+                  </td>
                   {TOGGLEABLE_MODULES.map((m) => (
                     <td key={m.key} className="td text-center">
-                      <input type="checkbox" form={`vis-${u.id}`} name="visible" value={m.key}
+                      <input type="checkbox" name={`visible_${u.id}`} value={m.key}
                              defaultChecked={!u.hiddenModules.includes(m.key)}
                              className="h-4 w-4 accent-brand" aria-label={`${u.name} can see ${m.label}`} />
                     </td>
                   ))}
-                  <td className="td">
-                    <form id={`vis-${u.id}`} action={updateHiddenModules}>
-                      <input type="hidden" name="userId" value={u.id} />
-                      <button className="btn-secondary btn-sm">Save</button>
-                    </form>
-                  </td>
                 </tr>
               ))}
               {users.filter((u) => u.role !== 'MASTER_ADMIN').length === 0 && (
-                <tr><td colSpan={TOGGLEABLE_MODULES.length + 2} className="td text-ink-muted">Nobody else to set this for yet.</td></tr>
+                <tr><td colSpan={TOGGLEABLE_MODULES.length + 1} className="td text-ink-muted">Nobody else to set this for yet.</td></tr>
               )}
             </tbody>
           </table>
         </div>
+        {users.filter((u) => u.role !== 'MASTER_ADMIN').length > 0 && (
+          <button className="btn-primary mt-4">Save all</button>
+        )}
+        </form>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
