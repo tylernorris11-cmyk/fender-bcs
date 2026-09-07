@@ -29,7 +29,7 @@ export default async function ChecksPage({
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const [checks, activeAssets, checkedTodayIds, openIssues] = await Promise.all([
+  const [checks, activeAssets, checkedTodayIds, openIssues, flaggedChecksCount] = await Promise.all([
     db.assetCheck.findMany({
       where: {
         asset: {
@@ -51,6 +51,17 @@ export default async function ChecksPage({
       where: { resolved: false, asset: { OR: [{ company: null }, { company }] } },
       include: { asset: true, reportedBy: true },
       orderBy: { reportedAt: 'asc' },
+    }),
+    // "Open issues" needs to count everything currently showing as flagged —
+    // not just AssetIssue reports, but every FAIL check still carrying an
+    // unresolved item too, or the stat silently undercounts what's visible
+    // as red "Issue flagged" further down the same page.
+    db.assetCheck.count({
+      where: {
+        asset: { OR: [{ company: null }, { company }] },
+        result: 'FAIL',
+        items: { some: { ok: false, resolved: false } },
+      },
     }),
   ]);
 
@@ -74,7 +85,7 @@ export default async function ChecksPage({
         <Stat value={activeAssets.length - notCheckedToday.length} label="Checked today" tone="good" />
         <Stat value={notCheckedToday.length} label="Not checked today" tone={notCheckedToday.length ? 'warn' : 'default'} />
         <Stat value={outOfServiceAssets.length} label="Out of service" tone={outOfServiceAssets.length ? 'bad' : 'default'} />
-        <Stat value={openIssues.length} label="Open issues" tone={openIssues.length ? 'bad' : 'default'} />
+        <Stat value={flaggedChecksCount + openIssues.length} label="Open issues" tone={flaggedChecksCount + openIssues.length ? 'bad' : 'default'} />
         <Stat value={activeAssets.length} label="Active assets" href="/assets" />
       </StatRow>
 
@@ -92,8 +103,8 @@ export default async function ChecksPage({
 
       {openIssues.length > 0 && (
         <section className="card card-pad mb-6 border-2 border-signal/30">
-          <h2 className="text-lg font-bold mb-1">Open issues</h2>
-          <p className="text-sm text-ink-muted mb-4">Reported separately from the daily checklist — stays here until someone marks it fixed.</p>
+          <h2 className="text-lg font-bold mb-1">Issues reported</h2>
+          <p className="text-sm text-ink-muted mb-4">Reported separately from the daily checklist — stays here until someone marks it fixed. Checklist failures show as &ldquo;Issue flagged&rdquo; in the table below instead.</p>
           <ul className="divide-y divide-hairline">
             {openIssues.map((issue) => (
               <li key={issue.id} className="py-3 flex flex-wrap items-center gap-3">
