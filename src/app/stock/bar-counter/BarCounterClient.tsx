@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react';
 import type { BarCountMode } from '@prisma/client';
-import { AlertTriangle, Camera, Loader2 } from 'lucide-react';
+import { AlertTriangle, Camera, Loader2, Upload } from 'lucide-react';
 import { resizeImageToFile } from '@/lib/image';
 import { runBarDetection, confirmBarCount, type BarDetectResult } from './actions';
 import type { DetectedCircle } from '@/lib/barDetection';
@@ -40,6 +40,7 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
   const [saving, startSave] = useTransition();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   function onPhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const chosen = e.target.files?.[0];
@@ -95,9 +96,18 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
             ref={fileInputRef} id="photo" type="file" accept="image/png,image/jpeg,image/webp"
             capture="environment" className="sr-only" onChange={onPhotoChosen}
           />
-          <button type="button" className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
-            <Camera size={16} /> Take Picture
-          </button>
+          <input
+            ref={uploadInputRef} type="file" accept="image/png,image/jpeg,image/webp"
+            className="sr-only" onChange={onPhotoChosen}
+          />
+          <div className="flex gap-2">
+            <button type="button" className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
+              <Camera size={16} /> Take Picture
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => uploadInputRef.current?.click()}>
+              <Upload size={16} /> Upload Photo
+            </button>
+          </div>
           {file && <span className="block text-xs text-ink-muted mt-1.5">{file.name}</span>}
         </div>
         {file && (
@@ -165,7 +175,7 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
           )}
 
           <form
-            action={(formData) => startSave(async () => { await confirmBarCount(formData); setFile(null); setPreviewSrc(''); setResult(null); setCircles([]); setManualCount(''); setOrderId(''); setNotes(''); if (fileInputRef.current) fileInputRef.current.value = ''; })}
+            action={(formData) => startSave(async () => { await confirmBarCount(formData); setFile(null); setPreviewSrc(''); setResult(null); setCircles([]); setManualCount(''); setOrderId(''); setNotes(''); if (fileInputRef.current) fileInputRef.current.value = ''; if (uploadInputRef.current) uploadInputRef.current.value = ''; })}
             className="flex flex-wrap items-end gap-3 pt-2 border-t border-hairline"
           >
             <input type="hidden" name="mode" value={result.mode} />
