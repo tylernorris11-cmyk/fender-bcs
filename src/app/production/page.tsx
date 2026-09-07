@@ -200,7 +200,11 @@ async function CurrentJobView({ job }: { job: any }) {
   const lastRow = job.rows.length > 0 ? job.rows[job.rows.length - 1] : null;
   const lastCastNumber = lastRow?.castNumber ?? '';
   const lastSteelGrade = lastRow?.steelGrade ?? '';
-  const lastDiaMm = lastRow?.diaMm ?? '';
+  // diaMm is stored as a fixed-scale Decimal (always one decimal place, e.g.
+  // "16.0"), which would mismatch Fender's plain-number <option value>s and
+  // show an unwanted ".0" everywhere a whole diameter was entered — strip it
+  // back to a plain number for display, keeping any real decimal (e.g. 8.5).
+  const lastDiaMm = lastRow?.diaMm != null ? Number(lastRow.diaMm) : '';
 
   const machines = isFenderJob ? [] : await db.asset.findMany({
     where: { type: 'MACHINE', retired: false, OR: [{ company: null }, { company: job.company }] },
@@ -278,7 +282,7 @@ async function CurrentJobView({ job }: { job: any }) {
               </div>
               <div>
                 <label className="label text-xs" htmlFor="diaMm">Diameter (mm)</label>
-                <input id="diaMm" name="diaMm" type="number" min="0" className="input w-24" defaultValue={lastDiaMm} />
+                <input id="diaMm" name="diaMm" type="number" min="0" step="0.1" className="input w-24" defaultValue={lastDiaMm} />
               </div>
               <div>
                 <label className="label text-xs" htmlFor="tallyWeightKg">Weight of bundle (kg)</label>
@@ -297,7 +301,7 @@ async function CurrentJobView({ job }: { job: any }) {
         </>}>
           {job.rows.map((r: any) => (
             <tr key={r.id} className="row">
-              <td className="td">{r.diaMm ? `${r.diaMm} mm` : '—'}</td>
+              <td className="td">{r.diaMm ? `${Number(r.diaMm)} mm` : '—'}</td>
               <td className="td">{r.barMark || '—'}</td>
               <td className="td">{r.castNumber || '—'}</td>
               <td className="td">{r.mill || '—'}</td>
@@ -315,7 +319,7 @@ async function CurrentJobView({ job }: { job: any }) {
             <tr key={r.id} className="row">
               <td className="td">{r.machine || '—'}</td>
               <td className="td">{r.steelGrade || '—'}</td>
-              <td className="td">{r.diaMm ? `${r.diaMm} mm` : '—'}</td>
+              <td className="td">{r.diaMm ? `${Number(r.diaMm)} mm` : '—'}</td>
               <td className="td">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
             </tr>
           ))}

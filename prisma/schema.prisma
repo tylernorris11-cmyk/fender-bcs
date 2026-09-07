@@ -560,7 +560,7 @@ model ProductionJob {
 model ProductionJobRow {
   id            String   @id @default(cuid())
   jobId         String
-  diaMm         Int? // Fender: bar diameter. BCS: fence post/wire diameter.
+  diaMm         Decimal? @db.Decimal(5, 1) // Fender: bar diameter (always whole). BCS: fence post/wire diameter (can be e.g. 8.5mm).
   barMark       String   @default("") // Fender only
   castNumber    String   @default("") // Fender only
   mill          String   @default("") // Fender only

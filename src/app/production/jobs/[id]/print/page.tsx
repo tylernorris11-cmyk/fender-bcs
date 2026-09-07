@@ -73,7 +73,7 @@ export default async function ProductionJobPrint({ params }: { params: { id: str
             <tr key={r.id} className="border-b border-black/10">
               {isFender ? (
                 <>
-                  <td className="py-2">{r.diaMm ? `${r.diaMm} mm` : '—'}</td>
+                  <td className="py-2">{r.diaMm ? `${Number(r.diaMm)} mm` : '—'}</td>
                   <td className="py-2">{r.barMark || '—'}</td>
                   <td className="py-2">{r.castNumber || '—'}</td>
                   <td className="py-2">{r.mill || '—'}</td>
@@ -84,7 +84,7 @@ export default async function ProductionJobPrint({ params }: { params: { id: str
                 <>
                   <td className="py-2">{r.machine || '—'}</td>
                   <td className="py-2">{r.steelGrade || '—'}</td>
-                  <td className="py-2">{r.diaMm ? `${r.diaMm} mm` : '—'}</td>
+                  <td className="py-2">{r.diaMm ? `${Number(r.diaMm)} mm` : '—'}</td>
                   <td className="py-2 text-right">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
                 </>
               )}
