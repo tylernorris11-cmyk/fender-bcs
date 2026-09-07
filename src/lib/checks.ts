@@ -24,7 +24,6 @@ export const MACHINE_CHECK_ITEMS = [
   'No visible damage to blades, dies or rollers',
   'Hydraulic and air lines — no leaks',
   'Work area clear and clean',
-  'Lifting equipment inspected (if fitted)',
   'Noise and vibration normal on start-up',
 ];
 
@@ -69,6 +68,13 @@ export const OVERHEAD_CRANE_CHECK_ITEMS = [
   'Electrical isolation points are free, clear and visible',
   'Warning signs are clear and visible',
 ];
+
+/** An emergency stop is the one checklist item that should always take the
+ * asset out of service if it fails — matches any of the differently-worded
+ * emergency-stop items across the default lists above. */
+export function isCriticalByDefault(label: string): boolean {
+  return /emergency stop/i.test(label);
+}
 
 export function defaultCheckItems(assetType: AssetType, category?: string): string[] {
   const c = category?.trim().toLowerCase();

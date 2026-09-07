@@ -6,7 +6,7 @@ import type { AssetType, Company } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { canAccessCompany } from '@/lib/company';
-import { defaultCheckItems } from '@/lib/checks';
+import { defaultCheckItems, isCriticalByDefault } from '@/lib/checks';
 import { isOutOfService } from '@/lib/assets';
 
 async function nextAssetRef(type: AssetType) {
@@ -58,7 +58,7 @@ export async function createAsset(formData: FormData) {
   // A sensible starting checklist for its type — editable from here on,
   // since a real lorry or machine often needs its own tweaks.
   await db.assetChecklistItem.createMany({
-    data: defaultCheckItems(type, category).map((label, i) => ({ assetId: asset.id, label, sortOrder: i })),
+    data: defaultCheckItems(type, category).map((label, i) => ({ assetId: asset.id, label, sortOrder: i, critical: isCriticalByDefault(label) })),
   });
 
   await logActivity('Asset', asset.id, 'Added', `${asset.ref} — ${name}`, user.id);
