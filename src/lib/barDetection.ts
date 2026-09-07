@@ -4,22 +4,23 @@ import { PNG } from 'pngjs';
 
 export type DetectedCircle = { x: number; y: number; r: number }; // all 0–1, normalized by width (r too, so it never distorts into an ellipse)
 
-// Retuned against a real, densely packed yard photo (rust texture, tightly
-// touching ends, dark grading marks across several faces) after the
-// original starting values — proven only against a clean synthetic test
-// image — turned out to over-detect by roughly 4x on a real bundle (921 vs.
-// a plausible ballpark in the 150-250 range for that same frame). Still a
-// starting point, not a verified-accurate result — a real photo has no
-// ground-truth count to tune against precisely, and this will keep needing
-// adjustment as more real corrections come in (see the Bar Counter plan's
-// note on retuning from logged corrections).
+// Retuned against a real yard photo with a genuine, verified ground-truth
+// count: 112 bar ends, counted by a dedicated object-counting app ("Count
+// This") and confirmed by the person who took the photo. These values land
+// at 110 on that exact photo — a first pass tuned only against a clean
+// synthetic image had over-detected the same bundle by roughly 2x (228).
+// Calibrated against a single real photo, not a general solution — a real
+// ground-truth count is rare enough that this is still worth keeping over
+// the earlier guess, but expect this to keep moving as more corrections
+// come in from real use (see the Bar Counter plan's note on retuning from
+// logged corrections).
 const DP = 1;
-const BLUR_KERNEL = 7; // was 5 — a touch more smoothing to suppress rust/dirt texture noise
+const BLUR_KERNEL = 7; // a touch more smoothing to suppress rust/dirt texture noise
 const PARAM1 = 50; // Canny high threshold
-const PARAM2 = 25; // accumulator threshold — was 15; too permissive on a busy real photo, picking up rust/texture as false circles
-const MIN_DIST_FRACTION = 0.035; // min gap between circle centers, as a fraction of the smaller image dimension
-const MIN_RADIUS_FRACTION = 0.012;
-const MAX_RADIUS_FRACTION = 0.07;
+const PARAM2 = 27; // accumulator threshold — higher is stricter; 15 was far too permissive on a busy real photo
+const MIN_DIST_FRACTION = 0.04; // min gap between circle centers, as a fraction of the smaller image dimension
+const MIN_RADIUS_FRACTION = 0.014;
+const MAX_RADIUS_FRACTION = 0.065;
 
 // HoughCircles' cost blows up with edge count × radius search range — fine
 // on a clean synthetic test image, but a real yard photo (rust texture,
