@@ -130,7 +130,12 @@ export default async function ChecksPage({
               </>
             }
           >
-            {checks.map((c) => (
+            {checks.map((c) => {
+              const failed = c.items.filter((i) => !i.ok);
+              const open = failed.filter((i) => !i.resolved);
+              const allFixed = failed.length > 0 && open.length === 0;
+              const label = c.result === 'PASS' ? 'Pass' : allFixed ? 'Resolved' : open.length < failed.length ? `${failed.length - open.length}/${failed.length} fixed` : 'Issue flagged';
+              return (
               <tr key={c.id} className="row">
                 <td className="td">
                   <Link href={`/assets/${c.assetId}`} className="font-semibold text-brand-700 hover:underline">{c.asset.name}</Link>
@@ -140,14 +145,12 @@ export default async function ChecksPage({
                   <Link href={`/checks/${c.id}`} className="hover:text-ink hover:underline">{shortDate(c.performedAt)} {clock(c.performedAt)}</Link>
                 </td>
                 <td className="td">
-                  {c.result === 'FAIL' && !c.resolved && can(user, 'checks.create') ? (
+                  {c.result === 'FAIL' && open.length > 0 && can(user, 'checks.create') ? (
                     <Link href={`/checks/${c.id}/resolve`} className="hover:opacity-80">
-                      <Pill tone="bad">Issue flagged</Pill>
+                      <Pill tone="bad">{label}</Pill>
                     </Link>
                   ) : (
-                    <Pill tone={c.result === 'PASS' || c.resolved ? 'good' : 'bad'}>
-                      {c.result === 'PASS' ? 'Pass' : c.resolved ? 'Resolved' : 'Issue flagged'}
-                    </Pill>
+                    <Pill tone={c.result === 'PASS' || allFixed ? 'good' : 'bad'}>{label}</Pill>
                   )}
                 </td>
                 <td className="td">
@@ -165,7 +168,8 @@ export default async function ChecksPage({
                   </span>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </Table>
         )}
       </section>

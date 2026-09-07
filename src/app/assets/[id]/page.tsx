@@ -174,20 +174,24 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
       <section className="card card-pad mb-6">
         <h2 className="text-lg font-bold mb-3">Check history</h2>
         <ul className="text-sm divide-y divide-hairline">
-          {asset.checks.map((c) => (
-            <li key={c.id} className="py-3 flex flex-wrap items-center gap-2">
-              <Link href={`/checks/${c.id}`} className="text-ink-muted w-40 hover:text-ink hover:underline">
-                {shortDate(c.performedAt)} {clock(c.performedAt)}
-              </Link>
-              <Pill tone={c.result === 'PASS' || c.resolved ? 'good' : 'bad'}>
-                {c.result === 'PASS' ? 'Pass' : c.resolved ? 'Resolved' : 'Issue flagged'}
-              </Pill>
-              <span className="text-ink-muted">{c.user?.name ?? 'Unknown'}</span>
-              {c.items.some((i) => !i.ok) && (
-                <span className="text-signal w-full text-sm">{c.items.filter((i) => !i.ok).map((i) => i.label).join(', ')}</span>
-              )}
-            </li>
-          ))}
+          {asset.checks.map((c) => {
+            const failed = c.items.filter((i) => !i.ok);
+            const open = failed.filter((i) => !i.resolved);
+            const allFixed = failed.length > 0 && open.length === 0;
+            const label = c.result === 'PASS' ? 'Pass' : allFixed ? 'Resolved' : open.length < failed.length ? `${failed.length - open.length}/${failed.length} fixed` : 'Issue flagged';
+            return (
+              <li key={c.id} className="py-3 flex flex-wrap items-center gap-2">
+                <Link href={`/checks/${c.id}`} className="text-ink-muted w-40 hover:text-ink hover:underline">
+                  {shortDate(c.performedAt)} {clock(c.performedAt)}
+                </Link>
+                <Pill tone={c.result === 'PASS' || allFixed ? 'good' : 'bad'}>{label}</Pill>
+                <span className="text-ink-muted">{c.user?.name ?? 'Unknown'}</span>
+                {open.length > 0 && (
+                  <span className="text-signal w-full text-sm">{open.map((i) => i.label).join(', ')}</span>
+                )}
+              </li>
+            );
+          })}
           {asset.checks.length === 0 && <li className="py-3 text-ink-muted">Nothing logged yet.</li>}
         </ul>
       </section>

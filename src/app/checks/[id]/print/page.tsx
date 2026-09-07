@@ -15,7 +15,7 @@ export default async function CheckPrint({ params }: { params: { id: string } })
   const user = await requirePermission('checks.view');
   const check = await db.assetCheck.findUnique({
     where: { id: params.id },
-    include: { asset: true, user: true, resolvedBy: true, items: true },
+    include: { asset: true, user: true, items: { include: { resolvedBy: true } } },
   });
   if (!check) notFound();
   if (check.asset.company && !user.companies.includes(check.asset.company)) notFound();
@@ -23,6 +23,9 @@ export default async function CheckPrint({ params }: { params: { id: string } })
   const company = check.asset.company ?? getActiveCompany(user);
   const isFender = company === 'FENDER';
   const failed = check.items.filter((i) => !i.ok);
+  const open = failed.filter((i) => !i.resolved);
+  const allFixed = failed.length > 0 && open.length === 0;
+  const resultLabel = check.result === 'PASS' ? 'Pass' : allFixed ? 'Resolved' : open.length < failed.length ? `${failed.length - open.length}/${failed.length} fixed` : 'Issue flagged';
 
   return (
     <div className="bg-white min-h-screen">
@@ -45,8 +48,8 @@ export default async function CheckPrint({ params }: { params: { id: string } })
           <h1 className="text-xl font-bold">Pre-use check</h1>
           <p className="font-semibold">{check.asset.name} · {check.asset.ref}</p>
           <p>{shortDate(check.performedAt)} {clock(check.performedAt)}</p>
-          <p className="font-bold" style={{ color: check.result === 'PASS' || check.resolved ? 'rgb(13,74,66)' : '#C0392B' }}>
-            {check.result === 'PASS' ? 'Pass' : check.resolved ? 'Resolved' : 'Issue flagged'}
+          <p className="font-bold" style={{ color: check.result === 'PASS' || allFixed ? 'rgb(13,74,66)' : '#C0392B' }}>
+            {resultLabel}
           </p>
         </div>
       </div>
@@ -60,9 +63,13 @@ export default async function CheckPrint({ params }: { params: { id: string } })
         <tbody>
           {check.items.map((i) => (
             <tr key={i.id} className="border-b border-black/10">
-              <td className="py-2 text-center">{i.ok ? '✓' : '✕'}</td>
+              <td className="py-2 text-center">{i.ok || i.resolved ? '✓' : '✕'}</td>
               <td className="py-2">{i.label}</td>
-              <td className="py-2 text-ink-muted">{i.note || (i.ok ? '—' : 'Not confirmed — no note left.')}</td>
+              <td className="py-2 text-ink-muted">
+                {i.resolved
+                  ? `Fixed — ${i.resolutionNote || 'no note'} (${i.resolvedBy?.name ?? 'Unknown'}${i.resolvedAt ? `, ${shortDate(i.resolvedAt)}` : ''})`
+                  : i.note || (i.ok ? '—' : 'Not confirmed — no note left.')}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -85,16 +92,6 @@ export default async function CheckPrint({ params }: { params: { id: string } })
 
       <p className="mb-6">Logged by {check.user?.name ?? 'Unknown'}</p>
 
-      {check.resolved && (
-        <div className="mb-6">
-          <p className="font-bold mb-1">Resolved</p>
-          <p>{check.resolutionNote}</p>
-          <p className="text-ink-muted mt-1">
-            {check.resolvedBy?.name ?? 'Unknown'} · {check.resolvedAt ? `${shortDate(check.resolvedAt)} ${clock(check.resolvedAt)}` : ''}
-          </p>
-        </div>
-      )}
-
       <div className="grid grid-cols-2 gap-10 pt-6 border-t border-black/20">
         <div><p className="mb-10 font-bold">Actioned by (print name)</p><div className="border-b border-black/40" /></div>
         <div><p className="mb-10 font-bold">Signature &amp; date</p><div className="border-b border-black/40" /></div>
@@ -102,7 +99,7 @@ export default async function CheckPrint({ params }: { params: { id: string } })
 
       <p className="text-[11px] text-ink-muted mt-8">
         Printed {shortDate(new Date())} {clock(new Date())}.
-        {check.resolved ? '' : ' Any item marked with a cross must be actioned before this asset goes back into use.'}
+        {allFixed ? '' : ' Any item marked with a cross must be actioned before this asset goes back into use.'}
       </p>
       </div>
     </div>

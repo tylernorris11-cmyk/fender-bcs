@@ -91,7 +91,7 @@ model User {
   holidayAdjustmentsMade     HolidayAdjustment[] @relation("holidayAdjustmentBy")
   assetIssuesReported        AssetIssue[]        @relation("assetIssueReportedBy")
   assetIssuesResolved        AssetIssue[]        @relation("assetIssueResolvedBy")
-  assetChecksResolved        AssetCheck[]        @relation("assetCheckResolvedBy")
+  assetCheckItemsResolved    AssetCheckItem[]    @relation("assetCheckItemResolvedBy")
   fuelEntriesLogged          FuelEntry[]
 }
 
@@ -812,35 +812,40 @@ enum CheckResult {
 }
 
 model AssetCheck {
-  id             String      @id @default(cuid())
-  assetId        String
-  userId         String?
-  performedAt    DateTime    @default(now())
-  result         CheckResult @default(PASS)
-  notes          String      @default("")
-  photo          String?     @db.Text // a data URL attached to the overall notes — resized client-side before upload
-  resolved       Boolean     @default(false) // a FAIL that's been actioned — see AssetIssue for the same pattern
-  resolvedById   String?
-  resolvedAt     DateTime?
-  resolutionNote String      @default("")
+  id          String      @id @default(cuid())
+  assetId     String
+  userId      String?
+  performedAt DateTime    @default(now())
+  result      CheckResult @default(PASS)
+  notes       String      @default("")
+  photo       String?     @db.Text // a data URL attached to the overall notes — resized client-side before upload
 
-  asset      Asset            @relation(fields: [assetId], references: [id])
-  user       User?            @relation(fields: [userId], references: [id])
-  resolvedBy User?            @relation("assetCheckResolvedBy", fields: [resolvedById], references: [id])
-  items      AssetCheckItem[]
+  asset Asset            @relation(fields: [assetId], references: [id])
+  user  User?            @relation(fields: [userId], references: [id])
+  items AssetCheckItem[]
 
   @@index([assetId, performedAt])
-  @@index([resolved])
 }
 
+// Resolution is tracked per item, not on the check as a whole — a check can
+// flag several things at once, and someone might fix two of them today and
+// leave a third genuinely still broken, so the check as a whole should stay
+// flagged until every failed item is individually marked fixed.
 model AssetCheckItem {
-  id      String  @id @default(cuid())
-  checkId String
-  label   String
-  ok      Boolean @default(true)
-  note    String  @default("")
+  id             String    @id @default(cuid())
+  checkId        String
+  label          String
+  ok             Boolean   @default(true)
+  note           String    @default("")
+  resolved       Boolean   @default(false)
+  resolvedById   String?
+  resolvedAt     DateTime?
+  resolutionNote String    @default("")
 
-  check AssetCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+  check      AssetCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+  resolvedBy User?      @relation("assetCheckItemResolvedBy", fields: [resolvedById], references: [id])
+
+  @@index([resolved])
 }
 
 model AssetNote {

@@ -85,28 +85,44 @@ export async function resolveAssetIssue(formData: FormData) {
 }
 
 // ------------------------------------------------------------------ resolving a flagged check
-// A FAIL result on the pass/fail checklist itself (not an AssetIssue) — same
-// resolve pattern, reached via its own page so the fix can be described.
+// A FAIL result on the pass/fail checklist itself (not an AssetIssue). Resolution
+// is tracked per item — a check can flag several things at once, and someone
+// might fix two today and genuinely leave a third one still broken, so each
+// ticked item is marked fixed individually rather than the check as a whole.
 
-export async function resolveAssetCheck(formData: FormData) {
+export async function resolveAssetCheckItems(formData: FormData) {
   const user = await assertPermission('checks.create');
-  const id = String(formData.get('checkId') ?? '');
-  const check = await db.assetCheck.findUniqueOrThrow({ where: { id } });
-  if (check.result !== 'FAIL') throw new Error('Only a flagged check can be resolved.');
-  if (check.resolved) redirect(`/checks/${id}`);
+  const checkId = String(formData.get('checkId') ?? '');
+  const check = await db.assetCheck.findUniqueOrThrow({ where: { id: checkId }, include: { asset: true, items: true } });
+  if (check.asset.company && !user.companies.includes(check.asset.company)) throw new Error('Not found.');
 
-  const resolutionNote = String(formData.get('resolutionNote') ?? '').trim();
-  if (!resolutionNote) throw new Error('Say what was done to fix it.');
+  const openItemIds = new Set(check.items.filter((i) => !i.ok && !i.resolved).map((i) => i.id));
+  const toResolve = Array.from(formData.entries())
+    .filter(([key, value]) => key.startsWith('fixed_') && value === '1' && openItemIds.has(key.slice('fixed_'.length)))
+    .map(([key]) => {
+      const itemId = key.slice('fixed_'.length);
+      return { itemId, note: String(formData.get(`note_${itemId}`) ?? '').trim() };
+    });
+  if (toResolve.length === 0) throw new Error('Tick at least one item to mark as fixed.');
 
-  await db.assetCheck.update({
-    where: { id },
-    data: { resolved: true, resolvedById: user.id, resolvedAt: new Date(), resolutionNote },
-  });
+  await db.$transaction(
+    toResolve.map(({ itemId, note }) =>
+      db.assetCheckItem.update({
+        where: { id: itemId },
+        data: { resolved: true, resolvedById: user.id, resolvedAt: new Date(), resolutionNote: note },
+      }),
+    ),
+  );
 
-  await logActivity('AssetCheck', check.id, 'Issue resolved', resolutionNote, user.id);
+  const summary = toResolve.map((r) => r.note).filter(Boolean).join('; ') || `${toResolve.length} item(s) fixed`;
+  await logActivity('AssetCheck', check.id, 'Issue(s) resolved', summary, user.id);
+
   revalidatePath('/checks');
   revalidatePath(`/checks/${check.id}`);
   revalidatePath(`/checks/${check.id}/print`);
   revalidatePath(`/assets/${check.assetId}`);
-  redirect(`/checks/${check.id}`);
+
+  const resolvedNow = new Set(toResolve.map((r) => r.itemId));
+  const stillOpen = check.items.some((i) => !i.ok && !i.resolved && !resolvedNow.has(i.id));
+  redirect(stillOpen ? `/checks/${check.id}/resolve` : `/checks/${check.id}`);
 }
