@@ -11,14 +11,24 @@ export const tonnes = (kg: unknown) => `${(Number(kg ?? 0) / 1000).toFixed(3)} t
 export const qty = (v: unknown, unit = 't') =>
   unit === 't' ? `${Number(v ?? 0).toFixed(3)} t` : `${Number(v ?? 0).toLocaleString('en-GB')} ${unit}`;
 
+// Every one of these renders on the server, which on Vercel always runs in
+// UTC regardless of deploy region — never the visitor's own browser
+// timezone. Without an explicit timeZone, that's fine for the date-only
+// helpers most of the year but silently wrong for clock() specifically:
+// Britain is UTC+1 (BST) roughly late March to late October, so any time
+// rendered against the server's UTC clock reads exactly one hour behind
+// for most of the year. Pin all three to Europe/London explicitly — it
+// already knows about the BST/GMT switch, so this needs no seasonal logic.
+const UK_TZ = 'Europe/London';
+
 export const shortDate = (d?: Date | string | null) =>
-  d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: UK_TZ }) : '—';
 
 export const longDate = (d?: Date | string | null) =>
-  d ? new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  d ? new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: UK_TZ }) : '—';
 
 export const clock = (d?: Date | string | null) =>
-  d ? new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+  d ? new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: UK_TZ }) : '';
 
 export const daysUntil = (d?: Date | string | null) => {
   if (!d) return null;
