@@ -7,6 +7,7 @@ import { getAlerts } from '@/lib/alerts';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, PageHeader, Pill } from '@/components/ui';
+import { PhotoLightbox } from '@/components/PhotoLightbox';
 
 export default async function CheckDetailPage({ params }: { params: { id: string } }) {
   const user = await requirePermission('checks.view');
@@ -63,12 +64,7 @@ export default async function CheckDetailPage({ params }: { params: { id: string
         <section className="card card-pad mb-6">
           <h2 className="text-lg font-bold mb-2">Overall notes</h2>
           {check.notes && <p className="text-sm">{check.notes}</p>}
-          {check.photo && (
-            <a href={check.photo} target="_blank" rel="noreferrer" className="inline-block mt-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={check.photo} alt="Photo attached to this check" className="h-32 w-32 rounded-xl object-cover border border-hairline hover:opacity-90" />
-            </a>
-          )}
+          {check.photo && <PhotoLightbox src={check.photo} alt="Photo attached to this check" />}
         </section>
       )}
 
