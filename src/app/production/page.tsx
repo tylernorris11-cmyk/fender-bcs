@@ -6,6 +6,7 @@ import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
 import { clock, shortDate, tonnes } from '@/lib/format';
+import { isOutOfService } from '@/lib/assets';
 import { BAR_SIZES } from '@/lib/bs8666';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, SortSelect, StagePill, Stat, StatRow, Table } from '@/components/ui';
@@ -255,7 +256,10 @@ async function CurrentJobView({ job }: { job: any }) {
   const machines = isFenderJob ? [] : await db.asset.findMany({
     where: { type: 'MACHINE', retired: false, OR: [{ company: null }, { company: job.company }] },
     orderBy: { name: 'asc' },
-    select: { id: true, name: true },
+    select: {
+      id: true, name: true,
+      checks: { orderBy: { performedAt: 'desc' }, take: 1, select: { result: true, items: { select: { critical: true, ok: true, resolved: true } } } },
+    },
   });
 
   return (
@@ -331,7 +335,14 @@ async function CurrentJobView({ job }: { job: any }) {
                 <label className="label text-xs" htmlFor="machine">Machine used</label>
                 <select id="machine" name="machine" className="input w-40">
                   <option value="">—</option>
-                  {machines.map((m) => <option key={m.id} value={m.name}>{m.name}</option>)}
+                  {machines.map((m) => {
+                    const outOfService = isOutOfService(m.checks[0]);
+                    return (
+                      <option key={m.id} value={m.name} disabled={outOfService}>
+                        {m.name}{outOfService ? ' — OUT OF SERVICE' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
@@ -395,7 +406,10 @@ async function BcsView({ orders, sort, user, company }: { orders: any[]; sort?: 
   const machines = await db.asset.findMany({
     where: { type: 'MACHINE', retired: false, OR: [{ company: null }, { company }] },
     orderBy: { name: 'asc' },
-    select: { id: true, name: true, category: true },
+    select: {
+      id: true, name: true, category: true,
+      checks: { orderBy: { performedAt: 'desc' }, take: 1, select: { result: true, items: { select: { critical: true, ok: true, resolved: true } } } },
+    },
   });
 
   const notStarted = orders.filter((o) => o.production.length === 0).length;
@@ -455,7 +469,14 @@ async function BcsView({ orders, sort, user, company }: { orders: any[]; sort?: 
                   <div>
                     <label className="label text-xs" htmlFor={`asset-${o.id}`}>Machine</label>
                     <select id={`asset-${o.id}`} name="assetId" className="input w-36 py-2">
-                      {machines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      {machines.map((m) => {
+                        const outOfService = isOutOfService(m.checks[0]);
+                        return (
+                          <option key={m.id} value={m.id} disabled={outOfService}>
+                            {m.name}{outOfService ? ' — OUT OF SERVICE' : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                   <div>

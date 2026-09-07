@@ -7,17 +7,29 @@ import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { withinTolerance } from '@/lib/bs8666';
 import { getActiveCompany, assertCompanyAccess } from '@/lib/company';
+import { isOutOfService } from '@/lib/assets';
 
 export async function logProduction(formData: FormData) {
   const user = await assertPermission('production.progress');
   const orderId = String(formData.get('orderId'));
   const barMarkId = String(formData.get('barMarkId') ?? '');
 
+  const assetId = String(formData.get('assetId') ?? '') || null;
+  if (assetId) {
+    const asset = await db.asset.findUnique({
+      where: { id: assetId },
+      include: { checks: { orderBy: { performedAt: 'desc' }, take: 1, include: { items: true } } },
+    });
+    if (asset && isOutOfService(asset.checks[0])) {
+      throw new Error(`${asset.name} is out of service — resolve the critical issue before logging work against it.`);
+    }
+  }
+
   await db.productionEvent.create({
     data: {
       orderId,
       station: String(formData.get('station')),
-      assetId: String(formData.get('assetId') ?? '') || null,
+      assetId,
       action: String(formData.get('action')),
       note: String(formData.get('note') ?? ''),
       userId: user.id,
@@ -142,6 +154,17 @@ export async function addProductionJobRow(formData: FormData) {
   if (job.userId !== user.id) throw new Error('You can only add rows to your own job.');
   if (job.finishedAt) throw new Error('This job has already finished.');
 
+  const machine = String(formData.get('machine') ?? '').trim();
+  if (machine) {
+    const asset = await db.asset.findFirst({
+      where: { name: machine, type: 'MACHINE' },
+      include: { checks: { orderBy: { performedAt: 'desc' }, take: 1, include: { items: true } } },
+    });
+    if (asset && isOutOfService(asset.checks[0])) {
+      throw new Error(`${machine} is out of service — resolve the critical issue before logging work against it.`);
+    }
+  }
+
   const diaRaw = formData.get('diaMm');
 
   await db.productionJobRow.create({
@@ -151,7 +174,7 @@ export async function addProductionJobRow(formData: FormData) {
       barMark: String(formData.get('barMark') ?? '').trim(),
       castNumber: String(formData.get('castNumber') ?? '').trim(),
       mill: String(formData.get('mill') ?? '').trim(),
-      machine: String(formData.get('machine') ?? '').trim(),
+      machine,
       steelGrade: String(formData.get('steelGrade') ?? '').trim(),
       tallyWeightKg: Number(formData.get('tallyWeightKg') || 0),
       comments: String(formData.get('comments') ?? '').trim(),
