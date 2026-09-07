@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { getActiveCompany } from '@/lib/company';
+import { isOutOfService } from '@/lib/assets';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
 import { NewCheckForm } from './NewCheckForm';
@@ -13,14 +14,16 @@ export default async function NewCheckPage({ searchParams }: { searchParams: { a
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
 
-  const assets = await db.asset.findMany({
+  const assetRows = await db.asset.findMany({
     where: { retired: false, OR: [{ company: null }, { company }] },
     orderBy: [{ type: 'asc' }, { name: 'asc' }],
     select: {
       id: true, name: true, ref: true, type: true,
-      checklistItems: { where: { active: true }, orderBy: { sortOrder: 'asc' }, select: { label: true } },
+      checklistItems: { where: { active: true }, orderBy: { sortOrder: 'asc' }, select: { label: true, critical: true } },
+      checks: { orderBy: { performedAt: 'desc' }, take: 1, select: { id: true, result: true, items: { select: { critical: true, ok: true, resolved: true } } } },
     },
   });
+  const assets = assetRows.map((a) => ({ ...a, outOfService: isOutOfService(a.checks[0]), latestCheckId: a.checks[0]?.id ?? null }));
 
   return (
     <Shell user={user} module="checks" nav={NAV.checks} current="/checks/new" alerts={alerts.length}>

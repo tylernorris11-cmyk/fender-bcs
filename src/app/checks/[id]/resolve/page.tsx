@@ -48,6 +48,7 @@ export default async function ResolveCheckPage({ params }: { params: { id: strin
                   <input type="checkbox" name={`fixed_${i.id}`} value="1" className="mt-1 h-4 w-4" />
                   <span className="flex-1">
                     <span className="font-medium">{i.label}</span>
+                    {i.critical && <span className="ml-2 text-xs font-bold text-signal uppercase tracking-wide">Critical</span>}
                     {i.note && <span className="text-ink-muted"> — {i.note}</span>}
                     <input
                       name={`note_${i.id}`}

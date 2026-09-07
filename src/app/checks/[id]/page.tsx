@@ -16,7 +16,11 @@ export default async function CheckDetailPage({ params }: { params: { id: string
 
   const check = await db.assetCheck.findUnique({
     where: { id: params.id },
-    include: { asset: true, user: true, items: { include: { resolvedBy: true } } },
+    include: {
+      asset: { include: { checks: { orderBy: { performedAt: 'desc' }, take: 1, select: { id: true } } } },
+      user: true,
+      items: { include: { resolvedBy: true } },
+    },
   });
   if (!check) notFound();
   if (check.asset.company && !user.companies.includes(check.asset.company)) notFound();
@@ -27,6 +31,7 @@ export default async function CheckDetailPage({ params }: { params: { id: string
   const needsResolving = check.result === 'FAIL' && openItems.length > 0;
   const resultLabel = check.result === 'PASS' ? 'Pass' : allFixed ? 'Resolved' : openItems.length < failedItems.length ? `${failedItems.length - openItems.length}/${failedItems.length} fixed` : 'Issue flagged';
   const resultPill = <Pill tone={check.result === 'PASS' || allFixed ? 'good' : 'bad'}>{resultLabel}</Pill>;
+  const isOutOfService = check.asset.checks[0]?.id === check.id && openItems.some((i) => i.critical);
 
   return (
     <Shell user={user} module="checks" nav={NAV.checks} current="/checks" alerts={alerts.length}>
@@ -47,6 +52,12 @@ export default async function CheckDetailPage({ params }: { params: { id: string
         )}
       />
 
+      {isOutOfService && (
+        <p className="banner-bad mb-6">
+          <strong>{check.asset.name} is out of service</strong> — a critical item below is still unresolved.
+        </p>
+      )}
+
       <section className="card card-pad mb-6">
         <h2 className="text-lg font-bold mb-4">Checklist</h2>
         <ul className="divide-y divide-hairline">
@@ -61,7 +72,10 @@ export default async function CheckDetailPage({ params }: { params: { id: string
                 {i.ok || i.resolved ? '✓' : '!'}
               </div>
               <div className="flex-1 min-w-[200px]">
-                <p className="text-sm font-medium">{i.label}</p>
+                <p className="text-sm font-medium">
+                  {i.label}
+                  {i.critical && <span className="ml-2 text-xs font-bold text-signal uppercase tracking-wide">Critical</span>}
+                </p>
                 {i.note && <p className="text-sm text-ink-muted mt-0.5">{i.note}</p>}
                 {!i.ok && !i.note && !i.resolved && <p className="text-sm text-ink-faint mt-0.5">Not confirmed — no note left.</p>}
                 {i.resolved && (

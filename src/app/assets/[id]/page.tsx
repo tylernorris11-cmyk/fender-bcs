@@ -6,7 +6,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { clock, daysUntil, shortDate } from '@/lib/format';
-import { alertWindowDays } from '@/lib/assets';
+import { alertWindowDays, isOutOfService } from '@/lib/assets';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill } from '@/components/ui';
 import { addAssetChecklistItem, addAssetNote, logInspection, removeAssetChecklistItem, retireAsset } from '../actions';
@@ -44,6 +44,9 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
   if (!asset) notFound();
   if (asset.company && !user.companies.includes(asset.company)) notFound();
 
+  const latestCheck = asset.checks[0];
+  const outOfService = isOutOfService(latestCheck);
+
   return (
     <Shell user={user} module="assets" nav={NAV.assets} current="/assets" alerts={alerts.length}>
       <Link href="/assets" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:underline mb-4">
@@ -67,6 +70,16 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
           </>
         }
       />
+
+      {outOfService && latestCheck && (
+        <p className="banner-bad mb-6">
+          <strong>Out of service</strong> — a critical item on the{' '}
+          <Link href={`/checks/${latestCheck.id}`} className="underline">last check</Link> is still unresolved.{' '}
+          {can(user, 'checks.create') && (
+            <Link href={`/checks/${latestCheck.id}/resolve`} className="underline font-semibold">Resolve it</Link>
+          )}
+        </p>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
         <section className="card card-pad">
@@ -105,7 +118,14 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
         </section>
       </div>
 
-      {can(user, 'assets.edit') && (
+      {can(user, 'assets.edit') && outOfService && (
+        <section className="card card-pad mb-6">
+          <h2 className="text-lg font-bold mb-2">Log an inspection</h2>
+          <p className="text-sm text-ink-muted">Out of service — resolve the critical issue above before logging an inspection.</p>
+        </section>
+      )}
+
+      {can(user, 'assets.edit') && !outOfService && (
         <section className="card card-pad mb-6">
           <h2 className="text-lg font-bold mb-4">Log an inspection</h2>
           <form action={logInspection} className="grid gap-4 sm:grid-cols-3">
@@ -151,7 +171,10 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
           {asset.checklistItems.map((item, i) => (
             <li key={item.id} className="py-2.5 flex items-center gap-3">
               <span className="h-6 w-6 shrink-0 rounded-full bg-brand-100 text-forest grid place-items-center text-xs font-bold">{i + 1}</span>
-              <span className="flex-1 text-sm">{item.label}</span>
+              <span className="flex-1 text-sm">
+                {item.label}
+                {item.critical && <span className="ml-2 text-xs font-bold text-signal uppercase tracking-wide">Critical</span>}
+              </span>
               {can(user, 'assets.edit') && (
                 <form action={removeAssetChecklistItem}>
                   <input type="hidden" name="itemId" value={item.id} />
@@ -163,9 +186,13 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
           {asset.checklistItems.length === 0 && <li className="py-2.5 text-ink-muted text-sm">Nothing on the checklist yet.</li>}
         </ol>
         {can(user, 'assets.edit') && (
-          <form action={addAssetChecklistItem} className="flex gap-2">
+          <form action={addAssetChecklistItem} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="assetId" value={asset.id} />
-            <input name="label" required className="input flex-1" placeholder="e.g. Tail lift operation" aria-label="New checklist item" />
+            <input name="label" required className="input flex-1 min-w-[200px]" placeholder="e.g. Tail lift operation" aria-label="New checklist item" />
+            <label className="flex items-center gap-1.5 text-sm text-ink-muted whitespace-nowrap">
+              <input type="checkbox" name="critical" value="1" className="h-4 w-4" />
+              Critical
+            </label>
             <button className="btn-primary">Add item</button>
           </form>
         )}

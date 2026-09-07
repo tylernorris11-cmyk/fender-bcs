@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
+import { isOutOfService } from '@/lib/assets';
 
 /** Read the repeating checklist-item rows out of the check form. */
 function rows(formData: FormData, prefix: string): Record<string, string>[] {
@@ -22,6 +23,11 @@ export async function logAssetCheck(formData: FormData) {
   const assetId = String(formData.get('assetId') ?? '');
   if (!assetId) throw new Error('Choose an asset before saving.');
 
+  const latestCheck = await db.assetCheck.findFirst({ where: { assetId }, orderBy: { performedAt: 'desc' }, include: { items: true } });
+  if (isOutOfService(latestCheck)) {
+    throw new Error('This asset is out of service — resolve the critical issue before running a new check.');
+  }
+
   const itemRows = rows(formData, 'item').filter((r) => r.label);
   const allOk = itemRows.every((r) => r.ok === '1');
 
@@ -33,7 +39,7 @@ export async function logAssetCheck(formData: FormData) {
       notes: String(formData.get('notes') ?? ''),
       photo: String(formData.get('photo') ?? '') || null,
       items: {
-        create: itemRows.map((r) => ({ label: r.label, ok: r.ok === '1', note: r.note ?? '' })),
+        create: itemRows.map((r) => ({ label: r.label, ok: r.ok === '1', note: r.note ?? '', critical: r.critical === '1' })),
       },
     },
   });

@@ -1,12 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Camera, X } from 'lucide-react';
 import type { AssetType } from '@prisma/client';
 import { resizeImageToDataUrl } from '@/lib/image';
 import { logAssetCheck, reportAssetIssue } from '../actions';
 
-type Asset = { id: string; name: string; ref: string; type: AssetType; checklistItems: { label: string }[] };
+type Asset = {
+  id: string; name: string; ref: string; type: AssetType;
+  checklistItems: { label: string; critical: boolean }[];
+  outOfService: boolean; latestCheckId: string | null;
+};
 
 export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; initialAssetId?: string }) {
   const [assetId, setAssetId] = useState(initialAssetId && assets.some((a) => a.id === initialAssetId) ? initialAssetId : assets[0]?.id ?? '');
@@ -28,7 +33,7 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
   }
 
   const asset = assets.find((a) => a.id === assetId);
-  const items = asset ? asset.checklistItems.map((i) => i.label) : [];
+  const items = asset ? asset.checklistItems : [];
   const vehicles = assets.filter((a) => a.type === 'VEHICLE');
   const machines = assets.filter((a) => a.type === 'MACHINE');
 
@@ -40,16 +45,28 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
                 onChange={(e) => setAssetId(e.target.value)} className="input max-w-md">
           {vehicles.length > 0 && (
             <optgroup label="Vehicles">
-              {vehicles.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.ref})</option>)}
+              {vehicles.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.ref}){a.outOfService ? ' — OUT OF SERVICE' : ''}</option>)}
             </optgroup>
           )}
           {machines.length > 0 && (
             <optgroup label="Machines">
-              {machines.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.ref})</option>)}
+              {machines.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.ref}){a.outOfService ? ' — OUT OF SERVICE' : ''}</option>)}
             </optgroup>
           )}
         </select>
       </section>
+
+      {asset?.outOfService && (
+        <section className="card card-pad border-2 border-signal">
+          <h2 className="text-lg font-bold mb-1 text-signal">{asset.name} is out of service</h2>
+          <p className="text-sm">
+            A critical item on the last check is still unresolved. Resolve it before a new check can be logged for this asset.
+          </p>
+          {asset.latestCheckId && (
+            <Link href={`/checks/${asset.latestCheckId}/resolve`} className="btn-secondary mt-3 inline-flex">Go to resolve it</Link>
+          )}
+        </section>
+      )}
 
       <section className="card card-pad border-2 border-signal/30">
         <h2 className="text-lg font-bold mb-1">Report an issue</h2>
@@ -69,19 +86,20 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
 
       <form action={logAssetCheck} className="space-y-6">
       <input type="hidden" name="assetId" value={assetId} />
-      {asset && (
+      {asset && !asset.outOfService && (
         <section className="card card-pad">
           <h2 className="text-lg font-bold mb-1">Checklist</h2>
           <p className="text-sm text-ink-muted mb-4">
             Nothing is ticked yet — go through each one and confirm it&apos;s OK. Leave anything you can&apos;t confirm unticked and add a note.
           </p>
           <ul className="space-y-2">
-            {items.map((label, i) => {
+            {items.map(({ label, critical }, i) => {
               const ok = oks[label] ?? false;
               return (
                 <li key={label} className="flex flex-wrap items-center gap-3 bg-canvas rounded-xl p-3">
                   <input type="hidden" name={`item[${i}][label]`} value={label} />
                   <input type="hidden" name={`item[${i}][ok]`} value={ok ? '1' : '0'} />
+                  <input type="hidden" name={`item[${i}][critical]`} value={critical ? '1' : '0'} />
                   <button
                     type="button"
                     onClick={() => setOks((p) => ({ ...p, [label]: !ok }))}
@@ -93,7 +111,10 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
                   >
                     {ok ? '✓' : ''}
                   </button>
-                  <span className="flex-1 text-sm font-medium">{label}</span>
+                  <span className="flex-1 text-sm font-medium">
+                    {label}
+                    {critical && <span className="ml-2 text-xs font-bold text-signal uppercase tracking-wide">Critical</span>}
+                  </span>
                   {!ok && (
                     <input
                       name={`item[${i}][note]`}
@@ -109,6 +130,7 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
         </section>
       )}
 
+      {asset && !asset.outOfService && (
       <section className="card card-pad">
         <label className="label" htmlFor="notes">Overall notes</label>
         <textarea id="notes" name="notes" rows={2} className="input" placeholder="Anything else worth recording" />
@@ -140,8 +162,9 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
           <p className="text-xs text-ink-faint">If there's a problem, a photo helps whoever picks this up next.</p>
         </div>
 
-        <button type="submit" className="btn-primary mt-4" disabled={!asset}>Save check</button>
+        <button type="submit" className="btn-primary mt-4" disabled={!asset || asset.outOfService}>Save check</button>
       </section>
+      )}
       </form>
     </div>
   );

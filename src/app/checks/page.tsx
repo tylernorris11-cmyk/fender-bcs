@@ -7,6 +7,7 @@ import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
+import { isOutOfService } from '@/lib/assets';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, Empty, PageHeader, Pill, SortTh, Stat, StatRow, Table } from '@/components/ui';
 import { resolveAssetIssue } from './actions';
@@ -41,7 +42,10 @@ export default async function ChecksPage({
       orderBy,
       take: 200,
     }),
-    db.asset.findMany({ where: { retired: false, OR: [{ company: null }, { company }] } }),
+    db.asset.findMany({
+      where: { retired: false, OR: [{ company: null }, { company }] },
+      include: { checks: { orderBy: { performedAt: 'desc' }, take: 1, select: { items: { select: { critical: true, ok: true, resolved: true } }, result: true } } },
+    }),
     db.assetCheck.findMany({ where: { performedAt: { gte: startOfToday } }, select: { assetId: true } }),
     db.assetIssue.findMany({
       where: { resolved: false, asset: { OR: [{ company: null }, { company }] } },
@@ -52,6 +56,7 @@ export default async function ChecksPage({
 
   const checkedToday = new Set(checkedTodayIds.map((c) => c.assetId));
   const notCheckedToday = activeAssets.filter((a) => !checkedToday.has(a.id));
+  const outOfServiceAssets = activeAssets.filter((a) => isOutOfService(a.checks[0]));
 
   return (
     <Shell user={user} module="checks" nav={NAV.checks} current="/checks" alerts={alerts.length}>
@@ -68,9 +73,22 @@ export default async function ChecksPage({
       <StatRow>
         <Stat value={activeAssets.length - notCheckedToday.length} label="Checked today" tone="good" />
         <Stat value={notCheckedToday.length} label="Not checked today" tone={notCheckedToday.length ? 'warn' : 'default'} />
+        <Stat value={outOfServiceAssets.length} label="Out of service" tone={outOfServiceAssets.length ? 'bad' : 'default'} />
         <Stat value={openIssues.length} label="Open issues" tone={openIssues.length ? 'bad' : 'default'} />
         <Stat value={activeAssets.length} label="Active assets" href="/assets" />
       </StatRow>
+
+      {outOfServiceAssets.length > 0 && (
+        <div className="banner-bad mb-6">
+          <strong>{outOfServiceAssets.length} {outOfServiceAssets.length === 1 ? 'asset is' : 'assets are'} out of service.</strong>{' '}
+          {outOfServiceAssets.map((a, i) => (
+            <span key={a.id}>
+              <Link href={`/assets/${a.id}`} className="underline">{a.name}</Link>
+              {i < outOfServiceAssets.length - 1 ? ', ' : ''}
+            </span>
+          ))}
+        </div>
+      )}
 
       {openIssues.length > 0 && (
         <section className="card card-pad mb-6 border-2 border-signal/30">
@@ -163,7 +181,8 @@ export default async function ChecksPage({
                 </td>
                 <td className="td text-ink-muted">
                   <span className="inline-flex items-center gap-1.5">
-                    {c.items.filter((i) => !i.ok).map((i) => i.label).join(', ') || c.notes || '—'}
+                    {failed.map((i) => i.label).join(', ') || c.notes || '—'}
+                    {failed.some((i) => i.critical) && <span className="text-xs font-bold text-signal uppercase tracking-wide">Critical</span>}
                     {c.photo && <Camera size={13} className="text-ink-faint shrink-0" aria-label="Has a photo attached" />}
                   </span>
                 </td>

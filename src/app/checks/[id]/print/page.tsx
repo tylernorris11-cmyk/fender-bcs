@@ -64,7 +64,7 @@ export default async function CheckPrint({ params }: { params: { id: string } })
           {check.items.map((i) => (
             <tr key={i.id} className="border-b border-black/10">
               <td className="py-2 text-center">{i.ok || i.resolved ? '✓' : '✕'}</td>
-              <td className="py-2">{i.label}</td>
+              <td className="py-2">{i.label}{i.critical ? ' (Critical)' : ''}</td>
               <td className="py-2 text-ink-muted">
                 {i.resolved
                   ? `Fixed — ${i.resolutionNote || 'no note'} (${i.resolvedBy?.name ?? 'Unknown'}${i.resolvedAt ? `, ${shortDate(i.resolvedAt)}` : ''})`

@@ -4,7 +4,7 @@ import { db } from './db';
 import { daysUntil } from './format';
 import { can, type SessionUser } from './rbac';
 import { getActiveCompany } from './company';
-import { alertWindowDays, type StatutoryCheck } from './assets';
+import { alertWindowDays, isOutOfService, type StatutoryCheck } from './assets';
 
 export type Alert = {
   id: string;
@@ -37,7 +37,10 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
     db.ncr.findMany({ where: { company, status: 'OPEN' }, orderBy: { raisedAt: 'asc' } }),
     db.batch.findMany({ where: { company, status: 'Quarantined' }, include: { product: true, supplier: true } }),
     db.supplier.findMany({ where: { company, blocked: false }, include: { certificates: true, batches: { take: 1 } } }),
-    db.asset.findMany({ where: { retired: false, OR: [{ company: null }, { company }] } }),
+    db.asset.findMany({
+      where: { retired: false, OR: [{ company: null }, { company }] },
+      include: { checks: { orderBy: { performedAt: 'desc' }, take: 1, select: { items: { select: { critical: true, ok: true, resolved: true } }, result: true } } },
+    }),
     db.customer.findMany({ where: { company }, include: { orders: { where: { paymentStatus: 'UNPAID', stage: { notIn: ['CANCELLED'] } } } } }),
     db.order.count({ where: { company, stage: 'PENDING_APPROVAL', archived: false } }),
     db.batch.count({ where: { company, millCertUrl: '', status: { not: 'Rejected' } } }),
@@ -53,6 +56,18 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
       detail: 'From the login page — review who is asking and what they need.',
       href: '/setup/access-requests',
       perm: 'setup.users',
+    });
+  }
+
+  for (const a of assets) {
+    if (!isOutOfService(a.checks[0])) continue;
+    out.push({
+      id: `out-of-service-${a.id}`,
+      severity: 'bad',
+      title: `${a.name} is out of service`,
+      detail: 'A critical item on its last check is still unresolved.',
+      href: `/assets/${a.id}`,
+      perm: 'assets.view',
     });
   }
 

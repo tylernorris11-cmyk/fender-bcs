@@ -782,6 +782,7 @@ model AssetChecklistItem {
   label     String
   sortOrder Int     @default(0)
   active    Boolean @default(true)
+  critical  Boolean @default(false) // a fail here takes the asset out of service until resolved
 
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
@@ -837,6 +838,7 @@ model AssetCheckItem {
   label          String
   ok             Boolean   @default(true)
   note           String    @default("")
+  critical       Boolean   @default(false) // snapshot of AssetChecklistItem.critical at the time this check was run
   resolved       Boolean   @default(false)
   resolvedById   String?
   resolvedAt     DateTime?

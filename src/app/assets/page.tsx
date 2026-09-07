@@ -7,7 +7,7 @@ import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
 import { daysUntil, shortDate } from '@/lib/format';
-import { alertWindowDays, type StatutoryCheck } from '@/lib/assets';
+import { alertWindowDays, isOutOfService, type StatutoryCheck } from '@/lib/assets';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, SortSelect, Stat, StatRow } from '@/components/ui';
 
@@ -46,6 +46,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
       ] }] } : {}),
     },
     orderBy: searchParams.sort === 'name' ? { name: 'asc' } : searchParams.sort === 'category' ? { category: 'asc' } : { ref: 'asc' },
+    include: { checks: { orderBy: { performedAt: 'desc' }, take: 1, select: { items: { select: { critical: true, ok: true, resolved: true } }, result: true } } },
   });
 
   const dueDates = (a: (typeof assets)[number]) => [a.motDue, a.taxDue, a.weeklyCheckDue, a.puwerDue, a.lolerDue, a.serviceDue, a.calibrationDue].filter(Boolean) as Date[];
@@ -57,7 +58,11 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
     });
   }
 
-  const all = await db.asset.findMany({ where: { retired: false, OR: [{ company: null }, { company }] } });
+  const all = await db.asset.findMany({
+    where: { retired: false, OR: [{ company: null }, { company }] },
+    include: { checks: { orderBy: { performedAt: 'desc' }, take: 1, select: { items: { select: { critical: true, ok: true, resolved: true } }, result: true } } },
+  });
+  const outOfServiceCount = all.filter((a) => isOutOfService(a.checks[0])).length;
   const checksFor = (a: typeof all[number]): [StatutoryCheck, Date | null][] => [
     ['MOT', a.motDue], ['Road tax', a.taxDue], ['Safety inspection', a.weeklyCheckDue],
     ['PUWER inspection', a.puwerDue], ['LOLER exam', a.lolerDue], ['Service', a.serviceDue],
@@ -85,6 +90,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
       <StatRow>
         <Stat value={all.filter((a) => a.type === 'VEHICLE').length} label="Vehicles" href="/assets?type=VEHICLE" />
         <Stat value={all.filter((a) => a.type === 'MACHINE').length} label="Machinery" href="/assets?type=MACHINE" />
+        <Stat value={outOfServiceCount} label="Out of service" tone={outOfServiceCount ? 'bad' : 'default'} />
         <Stat value={overdue} label="Checks overdue" tone={overdue ? 'bad' : 'default'} />
         <Stat value={soon} label="Due soon" tone={soon ? 'warn' : 'default'} />
       </StatRow>
@@ -110,7 +116,10 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
           {assets.map((a) => (
             <Link key={a.id} href={`/assets/${a.id}`} className="flex flex-wrap items-center gap-4 px-4 py-2.5 border-b border-hairline last:border-0 hover:bg-canvas transition-colors">
               <div className="min-w-[190px]">
-                <p className="font-bold">{a.name}</p>
+                <p className="font-bold flex items-center gap-2">
+                  {a.name}
+                  {isOutOfService(a.checks[0]) && <Pill tone="bad">Out of service</Pill>}
+                </p>
                 <p className="text-xs text-ink-faint">{a.ref} · {a.category} · {a.depot}</p>
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm flex-1">

@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { canAccessCompany } from '@/lib/company';
 import { defaultCheckItems } from '@/lib/checks';
+import { isOutOfService } from '@/lib/assets';
 
 async function nextAssetRef(type: AssetType) {
   const prefix = type === 'VEHICLE' ? 'VH' : 'MC';
@@ -70,8 +71,9 @@ export async function addAssetChecklistItem(formData: FormData) {
   const assetId = String(formData.get('assetId'));
   const label = String(formData.get('label') ?? '').trim();
   if (!label) return;
+  const critical = formData.get('critical') === '1';
   const count = await db.assetChecklistItem.count({ where: { assetId } });
-  await db.assetChecklistItem.create({ data: { assetId, label, sortOrder: count } });
+  await db.assetChecklistItem.create({ data: { assetId, label, sortOrder: count, critical } });
   revalidatePath(`/assets/${assetId}`);
 }
 
@@ -91,6 +93,12 @@ export async function removeAssetChecklistItem(formData: FormData) {
 export async function logInspection(formData: FormData) {
   const user = await assertPermission('assets.edit');
   const assetId = String(formData.get('assetId'));
+
+  const latestCheck = await db.assetCheck.findFirst({ where: { assetId }, orderBy: { performedAt: 'desc' }, include: { items: true } });
+  if (isOutOfService(latestCheck)) {
+    throw new Error('This asset is out of service — resolve the critical issue before logging an inspection.');
+  }
+
   const kind = String(formData.get('kind'));
   const performedOn = new Date(String(formData.get('performedOn')));
   const nextDueOn = formData.get('nextDueOn') ? new Date(String(formData.get('nextDueOn'))) : null;
