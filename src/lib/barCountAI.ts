@@ -21,10 +21,16 @@ export async function estimateBarCount({
     {
       type: 'text',
       text: [
-        'This is a photo of the cut end of a bundle of steel reinforcement bars, taken',
-        'end-on. Count how many individual bar ends are visible in the bundle. Reply',
-        'with nothing but a JSON object of the form {"count": <integer>} — your best',
-        'single estimate of the total, not a range. No other text, no markdown.',
+        'This is a photo of the cut end of a bundle of steel reinforcement bar (rebar),',
+        'taken end-on. Each bar end is a round, roughly circular cross-section, and',
+        'every bar in this one bundle is the same diameter as every other — use that',
+        'to help tell neighbouring bar ends apart where they touch or overlap, and as',
+        'a sanity check on your final count. The bars are packed tightly together,',
+        'typically in a rough hexagonal/circular pattern, banded as one bundle. Ignore',
+        'the strapping bands, pallet, floor and anything else in the background —',
+        'count only the round bar-end faces. Reply with nothing but a JSON object of',
+        'the form {"count": <integer>} — your best single estimate of the total, not',
+        'a range. No other text, no markdown.',
       ].join(' '),
     },
   ];
