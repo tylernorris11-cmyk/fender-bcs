@@ -5,11 +5,11 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
-import { shortDate, tonnes } from '@/lib/format';
+import { clock, shortDate, tonnes } from '@/lib/format';
 import { BAR_SIZES } from '@/lib/bs8666';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, SortSelect, StagePill, Stat, StatRow, Table } from '@/components/ui';
-import { logProduction, startProductionJob, finishProductionJob, addProductionJobRow } from './actions';
+import { logProduction, startProductionJob, finishProductionJob, partFinishProductionJob, addProductionJobRow } from './actions';
 import { CastNumberField } from './CastNumberField';
 
 const PROCESS_LABEL: Record<string, string> = { CUTTING: 'Cutting', BENDING: 'Bending', STEMA: 'Stema' };
@@ -31,6 +31,16 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
     where: { company, finishedAt: { not: null } },
     include: { user: true, rows: true },
     orderBy: { finishedAt: 'desc' },
+    take: 20,
+  });
+
+  const inProgressJobs = await db.productionJob.findMany({
+    where: {
+      company, finishedAt: null, lastPartFinishedAt: { not: null },
+      ...(activeJob ? { id: { not: activeJob.id } } : {}),
+    },
+    include: { user: true, rows: true },
+    orderBy: { lastPartFinishedAt: 'desc' },
     take: 20,
   });
 
@@ -59,8 +69,41 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
         <BcsView orders={orders} sort={searchParams.sort} user={user} company={company} />
       )}
 
+      <InProgressJobs jobs={inProgressJobs} isFender={isFender} />
       <RecentJobs jobs={finishedJobs} isFender={isFender} />
     </Shell>
+  );
+}
+
+function InProgressJobs({ jobs, isFender }: { jobs: any[]; isFender: boolean }) {
+  if (jobs.length === 0) return null;
+  return (
+    <section className="card card-pad mt-6">
+      <h2 className="text-lg font-bold mb-1">In progress</h2>
+      <p className="text-sm text-ink-muted mb-4">Finished for the day but not the whole job — still open, carries on when it's picked back up.</p>
+      <Table head={<>
+        <th className="th">Job</th><th className="th">{isFender ? 'Process' : 'Rows'}</th>
+        <th className="th">Weight so far</th><th className="th">Last worked</th><th className="th">By</th><th className="th sr-only">Print</th>
+      </>}>
+        {jobs.map((j) => {
+          const weight = j.rows.reduce((s: number, r: any) => s + Number(r.tallyWeightKg), 0);
+          return (
+            <tr key={j.id} className="row">
+              <td className="td font-semibold">{j.jobNumber}</td>
+              <td className="td">{isFender ? PROCESS_LABEL[j.process] : `${j.rows.length} row${j.rows.length === 1 ? '' : 's'}`}</td>
+              <td className="td">{tonnes(weight)}</td>
+              <td className="td text-ink-muted whitespace-nowrap">{shortDate(j.lastPartFinishedAt)} {clock(j.lastPartFinishedAt)}</td>
+              <td className="td text-ink-muted">{j.user?.name ?? '—'}</td>
+              <td className="td text-right">
+                <a href={`/production/jobs/${j.id}/print`} className="btn-secondary btn-sm">
+                  <Printer size={14} /> Print
+                </a>
+              </td>
+            </tr>
+          );
+        })}
+      </Table>
+    </section>
   );
 }
 
@@ -222,12 +265,24 @@ async function CurrentJobView({ job }: { job: any }) {
             : `Fence post cutting${job.order ? ` · linked to order ${job.order.number}` : ''}`
         }
         actions={(
-          <form action={finishProductionJob}>
-            <input type="hidden" name="jobId" value={job.id} />
-            <button className="btn-secondary btn-sm">Finish job</button>
-          </form>
+          <>
+            <form action={partFinishProductionJob}>
+              <input type="hidden" name="jobId" value={job.id} />
+              <button className="btn-secondary btn-sm" title="Not done yet — just counts today's tally and keeps the job open for next time">Finish for today</button>
+            </form>
+            <form action={finishProductionJob}>
+              <input type="hidden" name="jobId" value={job.id} />
+              <button className="btn-primary btn-sm">Finish job</button>
+            </form>
+          </>
         )}
       />
+
+      {job.lastPartFinishedAt && (
+        <p className="banner-warn mb-6">
+          Marked finished for the day at {clock(job.lastPartFinishedAt)} on {shortDate(job.lastPartFinishedAt)} — today&apos;s tally is counted and visible to everyone on the &ldquo;In progress&rdquo; list, but the job&apos;s still open, ready to carry on.
+        </p>
+      )}
 
       <StatRow>
         <Stat value={job.rows.length} label="Rows logged" />

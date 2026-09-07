@@ -540,14 +540,15 @@ enum ProductionProcess {
 }
 
 model ProductionJob {
-  id         String            @id @default(cuid())
-  company    Company           @default(FENDER)
-  jobNumber  String
-  process    ProductionProcess
-  orderId    String? // best-effort match against Order.number — never required, never blocks starting
-  userId     String
-  startedAt  DateTime          @default(now())
-  finishedAt DateTime?
+  id                 String            @id @default(cuid())
+  company            Company           @default(FENDER)
+  jobNumber          String
+  process            ProductionProcess
+  orderId            String? // best-effort match against Order.number — never required, never blocks starting
+  userId             String
+  startedAt          DateTime          @default(now())
+  finishedAt         DateTime?
+  lastPartFinishedAt DateTime? // "Finish for today" — a big job can span more than one day; this marks today's tally as counted without closing the job out, so it stops sitting invisible until the whole thing is eventually finished
 
   order Order?             @relation(fields: [orderId], references: [id])
   user  User               @relation(fields: [userId], references: [id])

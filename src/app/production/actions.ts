@@ -117,6 +117,25 @@ export async function finishProductionJob(formData: FormData) {
   revalidatePath('/production');
 }
 
+/**
+ * A big job (e.g. a 28-tonne run) can take more than one day. "Finish job"
+ * is the only real end — this just marks today's tally as counted, so it
+ * shows up on the Production board straight away instead of sitting
+ * invisible until the whole job is eventually finished. The job stays open:
+ * rows can keep being added tomorrow, picking up where they left off.
+ */
+export async function partFinishProductionJob(formData: FormData) {
+  const user = await assertPermission('production.progress');
+  const jobId = String(formData.get('jobId'));
+  const job = await db.productionJob.findUniqueOrThrow({ where: { id: jobId } });
+  if (job.userId !== user.id) throw new Error('You can only part-finish your own job.');
+  if (job.finishedAt) return;
+
+  await db.productionJob.update({ where: { id: jobId }, data: { lastPartFinishedAt: new Date() } });
+  await logActivity('ProductionJob', jobId, 'Part-finished for the day', job.jobNumber, user.id);
+  revalidatePath('/production');
+}
+
 export async function addProductionJobRow(formData: FormData) {
   const user = await assertPermission('production.progress');
   const jobId = String(formData.get('jobId'));
