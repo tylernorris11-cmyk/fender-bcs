@@ -4,16 +4,36 @@ import { PNG } from 'pngjs';
 
 export type DetectedCircle = { x: number; y: number; r: number }; // all 0–1, normalized by width (r too, so it never distorts into an ellipse)
 
-// Starting points only — real tuning needs real yard photos (lighting,
-// bar-end contrast, how tightly the bundle is packed). Proven against a
-// synthetic test image in dev; see the Bar Counter plan's verification
-// section for what's still deferred.
+// Retuned against a real, densely packed yard photo (rust texture, tightly
+// touching ends, dark grading marks across several faces) after the
+// original starting values — proven only against a clean synthetic test
+// image — turned out to over-detect by roughly 4x on a real bundle (921 vs.
+// a plausible ballpark in the 150-250 range for that same frame). Still a
+// starting point, not a verified-accurate result — a real photo has no
+// ground-truth count to tune against precisely, and this will keep needing
+// adjustment as more real corrections come in (see the Bar Counter plan's
+// note on retuning from logged corrections).
 const DP = 1;
+const BLUR_KERNEL = 7; // was 5 — a touch more smoothing to suppress rust/dirt texture noise
 const PARAM1 = 50; // Canny high threshold
-const PARAM2 = 15; // accumulator threshold — lower finds more circles, incl. more false positives
-const MIN_DIST_FRACTION = 0.03; // min gap between circle centers, as a fraction of the smaller image dimension
-const MIN_RADIUS_FRACTION = 0.01;
-const MAX_RADIUS_FRACTION = 0.08;
+const PARAM2 = 25; // accumulator threshold — was 15; too permissive on a busy real photo, picking up rust/texture as false circles
+const MIN_DIST_FRACTION = 0.035; // min gap between circle centers, as a fraction of the smaller image dimension
+const MIN_RADIUS_FRACTION = 0.012;
+const MAX_RADIUS_FRACTION = 0.07;
+
+// HoughCircles' cost blows up with edge count × radius search range — fine
+// on a clean synthetic test image, but a real yard photo (rust texture,
+// hundreds of tightly packed ends, dirt) has vastly more edge pixels and
+// can hang for minutes at full upload resolution (confirmed against a real
+// photo: a 2200px-wide bundle-end photo never returned inside several
+// minutes). Hough only needs enough resolution to tell circles apart, not
+// upload resolution, so run it on a smaller working copy — circle
+// coordinates come out already normalized (0–1), so no rescaling back up
+// is needed.
+const DETECTION_MAX_DIM = 1000;
+// Absolute backstop in case some other photo is still slow even at that
+// size — fail with a clear error instead of hanging the request forever.
+const DETECTION_TIMEOUT_MS = 20_000;
 
 let cvReady: Promise<typeof import('@techstark/opencv-js')> | null = null;
 
@@ -50,44 +70,62 @@ function decodeToRgba(bytes: Buffer, mimeType: string): { data: Uint8Array; widt
   throw new Error(`Unsupported image type for detection: ${mimeType}. Upload a JPEG or PNG.`);
 }
 
+async function runDetection(bytes: Buffer, mimeType: string): Promise<{ circles: DetectedCircle[]; width: number; height: number }> {
+  const { data, width, height } = decodeToRgba(bytes, mimeType);
+  const cv = await getCv();
+
+  const mat = new cv.Mat(height, width, cv.CV_8UC4);
+  mat.data.set(data);
+
+  // Downscale the working copy for Hough — see DETECTION_MAX_DIM's comment.
+  // Coordinates come out already normalized against whatever size Hough
+  // actually ran on, so this needs no rescaling back to the original.
+  const scale = Math.min(1, DETECTION_MAX_DIM / Math.max(width, height));
+  const workW = Math.max(1, Math.round(width * scale));
+  const workH = Math.max(1, Math.round(height * scale));
+  const resized = scale < 1 ? new cv.Mat() : null;
+  if (resized) cv.resize(mat, resized, new cv.Size(workW, workH), 0, 0, cv.INTER_AREA);
+  const working = resized ?? mat;
+
+  const gray = new cv.Mat();
+  const blurred = new cv.Mat();
+  const detected = new cv.Mat();
+  try {
+    cv.cvtColor(working, gray, cv.COLOR_RGBA2GRAY);
+    cv.medianBlur(gray, blurred, BLUR_KERNEL);
+
+    const minDim = Math.min(workW, workH);
+    cv.HoughCircles(
+      blurred, detected, cv.HOUGH_GRADIENT,
+      DP,
+      Math.max(1, Math.round(minDim * MIN_DIST_FRACTION)),
+      PARAM1,
+      PARAM2,
+      Math.max(1, Math.round(minDim * MIN_RADIUS_FRACTION)),
+      Math.max(2, Math.round(minDim * MAX_RADIUS_FRACTION)),
+    );
+
+    const circles: DetectedCircle[] = [];
+    for (let i = 0; i < detected.cols; i++) {
+      const x = detected.data32F[i * 3];
+      const y = detected.data32F[i * 3 + 1];
+      const r = detected.data32F[i * 3 + 2];
+      circles.push({ x: x / workW, y: y / workH, r: r / workW });
+    }
+    return { circles, width, height };
+  } finally {
+    mat.delete(); resized?.delete(); gray.delete(); blurred.delete(); detected.delete();
+  }
+}
+
 export async function detectBarCircles(
   bytes: Buffer, mimeType: string,
 ): Promise<{ circles: DetectedCircle[]; width: number; height: number; error?: string }> {
   try {
-    const { data, width, height } = decodeToRgba(bytes, mimeType);
-    const cv = await getCv();
-
-    const mat = new cv.Mat(height, width, cv.CV_8UC4);
-    mat.data.set(data);
-    const gray = new cv.Mat();
-    const blurred = new cv.Mat();
-    const detected = new cv.Mat();
-    try {
-      cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
-      cv.medianBlur(gray, blurred, 5);
-
-      const minDim = Math.min(width, height);
-      cv.HoughCircles(
-        blurred, detected, cv.HOUGH_GRADIENT,
-        DP,
-        Math.max(1, Math.round(minDim * MIN_DIST_FRACTION)),
-        PARAM1,
-        PARAM2,
-        Math.max(1, Math.round(minDim * MIN_RADIUS_FRACTION)),
-        Math.max(2, Math.round(minDim * MAX_RADIUS_FRACTION)),
-      );
-
-      const circles: DetectedCircle[] = [];
-      for (let i = 0; i < detected.cols; i++) {
-        const x = detected.data32F[i * 3];
-        const y = detected.data32F[i * 3 + 1];
-        const r = detected.data32F[i * 3 + 2];
-        circles.push({ x: x / width, y: y / height, r: r / width });
-      }
-      return { circles, width, height };
-    } finally {
-      mat.delete(); gray.delete(); blurred.delete(); detected.delete();
-    }
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Detection took too long on this photo — try Both/AI estimate, or crop closer to the bundle end and retake it.')), DETECTION_TIMEOUT_MS);
+    });
+    return await Promise.race([runDetection(bytes, mimeType), timeout]);
   } catch (err) {
     return { circles: [], width: 0, height: 0, error: err instanceof Error ? err.message : 'Unknown error detecting circles.' };
   }
