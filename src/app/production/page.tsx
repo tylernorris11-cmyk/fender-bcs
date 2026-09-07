@@ -20,9 +20,12 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
   const company = getActiveCompany(user);
   const isFender = company === 'FENDER';
 
-  const activeJob = await db.productionJob.findFirst({
-    where: { userId: user.id, finishedAt: null },
+  // A worker can have more than one job open at once — several machines
+  // running in parallel — so this is every open job of theirs, not just one.
+  const activeJobs = await db.productionJob.findMany({
+    where: { userId: user.id, company, finishedAt: null },
     include: { rows: { orderBy: { sortOrder: 'asc' } }, order: true },
+    orderBy: { startedAt: 'asc' },
   });
 
   const openOtherWork = await db.otherWorkTask.count({ where: { company, status: 'Open' } });
@@ -34,17 +37,18 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
     take: 20,
   });
 
+  const activeJobIds = activeJobs.map((j) => j.id);
   const inProgressJobs = await db.productionJob.findMany({
     where: {
       company, finishedAt: null, lastPartFinishedAt: { not: null },
-      ...(activeJob ? { id: { not: activeJob.id } } : {}),
+      ...(activeJobIds.length > 0 ? { id: { notIn: activeJobIds } } : {}),
     },
     include: { user: true, rows: true },
     orderBy: { lastPartFinishedAt: 'desc' },
     take: 20,
   });
 
-  const orders = activeJob ? [] : await db.order.findMany({
+  const orders = await db.order.findMany({
     where: { company, archived: false, stage: { in: ['APPROVED', 'IN_PRODUCTION', 'READY_FOR_DELIVERY'] } },
     include: {
       customer: true,
@@ -61,9 +65,8 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
   return (
     <Shell user={user} module="production" nav={NAV.production} current="/production" alerts={alerts.length}>
       <OtherWorkCallout openCount={openOtherWork} />
-      {activeJob ? (
-        <CurrentJobView job={activeJob} />
-      ) : isFender ? (
+      {activeJobs.map((job) => <CurrentJobView key={job.id} job={job} />)}
+      {isFender ? (
         <FenderView orders={orders} sort={searchParams.sort} user={user} />
       ) : (
         <BcsView orders={orders} sort={searchParams.sort} user={user} company={company} />

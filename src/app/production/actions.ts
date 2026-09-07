@@ -89,11 +89,10 @@ export async function startProductionJob(formData: FormData) {
     if (!PROCESSES.includes(process)) throw new Error('Choose cutting, bending or Stema.');
   }
 
-  const existing = await db.productionJob.findFirst({ where: { userId: user.id, finishedAt: null } });
-  if (existing) {
-    revalidatePath('/production');
-    return;
-  }
+  // A worker can run more than one job at once (several machines in
+  // parallel) — only stop them opening the exact same job number twice.
+  const duplicate = await db.productionJob.findFirst({ where: { userId: user.id, company, jobNumber, finishedAt: null } });
+  if (duplicate) throw new Error(`You already have job ${jobNumber} open.`);
 
   const matchedOrder = await db.order.findFirst({ where: { company, number: jobNumber } });
 
