@@ -6,11 +6,14 @@ import type { AssetType } from '@prisma/client';
  * LOLER/PUWER daily-check sheet if one already exists.
  */
 export const VEHICLE_CHECK_ITEMS = [
+  'Fit to drive (fatigue, alcohol, medication)',
   'Tyres — condition and pressure',
   'Lights, indicators and beacon',
   'Mirrors and windscreen',
   'Brakes',
   'Fluid levels (oil, water, screenwash)',
+  'AdBlue level (if applicable)',
+  'Enough fuel for the journey',
   'Load securing equipment (straps, chains, headboard)',
   'Wheel nuts',
   'Reversing alarm / camera',

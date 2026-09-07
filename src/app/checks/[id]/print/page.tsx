@@ -48,6 +48,7 @@ export default async function CheckPrint({ params }: { params: { id: string } })
           <h1 className="text-xl font-bold">Pre-use check</h1>
           <p className="font-semibold">{check.asset.name} · {check.asset.ref}</p>
           <p>{shortDate(check.performedAt)} {clock(check.performedAt)}</p>
+          {check.mileage != null && <p>{check.mileage.toLocaleString('en-GB')} miles</p>}
           <p className="font-bold" style={{ color: check.result === 'PASS' || allFixed ? 'rgb(13,74,66)' : '#C0392B' }}>
             {resultLabel}
           </p>

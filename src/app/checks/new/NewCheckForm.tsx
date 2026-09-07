@@ -92,6 +92,12 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
           <p className="text-sm text-ink-muted mb-4">
             Nothing is ticked yet — go through each one and confirm it&apos;s OK. Leave anything you can&apos;t confirm unticked and add a note.
           </p>
+          {asset.type === 'VEHICLE' && (
+            <div className="mb-4 max-w-[200px]">
+              <label className="label text-xs" htmlFor="mileage">Mileage</label>
+              <input id="mileage" name="mileage" type="number" min="0" step="1" className="input" placeholder="e.g. 84210" />
+            </div>
+          )}
           <ul className="space-y-2">
             {items.map(({ label, critical }, i) => {
               const ok = oks[label] ?? false;

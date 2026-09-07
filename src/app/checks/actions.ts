@@ -31,6 +31,13 @@ export async function logAssetCheck(formData: FormData) {
   const itemRows = rows(formData, 'item').filter((r) => r.label);
   const allOk = itemRows.every((r) => r.ok === '1');
 
+  const mileageRaw = formData.get('mileage');
+  let mileage: number | null = null;
+  if (mileageRaw) {
+    mileage = Number(mileageRaw);
+    if (!Number.isInteger(mileage) || mileage < 0) throw new Error('Enter the mileage as a whole number.');
+  }
+
   const check = await db.assetCheck.create({
     data: {
       assetId,
@@ -38,6 +45,7 @@ export async function logAssetCheck(formData: FormData) {
       result: allOk ? 'PASS' : 'FAIL',
       notes: String(formData.get('notes') ?? ''),
       photo: String(formData.get('photo') ?? '') || null,
+      mileage,
       items: {
         create: itemRows.map((r) => ({ label: r.label, ok: r.ok === '1', note: r.note ?? '', critical: r.critical === '1' })),
       },

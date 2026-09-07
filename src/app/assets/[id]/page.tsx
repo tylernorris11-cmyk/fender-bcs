@@ -213,6 +213,7 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
                 </Link>
                 <Pill tone={c.result === 'PASS' || allFixed ? 'good' : 'bad'}>{label}</Pill>
                 <span className="text-ink-muted">{c.user?.name ?? 'Unknown'}</span>
+                {c.mileage != null && <span className="text-ink-faint text-xs">{c.mileage.toLocaleString('en-GB')} miles</span>}
                 {open.length > 0 && (
                   <span className="text-signal w-full text-sm">{open.map((i) => i.label).join(', ')}</span>
                 )}

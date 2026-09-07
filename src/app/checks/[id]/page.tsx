@@ -41,7 +41,7 @@ export default async function CheckDetailPage({ params }: { params: { id: string
 
       <PageHeader
         title={check.asset.name}
-        blurb={`${check.asset.ref} · ${shortDate(check.performedAt)} at ${clock(check.performedAt)}${check.user ? ` · ${check.user.name}` : ''}`}
+        blurb={`${check.asset.ref} · ${shortDate(check.performedAt)} at ${clock(check.performedAt)}${check.user ? ` · ${check.user.name}` : ''}${check.mileage != null ? ` · ${check.mileage.toLocaleString('en-GB')} miles` : ''}`}
         actions={(
           <>
             <a href={`/checks/${check.id}/print`} className="btn-secondary"><Printer size={16} /> Print</a>

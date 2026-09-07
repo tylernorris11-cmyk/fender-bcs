@@ -821,6 +821,7 @@ model AssetCheck {
   result      CheckResult @default(PASS)
   notes       String      @default("")
   photo       String?     @db.Text // a data URL attached to the overall notes — resized client-side before upload
+  mileage     Int? // vehicles only — odometer reading at the time of this check
 
   asset Asset            @relation(fields: [assetId], references: [id])
   user  User?            @relation(fields: [userId], references: [id])
