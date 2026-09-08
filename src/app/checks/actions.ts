@@ -64,6 +64,7 @@ export async function logAssetCheck(formData: FormData) {
         ...flagged.map((r) => `- ${r.label}${r.note ? ` — ${r.note}` : ''}${r.critical === '1' ? ' (CRITICAL)' : ''}`),
       ].join('\n'),
       path: `/checks/${check.id}`,
+      email: false,
     });
   }
 
@@ -93,6 +94,7 @@ export async function reportAssetIssue(formData: FormData) {
     subject: `Issue reported: ${asset.name}`,
     text: `${user.name} reported an issue on ${asset.name} (${asset.ref}):\n\n"${description}"`,
     path: '/checks',
+    email: false,
   });
   revalidatePath('/checks');
   revalidatePath('/checks/new');

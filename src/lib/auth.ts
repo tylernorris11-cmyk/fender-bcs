@@ -162,22 +162,21 @@ export async function logActivity(entity: string, entityId: string, action: stri
   await db.activityLog.create({ data: { entity, entityId, action, detail, userId } });
 }
 
-/** Notifies every active Master Administrator by email, plus the shared
- * Telegram group if one's configured and `telegram` isn't turned off — for
- * anything that needs someone with full visibility to know right away (a
- * holiday request, a flagged issue). Telegram defaults on since that's
- * what most callers want; holiday requests turn it off deliberately, so
- * that group only sees things worth a look right now, not routine admin.
- * Builds the link from the current request's own host, so it points at
- * the right place in a preview deploy as well as production. Neither
- * sendEmail nor sendTelegramMessage ever throws on a failed send, so a
- * bad send here can't roll back whatever real thing was just saved. */
+/** Notifies every active Master Administrator — by email, by the shared
+ * Telegram group, or both, per the `email`/`telegram` flags (both default
+ * on). Issues are Telegram-only and holiday requests are email-only, kept
+ * that way deliberately so the Telegram group only ever shows things worth
+ * a look right now, not routine admin, while email still catches anything
+ * Telegram misses. Builds the link from the current request's own host, so
+ * it points at the right place in a preview deploy as well as production.
+ * Neither sendEmail nor sendTelegramMessage ever throws on a failed send,
+ * so a bad send here can't roll back whatever real thing was just saved. */
 export async function notifyMasterAdmins({
-  subject, text, path, telegram = true,
-}: { subject: string; text: string; path: string; telegram?: boolean }): Promise<void> {
+  subject, text, path, telegram = true, email = true,
+}: { subject: string; text: string; path: string; telegram?: boolean; email?: boolean }): Promise<void> {
   const h = headers();
   const link = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host')}${path}`;
-  const admins = await db.user.findMany({ where: { role: 'MASTER_ADMIN', active: true } });
+  const admins = email ? await db.user.findMany({ where: { role: 'MASTER_ADMIN', active: true } }) : [];
   await Promise.all([
     ...admins.map((a) => sendEmail({ to: a.email, subject, text: `${text}\n\n${link}` })),
     ...(telegram ? [sendTelegramMessage(`${subject}\n\n${text}\n\n${link}`)] : []),
