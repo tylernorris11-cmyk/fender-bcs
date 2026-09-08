@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import { cookies } from 'next/headers';
 import { getCurrentUser } from '@/lib/auth';
 import { getActiveCompany, COMPANY_COOKIE } from '@/lib/company';
+import { HelpBot } from '@/components/HelpBot';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
@@ -26,7 +27,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en-GB" className={inter.variable} data-brand={active === 'BS_SUPPLIES' ? 'bs-supplies' : undefined}>
-      <body>{children}</body>
+      <body>
+        {children}
+        {user && <HelpBot userName={user.name} />}
+      </body>
     </html>
   );
 }
