@@ -72,16 +72,37 @@ export const OVERHEAD_CRANE_CHECK_ITEMS = [
   'Warning signs are clear and visible',
 ];
 
-/** An emergency stop is the one checklist item that should always take the
- * asset out of service if it fails — matches any of the differently-worded
- * emergency-stop items across the default lists above. */
+// EN 50172:2004 / BS 5266-1's daily requirement is a single item: the
+// central power supply's indicator visually inspected for correct
+// operation (solid green). The monthly functional test and annual 3-hour
+// duration test are separate, longer procedures — those belong as
+// Inspections (kind "Functional" / "3 hour"), not this daily walk-round
+// item, matching the manufacturer's own routine inspection sheet
+// (Toughbay Pro Range) and its indicator status table:
+//   Solid green            — normal operation
+//   Green flashing 1s/1s   — initial charge / top up
+//   Green flashing 3s/3s   — 30 day test
+//   Green flashing 3s/1s   — duration test (every 360 days)
+//   Red flashing 0.5s/0.5s — duration test failure
+//   Red flashing 2s/2s     — open/short circuit, LED failure
+//   Solid red               — battery faulty / disconnected
+//   No indicator light      — battery operation (emergency mode)
+export const EMERGENCY_LIGHTING_CHECK_ITEMS = [
+  'Emergency light indicator — solid green (normal). Note the colour/flash pattern if not.',
+];
+
+/** An emergency stop or emergency lighting fault is the kind of checklist
+ * item that should always take the asset out of service if it fails —
+ * matches any of the differently-worded items across the default lists
+ * above. */
 export function isCriticalByDefault(label: string): boolean {
-  return /emergency stop/i.test(label);
+  return /emergency (stop|light)/i.test(label);
 }
 
 export function defaultCheckItems(assetType: AssetType, category?: string): string[] {
   const c = category?.trim().toLowerCase();
   if (c === 'forklift') return FORKLIFT_CHECK_ITEMS;
   if (c === 'overhead crane') return OVERHEAD_CRANE_CHECK_ITEMS;
+  if (c === 'emergency lighting') return EMERGENCY_LIGHTING_CHECK_ITEMS;
   return assetType === 'VEHICLE' ? VEHICLE_CHECK_ITEMS : MACHINE_CHECK_ITEMS;
 }
