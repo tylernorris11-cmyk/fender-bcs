@@ -41,11 +41,11 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
   const activeJobIds = activeJobs.map((j) => j.id);
   const inProgressJobs = await db.productionJob.findMany({
     where: {
-      company, finishedAt: null, lastPartFinishedAt: { not: null },
+      company, finishedAt: null,
       ...(activeJobIds.length > 0 ? { id: { notIn: activeJobIds } } : {}),
     },
     include: { user: true, rows: true },
-    orderBy: { lastPartFinishedAt: 'desc' },
+    orderBy: { startedAt: 'desc' },
     take: 20,
   });
 
@@ -84,19 +84,22 @@ function InProgressJobs({ jobs, isFender }: { jobs: any[]; isFender: boolean }) 
   return (
     <section className="card card-pad mt-6">
       <h2 className="text-lg font-bold mb-1">In progress</h2>
-      <p className="text-sm text-ink-muted mb-4">Finished for the day but not the whole job — still open, carries on when it's picked back up.</p>
+      <p className="text-sm text-ink-muted mb-4">Still open — being worked on right now or finished for the day, not the whole job. Visible to everyone, not just whoever's on it.</p>
       <Table head={<>
         <th className="th">Job</th><th className="th">{isFender ? 'Process' : 'Rows'}</th>
         <th className="th">Weight so far</th><th className="th">Last worked</th><th className="th">By</th><th className="th sr-only">Print</th>
       </>}>
         {jobs.map((j) => {
           const weight = j.rows.reduce((s: number, r: any) => s + Number(r.tallyWeightKg), 0);
+          const lastActivity = j.lastPartFinishedAt ?? (j.rows.length > 0
+            ? new Date(Math.max(...j.rows.map((r: any) => new Date(r.at).getTime())))
+            : j.startedAt);
           return (
             <tr key={j.id} className="row">
               <td className="td font-semibold">{j.jobNumber}</td>
               <td className="td">{isFender ? PROCESS_LABEL[j.process] : `${j.rows.length} row${j.rows.length === 1 ? '' : 's'}`}</td>
               <td className="td">{tonnes(weight)}</td>
-              <td className="td text-ink-muted whitespace-nowrap">{shortDate(j.lastPartFinishedAt)} {clock(j.lastPartFinishedAt)}</td>
+              <td className="td text-ink-muted whitespace-nowrap">{shortDate(lastActivity)} {clock(lastActivity)}</td>
               <td className="td text-ink-muted">{j.user?.name ?? '—'}</td>
               <td className="td text-right">
                 <a href={`/production/jobs/${j.id}/print`} className="btn-secondary btn-sm">
@@ -415,7 +418,18 @@ async function BcsView({ orders, sort, user, company }: { orders: any[]; sort?: 
   const notStarted = orders.filter((o) => o.production.length === 0).length;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const cutToday = orders.filter((o) => o.production[0] && new Date(o.production[0].at) >= today).length;
-  const tonnesInProgress = orders.reduce((s, o) => s + o.lines.reduce((n: number, l: any) => n + Number(l.weightKg), 0), 0);
+  // Most of what's actually "in progress" here is logged through the tally
+  // job (Add a job / Add a row), not against a sales order — a fence post
+  // run someone's mid-way through has real, weighed tonnage on it long
+  // before (if ever) it's tied to a specific order, so this has to count
+  // both or it silently shows 0 while a real job sits open on the floor.
+  const jobTonnageAgg = await db.productionJobRow.aggregate({
+    _sum: { tallyWeightKg: true },
+    where: { job: { company, finishedAt: null } },
+  });
+  const tonnesInProgress =
+    orders.reduce((s, o) => s + o.lines.reduce((n: number, l: any) => n + Number(l.weightKg), 0), 0) +
+    Number(jobTonnageAgg._sum.tallyWeightKg ?? 0);
 
   return (
     <>
