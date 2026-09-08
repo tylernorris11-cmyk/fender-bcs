@@ -65,6 +65,7 @@ export async function logAssetCheck(formData: FormData) {
       ].join('\n'),
       path: `/checks/${check.id}`,
       email: false,
+      photo: check.photo,
     });
   }
 

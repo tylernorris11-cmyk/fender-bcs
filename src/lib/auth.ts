@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { db } from './db';
 import { can, type Permission, type SessionUser } from './rbac';
 import { sendEmail } from './email';
-import { sendTelegramMessage } from './telegram';
+import { sendTelegramMessage, sendTelegramPhoto } from './telegram';
 
 const COOKIE = 'fs_session';
 const MAX_AGE = 60 * 60 * 12; // a working day, then sign in again
@@ -167,18 +167,22 @@ export async function logActivity(entity: string, entityId: string, action: stri
  * on). Issues are Telegram-only and holiday requests are email-only, kept
  * that way deliberately so the Telegram group only ever shows things worth
  * a look right now, not routine admin, while email still catches anything
- * Telegram misses. Builds the link from the current request's own host, so
- * it points at the right place in a preview deploy as well as production.
- * Neither sendEmail nor sendTelegramMessage ever throws on a failed send,
- * so a bad send here can't roll back whatever real thing was just saved. */
+ * Telegram misses. A `photo` (a check's stored data: URL) goes to Telegram
+ * as an actual inline photo, not just a link to click through for it —
+ * email stays text-only either way. Builds the link from the current
+ * request's own host, so it points at the right place in a preview deploy
+ * as well as production. None of sendEmail/sendTelegramMessage/
+ * sendTelegramPhoto ever throw on a failed send, so a bad send here can't
+ * roll back whatever real thing was just saved. */
 export async function notifyMasterAdmins({
-  subject, text, path, telegram = true, email = true,
-}: { subject: string; text: string; path: string; telegram?: boolean; email?: boolean }): Promise<void> {
+  subject, text, path, telegram = true, email = true, photo,
+}: { subject: string; text: string; path: string; telegram?: boolean; email?: boolean; photo?: string | null }): Promise<void> {
   const h = headers();
   const link = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host')}${path}`;
   const admins = email ? await db.user.findMany({ where: { role: 'MASTER_ADMIN', active: true } }) : [];
+  const fullMessage = `${subject}\n\n${text}\n\n${link}`;
   await Promise.all([
     ...admins.map((a) => sendEmail({ to: a.email, subject, text: `${text}\n\n${link}` })),
-    ...(telegram ? [sendTelegramMessage(`${subject}\n\n${text}\n\n${link}`)] : []),
+    ...(telegram ? [photo ? sendTelegramPhoto(photo, fullMessage) : sendTelegramMessage(fullMessage)] : []),
   ]);
 }
