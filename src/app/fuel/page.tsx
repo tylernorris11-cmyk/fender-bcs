@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { Plus, Printer } from 'lucide-react';
+import { AlertTriangle, Plus, Printer } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { findFuelDiscrepancies } from '@/lib/fuel';
 import { can } from '@/lib/rbac';
 import { clock, shortDate } from '@/lib/format';
 import { COMPANY_LABEL } from '@/lib/company';
@@ -12,6 +13,7 @@ import { Empty, PageHeader, Stat, StatRow, Table } from '@/components/ui';
 export default async function FuelPage() {
   const user = await requirePermission('fuel.view');
   const alerts = await getAlerts(user);
+  const discrepancies = await findFuelDiscrepancies();
 
   // One physical yard tank, shared by both companies' vehicles — the meter
   // readings only make sense read together, so this is never filtered by
@@ -41,6 +43,34 @@ export default async function FuelPage() {
           </>
         }
       />
+
+      {discrepancies.length > 0 && (
+        <div className="banner-bad mb-6">
+          <AlertTriangle size={22} className="shrink-0" aria-hidden />
+          <div>
+            <p className="font-bold text-base">
+              {discrepancies.length} {discrepancies.length === 1 ? 'gap' : 'gaps'} in the fuel log — check for missing fuel
+            </p>
+            <ul className="mt-1.5 space-y-1">
+              {discrepancies.map((d) => (
+                <li key={d.id}>
+                  {d.gapLitres > 0 ? (
+                    <>
+                      <strong>{d.gapLitres.toFixed(1)} L</strong> unaccounted for between {d.previous.vehicleLabel}&apos;s fill-up
+                      ({shortDate(d.previous.loggedAt)}) and {d.next.vehicleLabel}&apos;s ({shortDate(d.next.loggedAt)}).
+                    </>
+                  ) : (
+                    <>
+                      {d.next.vehicleLabel}&apos;s reading on {shortDate(d.next.loggedAt)} doesn&apos;t match {d.previous.vehicleLabel}&apos;s
+                      previous entry — <strong>{Math.abs(d.gapLitres).toFixed(1)} L</strong> out. Worth double-checking both readings.
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <StatRow>
         <Stat value={entries.length} label="Entries logged" />

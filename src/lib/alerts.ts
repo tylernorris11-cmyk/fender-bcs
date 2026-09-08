@@ -1,10 +1,11 @@
 import 'server-only';
 import type { Company } from '@prisma/client';
 import { db } from './db';
-import { daysUntil } from './format';
+import { daysUntil, shortDate } from './format';
 import { can, type SessionUser } from './rbac';
 import { getActiveCompany } from './company';
 import { alertWindowDays, isOutOfService, type StatutoryCheck } from './assets';
+import { findFuelDiscrepancies } from './fuel';
 
 export type Alert = {
   id: string;
@@ -32,7 +33,7 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const [certs, openNcrs, quarantined, suppliers, assets, overCredit, pending, missingCert, checkedTodayIds, pendingAccessRequests] = await Promise.all([
+  const [certs, openNcrs, quarantined, suppliers, assets, overCredit, pending, missingCert, checkedTodayIds, pendingAccessRequests, fuelGaps] = await Promise.all([
     db.certificate.findMany({ where: { company, expiresOn: { lte: in90 } }, orderBy: { expiresOn: 'asc' } }),
     db.ncr.findMany({ where: { company, status: 'OPEN' }, orderBy: { raisedAt: 'asc' } }),
     db.batch.findMany({ where: { company, status: 'Quarantined' }, include: { product: true, supplier: true } }),
@@ -46,6 +47,7 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
     db.batch.count({ where: { company, millCertUrl: '', status: { not: 'Rejected' } } }),
     db.assetCheck.findMany({ where: { performedAt: { gte: startOfToday } }, select: { assetId: true } }),
     user.role === 'MASTER_ADMIN' ? db.accessRequest.count({ where: { status: 'PENDING' } }) : 0,
+    findFuelDiscrepancies(), // one shared yard tank — not company-filtered, same as assets/checks below
   ]);
 
   if (pendingAccessRequests > 0) {
@@ -68,6 +70,20 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
       detail: 'A critical item on its last check is still unresolved.',
       href: `/assets/${a.id}`,
       perm: 'assets.view',
+    });
+  }
+
+  for (const gap of fuelGaps) {
+    const missing = gap.gapLitres > 0;
+    out.push({
+      id: `fuel-gap-${gap.id}`,
+      severity: 'bad',
+      title: missing
+        ? `${gap.gapLitres.toFixed(1)} L unaccounted for on the yard tank`
+        : `Fuel log readings don't add up (${Math.abs(gap.gapLitres).toFixed(1)} L)`,
+      detail: `${gap.next.vehicleLabel} logged the tank at ${gap.next.litresBefore.toFixed(1)} L on ${shortDate(gap.next.loggedAt)}, but ${gap.previous.vehicleLabel}'s entry left it at ${gap.previous.litresAfter.toFixed(1)} L.`,
+      href: '/fuel',
+      perm: 'fuel.view',
     });
   }
 
