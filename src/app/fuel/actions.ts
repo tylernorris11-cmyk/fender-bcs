@@ -35,6 +35,22 @@ export async function logFuelEntry(formData: FormData) {
     throw new Error('The new reading should be higher than the current reading — check you haven’t swapped them round.');
   }
 
+  // A second tap while the first save is still in flight (no page feedback
+  // in between makes that easy to do) creates two identical rows for the
+  // same vehicle — same mileage, same readings, seconds apart. The button
+  // itself now disables while saving, but this catches it either way.
+  const recentDuplicate = await db.fuelEntry.findFirst({
+    where: {
+      assetId: notOnSystem ? null : assetId,
+      otherVehicle: notOnSystem ? otherVehicle : '',
+      mileage, litresBefore, litresAfter,
+      loggedAt: { gte: new Date(Date.now() - 30_000) },
+    },
+  });
+  if (recentDuplicate) {
+    throw new Error('That looks like the same entry you just logged a moment ago — check the fuel log before submitting it again.');
+  }
+
   const entry = await db.fuelEntry.create({
     data: {
       assetId: notOnSystem ? null : assetId,

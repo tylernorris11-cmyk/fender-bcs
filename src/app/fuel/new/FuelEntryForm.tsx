@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Company } from '@prisma/client';
+import { SubmitButton } from '@/components/SubmitButton';
 import { logFuelEntry } from '../actions';
 
 type Asset = { id: string; name: string; ref: string; company: Company | null };
@@ -97,7 +98,7 @@ export function FuelEntryForm({ assets, defaultDriverName }: { assets: Asset[]; 
         )}
       </div>
 
-      <button type="submit" className="btn-primary">Save entry</button>
+      <SubmitButton pendingLabel="Saving…">Save entry</SubmitButton>
     </form>
   );
 }
