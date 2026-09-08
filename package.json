@@ -12,7 +12,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "setup": "prisma generate && prisma db push && npm run db:seed",
-    "backup": "tsx scripts/backup.ts"
+    "backup": "tsx --env-file=.env scripts/backup.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
