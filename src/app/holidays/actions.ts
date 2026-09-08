@@ -1,9 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { headers } from 'next/headers';
 import { db } from '@/lib/db';
-import { assertPermission, logActivity, requireUser } from '@/lib/auth';
+import { assertPermission, logActivity, notifyMasterAdmins, requireUser } from '@/lib/auth';
 import { sendEmail } from '@/lib/email';
 import { parseDayInput, workingDaysBetween } from '@/lib/holidays';
 
@@ -29,14 +28,11 @@ export async function requestHoliday(formData: FormData) {
 
   // Tell every Master Administrator there's something to look at — same
   // pattern as an access request landing in the approval queue.
-  const h = headers();
-  const link = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host')}/holidays`;
-  const admins = await db.user.findMany({ where: { role: 'MASTER_ADMIN', active: true } });
-  await Promise.all(admins.map((a) => sendEmail({
-    to: a.email,
+  await notifyMasterAdmins({
     subject: `Holiday request from ${user.name}`,
-    text: `${user.name} has asked for ${workingDays} day(s) off, ${startDate.toDateString()} to ${endDate.toDateString()}.\n\nReview it: ${link}`,
-  })));
+    text: `${user.name} has asked for ${workingDays} day(s) off, ${startDate.toDateString()} to ${endDate.toDateString()}.`,
+    path: '/holidays',
+  });
 
   revalidatePath('/holidays');
   revalidatePath('/planning');

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { assertPermission, logActivity } from '@/lib/auth';
+import { assertPermission, logActivity, notifyMasterAdmins } from '@/lib/auth';
 import { isOutOfService } from '@/lib/assets';
 
 /** Read the repeating checklist-item rows out of the check form. */
@@ -50,9 +50,22 @@ export async function logAssetCheck(formData: FormData) {
         create: itemRows.map((r) => ({ label: r.label, ok: r.ok === '1', note: r.note ?? '', critical: r.critical === '1' })),
       },
     },
+    include: { asset: true },
   });
 
   await logActivity('AssetCheck', check.id, allOk ? 'Check passed' : 'Check flagged an issue', '', user.id);
+
+  if (!allOk) {
+    const flagged = itemRows.filter((r) => r.ok !== '1');
+    await notifyMasterAdmins({
+      subject: `Check flagged an issue: ${check.asset.name}`,
+      text: [
+        `${user.name}'s check on ${check.asset.name} (${check.asset.ref}) flagged:`,
+        ...flagged.map((r) => `- ${r.label}${r.note ? ` — ${r.note}` : ''}${r.critical === '1' ? ' (CRITICAL)' : ''}`),
+      ].join('\n'),
+      path: `/checks/${check.id}`,
+    });
+  }
 
   revalidatePath('/checks');
   revalidatePath(`/assets/${assetId}`);
@@ -72,9 +85,15 @@ export async function reportAssetIssue(formData: FormData) {
   const description = String(formData.get('description') ?? '').trim();
   if (!description) throw new Error('Say what the issue is.');
 
+  const asset = await db.asset.findUniqueOrThrow({ where: { id: assetId } });
   const issue = await db.assetIssue.create({ data: { assetId, description, reportedById: user.id } });
 
   await logActivity('Asset', assetId, 'Issue reported', description, user.id);
+  await notifyMasterAdmins({
+    subject: `Issue reported: ${asset.name}`,
+    text: `${user.name} reported an issue on ${asset.name} (${asset.ref}):\n\n"${description}"`,
+    path: '/checks',
+  });
   revalidatePath('/checks');
   revalidatePath('/checks/new');
   revalidatePath(`/assets/${assetId}`);

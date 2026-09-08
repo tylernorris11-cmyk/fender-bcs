@@ -1,9 +1,10 @@
 import 'server-only';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import crypto from 'node:crypto';
 import { db } from './db';
 import { can, type Permission, type SessionUser } from './rbac';
+import { sendEmail } from './email';
 
 const COOKIE = 'fs_session';
 const MAX_AGE = 60 * 60 * 12; // a working day, then sign in again
@@ -158,4 +159,19 @@ export async function assertPermission(perm: Permission): Promise<SessionUser> {
 
 export async function logActivity(entity: string, entityId: string, action: string, detail = '', userId?: string) {
   await db.activityLog.create({ data: { entity, entityId, action, detail, userId } });
+}
+
+/** Emails every active Master Administrator — for anything that needs
+ * someone with full visibility to know right away (a holiday request, a
+ * flagged issue). Builds the link from the current request's own host, so
+ * it points at the right place in a preview deploy as well as production.
+ * sendEmail already never throws on a failed send, so a bad email here
+ * can't roll back whatever real thing was just saved. */
+export async function notifyMasterAdmins({
+  subject, text, path,
+}: { subject: string; text: string; path: string }): Promise<void> {
+  const h = headers();
+  const link = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host')}${path}`;
+  const admins = await db.user.findMany({ where: { role: 'MASTER_ADMIN', active: true } });
+  await Promise.all(admins.map((a) => sendEmail({ to: a.email, subject, text: `${text}\n\n${link}` })));
 }
