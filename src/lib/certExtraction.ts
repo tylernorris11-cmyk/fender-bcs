@@ -1,4 +1,15 @@
 import 'server-only';
+import type { CertificateSize } from '@prisma/client';
+
+// Which bar size (or mesh) a mill certificate is filed under. A fixed set
+// rather than reusing bs8666's full BAR_SIZES list, since compliance only
+// wants a certificate slot per size actually stocked/supplied — mesh isn't
+// a bar diameter at all, and 6/8/40/50mm aren't sizes this needs a slot for.
+export const CERT_SIZE_ORDER: CertificateSize[] = ['MM10', 'MM12', 'MM16', 'MM20', 'MM25', 'MM32', 'MESH'];
+
+export const CERT_SIZE_LABEL: Record<CertificateSize, string> = {
+  MM10: '10mm', MM12: '12mm', MM16: '16mm', MM20: '20mm', MM25: '25mm', MM32: '32mm', MESH: 'Mesh',
+};
 
 /**
  * Thin wrapper over the Anthropic Messages API — no SDK, same house style as

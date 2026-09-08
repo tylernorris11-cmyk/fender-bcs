@@ -1005,20 +1005,32 @@ model AccessRequest {
 // confirms a reading before it's trusted enough to fill in a batch's mill
 // certificate — an AI-misread digit becoming a traceability record with
 // nobody having checked it is exactly the mistake this is meant to prevent.
+enum CertificateSize {
+  MM10
+  MM12
+  MM16
+  MM20
+  MM25
+  MM32
+  MESH
+}
+
 model TestCertificate {
-  id           String   @id @default(cuid())
-  company      Company  @default(FENDER)
+  id           String           @id @default(cuid())
+  company      Company          @default(FENDER)
+  size         CertificateSize? // which bar size (or mesh) this cert is filed under — null for certs uploaded before sizes were tracked
   fileUrl      String
   fileName     String
-  status       String   @default("Processing") // Processing | NeedsReview | Reviewed | Failed
-  errorMessage String   @default("")
+  status       String           @default("Processing") // Processing | NeedsReview | Reviewed | Failed
+  errorMessage String           @default("")
   uploadedById String?
-  uploadedAt   DateTime @default(now())
+  uploadedAt   DateTime         @default(now())
 
   uploadedBy  User?                 @relation(fields: [uploadedById], references: [id])
   castNumbers ExtractedCastNumber[]
 
   @@index([company])
+  @@index([company, size])
 }
 
 // ------------------------------------------------------------ holidays

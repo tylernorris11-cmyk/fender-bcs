@@ -2,11 +2,12 @@
 
 import { put } from '@vercel/blob';
 import { revalidatePath } from 'next/cache';
+import type { CertificateSize } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { assertCaresApplies, assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { nextNcrRef } from '@/lib/orders';
-import { extractCastNumbers } from '@/lib/certExtraction';
+import { CERT_SIZE_LABEL, CERT_SIZE_ORDER, extractCastNumbers } from '@/lib/certExtraction';
 
 export async function raiseNcr(formData: FormData) {
   const user = await assertPermission('compliance.ncr');
@@ -133,6 +134,9 @@ export async function uploadTestCertificate(formData: FormData) {
   assertCaresApplies(user);
   const company = getActiveCompany(user);
 
+  const size = String(formData.get('size') ?? '') as CertificateSize;
+  if (!CERT_SIZE_ORDER.includes(size)) throw new Error('Choose which size this certificate is for.');
+
   const file = formData.get('file');
   if (!(file instanceof File) || file.size === 0) throw new Error('Choose a PDF or image to upload.');
   if (!ALLOWED_CERT_TYPES.includes(file.type)) throw new Error('Only PDF, PNG, JPEG or WebP files are supported.');
@@ -145,7 +149,7 @@ export async function uploadTestCertificate(formData: FormData) {
   const blob = await put(`test-certs/${Date.now()}-${safeName}`, Buffer.from(bytes), { access: 'private' });
 
   const certificate = await db.testCertificate.create({
-    data: { company, fileUrl: blob.url, fileName: file.name, uploadedById: user.id, status: 'Processing' },
+    data: { company, size, fileUrl: blob.url, fileName: file.name, uploadedById: user.id, status: 'Processing' },
   });
 
   const { castNumbers, error } = await extractCastNumbers({
@@ -167,7 +171,7 @@ export async function uploadTestCertificate(formData: FormData) {
     await db.testCertificate.update({ where: { id: certificate.id }, data: { status: 'NeedsReview' } });
   }
 
-  await logActivity('TestCertificate', certificate.id, 'Uploaded', file.name, user.id);
+  await logActivity('TestCertificate', certificate.id, 'Uploaded', `${CERT_SIZE_LABEL[size]} — ${file.name}`, user.id);
   revalidatePath('/compliance/test-certs');
 }
 
