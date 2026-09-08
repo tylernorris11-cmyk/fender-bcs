@@ -8,6 +8,7 @@ import { shortDate } from '@/lib/format';
 import { blobFileHref } from '@/lib/blob';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill } from '@/components/ui';
+import { SubmitButton } from '@/components/SubmitButton';
 import { archiveHseDocument, uploadHseDocument } from '../actions';
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -60,7 +61,7 @@ export default async function HsDocumentsPage() {
               <label className="label" htmlFor="file">File</label>
               <input id="file" name="file" type="file" required accept="application/pdf,image/png,image/jpeg,image/webp" className="input" />
             </div>
-            <button className="btn-primary">Upload</button>
+            <SubmitButton pendingLabel="Uploading…">Upload</SubmitButton>
           </form>
         </section>
       )}

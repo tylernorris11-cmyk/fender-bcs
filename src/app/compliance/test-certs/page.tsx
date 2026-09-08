@@ -10,6 +10,7 @@ import { blobFileHref } from '@/lib/blob';
 import { CERT_SIZE_LABEL, CERT_SIZE_ORDER } from '@/lib/certExtraction';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill } from '@/components/ui';
+import { SubmitButton } from '@/components/SubmitButton';
 import { confirmCastNumber, rejectCastNumber, uploadTestCertificate } from '../actions';
 
 export default async function TestCertsPage() {
@@ -57,7 +58,7 @@ export default async function TestCertsPage() {
                   className="input flex-1 min-w-0 text-xs"
                   aria-label={`Upload a ${CERT_SIZE_LABEL[size]} certificate`}
                 />
-                <button className="btn-primary btn-sm shrink-0">Upload</button>
+                <SubmitButton className="btn-primary btn-sm shrink-0" pendingLabel="Uploading…">Upload</SubmitButton>
               </form>
             ))}
           </div>

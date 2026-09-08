@@ -7,6 +7,7 @@ import { clock, shortDate } from '@/lib/format';
 import { blobFileHref } from '@/lib/blob';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader } from '@/components/ui';
+import { SubmitButton } from '@/components/SubmitButton';
 import { completeOtherWorkTask, createOtherWorkTask, logOtherWork } from '../actions';
 
 export default async function OtherWorkPage() {
@@ -94,7 +95,7 @@ export default async function OtherWorkPage() {
               <label className="label" htmlFor="photo">Photo (optional)</label>
               <input id="photo" name="photo" type="file" accept="image/png,image/jpeg,image/webp" className="input" />
             </div>
-            <button className="btn-primary">Post job</button>
+            <SubmitButton pendingLabel="Posting…">Post job</SubmitButton>
           </form>
         </section>
       )}

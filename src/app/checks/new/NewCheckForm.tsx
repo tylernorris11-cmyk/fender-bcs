@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Camera, X } from 'lucide-react';
 import type { AssetType } from '@prisma/client';
 import { resizeImageToDataUrl } from '@/lib/image';
+import { SubmitButton } from '@/components/SubmitButton';
 import { logAssetCheck, reportAssetIssue } from '../actions';
 
 type Asset = {
@@ -194,7 +195,7 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
           <p className="text-xs text-ink-faint">If there's a problem, a photo helps whoever picks this up next.</p>
         </div>
 
-        <button type="submit" className="btn-primary mt-4" disabled={!asset || asset.outOfService}>Save check</button>
+        <SubmitButton className="btn-primary mt-4" pendingLabel="Saving…" disabled={!asset || asset.outOfService}>Save check</SubmitButton>
       </section>
       )}
       </form>
