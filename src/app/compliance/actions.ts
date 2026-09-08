@@ -2,7 +2,7 @@
 
 import { put } from '@vercel/blob';
 import { revalidatePath } from 'next/cache';
-import type { CertificateSize } from '@prisma/client';
+import type { CertificateSize, Company } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { assertCaresApplies, assertCompanyAccess, getActiveCompany } from '@/lib/company';
@@ -188,6 +188,29 @@ export async function uploadTestCertificate(formData: FormData) {
   revalidatePath('/compliance/test-certs');
 }
 
+/** Shared by confirmCastNumber and confirmAllCastNumbers — marks one
+ * extracted cast number confirmed and files it against a batch that's
+ * missing its mill certificate, if one's waiting for it. Doesn't touch the
+ * certificate's own status or write an activity log entry; each caller
+ * does that once for the whole operation, not once per cast number. */
+async function confirmOneCastNumber(
+  cast: { id: string; castNumber: string },
+  certificate: { company: Company; fileUrl: string },
+  userId: string,
+): Promise<{ matchedBatchId: string | null }> {
+  const match = await db.batch.findFirst({
+    where: { company: certificate.company, heatNumber: cast.castNumber, millCertUrl: '' },
+  });
+  await db.extractedCastNumber.update({
+    where: { id: cast.id },
+    data: { confirmed: true, confirmedById: userId, confirmedAt: new Date(), matchedBatchId: match?.id ?? null },
+  });
+  if (match) {
+    await db.batch.update({ where: { id: match.id }, data: { millCertUrl: certificate.fileUrl } });
+  }
+  return { matchedBatchId: match?.id ?? null };
+}
+
 /**
  * A person confirms the AI read the cast number correctly before it's trusted
  * enough to fill in a batch's mill certificate. If a batch with this heat
@@ -203,25 +226,49 @@ export async function confirmCastNumber(formData: FormData) {
   assertCompanyAccess(user, cast.certificate.company);
   if (cast.confirmed) return;
 
-  const match = await db.batch.findFirst({
-    where: { company: cast.certificate.company, heatNumber: cast.castNumber, millCertUrl: '' },
-  });
-
-  await db.extractedCastNumber.update({
-    where: { id },
-    data: { confirmed: true, confirmedById: user.id, confirmedAt: new Date(), matchedBatchId: match?.id ?? null },
-  });
-
-  if (match) {
-    await db.batch.update({ where: { id: match.id }, data: { millCertUrl: cast.certificate.fileUrl } });
-  }
+  const { matchedBatchId } = await confirmOneCastNumber(cast, cast.certificate, user.id);
 
   const remaining = await db.extractedCastNumber.count({ where: { certificateId: cast.certificateId, confirmed: false } });
   if (remaining === 0) await db.testCertificate.update({ where: { id: cast.certificateId }, data: { status: 'Reviewed' } });
 
   await logActivity(
-    'Batch', match?.id ?? cast.certificateId, 'Cast number confirmed',
-    `${cast.castNumber}${match ? ' — matched to a batch missing its mill certificate' : ' — no matching batch yet, will match automatically at goods in'}`,
+    'Batch', matchedBatchId ?? cast.certificateId, 'Cast number confirmed',
+    `${cast.castNumber}${matchedBatchId ? ' — matched to a batch missing its mill certificate' : ' — no matching batch yet, will match automatically at goods in'}`,
+    user.id,
+  );
+  revalidatePath('/compliance/test-certs');
+  revalidatePath('/compliance/trace');
+  revalidatePath('/compliance');
+  revalidatePath('/stock');
+}
+
+/** Confirms every still-unconfirmed cast number on one certificate in one
+ * go — a certificate that reads back cleanly (the common case) shouldn't
+ * need Confirm clicked one at a time for every cast number on it. Same
+ * match-to-batch rule as confirming one at a time, just for all of them;
+ * logs a single summary line rather than one entry per cast number. */
+export async function confirmAllCastNumbers(formData: FormData) {
+  const user = await assertPermission('compliance.edit');
+  assertCaresApplies(user);
+  const certificateId = String(formData.get('certificateId'));
+
+  const certificate = await db.testCertificate.findUniqueOrThrow({ where: { id: certificateId } });
+  assertCompanyAccess(user, certificate.company);
+
+  const casts = await db.extractedCastNumber.findMany({ where: { certificateId, confirmed: false } });
+  if (casts.length === 0) return;
+
+  let matched = 0;
+  for (const cast of casts) {
+    const { matchedBatchId } = await confirmOneCastNumber(cast, certificate, user.id);
+    if (matchedBatchId) matched += 1;
+  }
+
+  await db.testCertificate.update({ where: { id: certificateId }, data: { status: 'Reviewed' } });
+
+  await logActivity(
+    'TestCertificate', certificateId, 'All cast numbers confirmed',
+    `${casts.length} confirmed, ${matched} matched to a batch missing its mill certificate`,
     user.id,
   );
   revalidatePath('/compliance/test-certs');

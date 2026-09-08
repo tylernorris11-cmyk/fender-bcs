@@ -11,7 +11,7 @@ import { CERT_SIZE_LABEL, CERT_SIZE_ORDER } from '@/lib/certExtraction';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill } from '@/components/ui';
 import { SubmitButton } from '@/components/SubmitButton';
-import { confirmCastNumber, rejectCastNumber, uploadTestCertificate } from '../actions';
+import { confirmAllCastNumbers, confirmCastNumber, rejectCastNumber, uploadTestCertificate } from '../actions';
 
 export default async function TestCertsPage() {
   const user = await requirePermission('compliance.view');
@@ -78,7 +78,9 @@ export default async function TestCertsPage() {
                   {size ? CERT_SIZE_LABEL[size] : 'Unspecified size (uploaded before sizes were tracked)'}
                 </h3>
                 <div className="space-y-4">
-                  {group.map((cert) => (
+                  {group.map((cert) => {
+                    const unconfirmed = cert.castNumbers.filter((cast) => !cast.confirmed);
+                    return (
                     <section key={cert.id} className="card card-pad">
                       <header className="flex flex-wrap items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-2">
@@ -89,9 +91,19 @@ export default async function TestCertsPage() {
                             {shortDate(cert.uploadedAt)} {clock(cert.uploadedAt)} · {cert.uploadedBy?.name ?? '—'}
                           </span>
                         </div>
-                        <Pill tone={cert.status === 'Reviewed' ? 'good' : cert.status === 'Failed' ? 'bad' : cert.status === 'NeedsReview' ? 'warn' : 'neutral'}>
-                          {cert.status === 'NeedsReview' ? 'Needs review' : cert.status}
-                        </Pill>
+                        <div className="flex items-center gap-2">
+                          {unconfirmed.length > 1 && can(user, 'compliance.edit') && (
+                            <form action={confirmAllCastNumbers}>
+                              <input type="hidden" name="certificateId" value={cert.id} />
+                              <SubmitButton className="btn-secondary btn-sm" pendingLabel="Confirming…">
+                                Confirm all ({unconfirmed.length})
+                              </SubmitButton>
+                            </form>
+                          )}
+                          <Pill tone={cert.status === 'Reviewed' ? 'good' : cert.status === 'Failed' ? 'bad' : cert.status === 'NeedsReview' ? 'warn' : 'neutral'}>
+                            {cert.status === 'NeedsReview' ? 'Needs review' : cert.status}
+                          </Pill>
+                        </div>
                       </header>
 
                       {cert.status === 'Failed' && (
@@ -136,7 +148,8 @@ export default async function TestCertsPage() {
                         </ul>
                       )}
                     </section>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
