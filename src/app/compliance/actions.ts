@@ -8,6 +8,7 @@ import { assertPermission, logActivity } from '@/lib/auth';
 import { assertCaresApplies, assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { nextNcrRef } from '@/lib/orders';
 import { CERT_SIZE_LABEL, CERT_SIZE_ORDER, extractCastNumbers } from '@/lib/certExtraction';
+import { shortDate } from '@/lib/format';
 
 export async function raiseNcr(formData: FormData) {
   const user = await assertPermission('compliance.ncr');
@@ -142,6 +143,18 @@ export async function uploadTestCertificate(formData: FormData) {
   if (!ALLOWED_CERT_TYPES.includes(file.type)) throw new Error('Only PDF, PNG, JPEG or WebP files are supported.');
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     throw new Error('File storage is not set up yet — add BLOB_READ_WRITE_TOKEN (create a store in Vercel → Storage → Blob) before uploading.');
+  }
+
+  // Same file name as one already on file for this company is almost
+  // always the same certificate uploaded twice by mistake — a Failed one
+  // doesn't count, since that upload never actually took and a retry with
+  // the identical file should be allowed.
+  const duplicate = await db.testCertificate.findFirst({
+    where: { company, fileName: { equals: file.name, mode: 'insensitive' }, status: { not: 'Failed' } },
+    orderBy: { uploadedAt: 'desc' },
+  });
+  if (duplicate) {
+    throw new Error(`"${file.name}" was already uploaded on ${shortDate(duplicate.uploadedAt)} (filed under ${duplicate.size ? CERT_SIZE_LABEL[duplicate.size] : 'unspecified size'}) — check the certificate list below before uploading it again.`);
   }
 
   const bytes = await file.arrayBuffer();
