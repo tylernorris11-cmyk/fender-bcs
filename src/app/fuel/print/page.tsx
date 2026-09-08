@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { getActiveCompany } from '@/lib/company';
+import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
 import { PrintActions } from '@/components/PrintActions';
 
@@ -24,11 +24,9 @@ export default async function FuelPrint({ searchParams }: { searchParams: { from
   const from = searchParams.from ? new Date(`${searchParams.from}T00:00:00.000Z`) : undefined;
   const to = searchParams.to ? new Date(`${searchParams.to}T23:59:59.999Z`) : undefined;
 
+  // Same shared-tank reasoning as /fuel and /fuel/new — no company filter.
   const entries = await db.fuelEntry.findMany({
-    where: {
-      OR: [{ assetId: null }, { asset: { OR: [{ company: null }, { company }] } }],
-      ...(from || to ? { loggedAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
-    },
+    where: from || to ? { loggedAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {},
     include: { asset: true, loggedBy: true },
     orderBy: { loggedAt: 'desc' },
   });
@@ -94,7 +92,11 @@ export default async function FuelPrint({ searchParams }: { searchParams: { from
           <tbody>
             {entries.map((e) => (
               <tr key={e.id} className="border-b border-black/10">
-                <td className="py-2">{e.asset ? `${e.asset.name} (${e.asset.ref})` : `${e.otherVehicle} — not on system`}</td>
+                <td className="py-2">
+                  {e.asset
+                    ? `${e.asset.name} (${e.asset.ref})${e.asset.company ? ` — ${COMPANY_LABEL[e.asset.company]}` : ''}`
+                    : `${e.otherVehicle} — not on system`}
+                </td>
                 <td className="py-2">{e.mileage.toLocaleString('en-GB')}</td>
                 <td className="py-2">{e.driverName}</td>
                 <td className="py-2 text-right">{Number(e.litresBefore).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>

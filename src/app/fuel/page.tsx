@@ -4,18 +4,20 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
-import { getActiveCompany } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
+import { COMPANY_LABEL } from '@/lib/company';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Stat, StatRow, Table } from '@/components/ui';
 
 export default async function FuelPage() {
   const user = await requirePermission('fuel.view');
   const alerts = await getAlerts(user);
-  const company = getActiveCompany(user);
 
+  // One physical yard tank, shared by both companies' vehicles — the meter
+  // readings only make sense read together, so this is never filtered by
+  // whichever company happens to be active. Same on /fuel/print and the
+  // vehicle picker on /fuel/new.
   const entries = await db.fuelEntry.findMany({
-    where: { OR: [{ assetId: null }, { asset: { OR: [{ company: null }, { company }] } }] },
     include: { asset: true, loggedBy: true },
     orderBy: { loggedAt: 'desc' },
     take: 200,
@@ -70,7 +72,9 @@ export default async function FuelPage() {
                   {e.asset ? (
                     <>
                       <Link href={`/assets/${e.assetId}`} className="font-semibold text-brand-700 hover:underline">{e.asset.name}</Link>
-                      <span className="block text-xs text-ink-faint">{e.asset.ref}</span>
+                      <span className="block text-xs text-ink-faint">
+                        {e.asset.ref}{e.asset.company && ` · ${COMPANY_LABEL[e.asset.company]}`}
+                      </span>
                     </>
                   ) : (
                     <>

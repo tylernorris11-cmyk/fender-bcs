@@ -1,12 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import type { Company } from '@prisma/client';
 import { logFuelEntry } from '../actions';
 
-type Asset = { id: string; name: string; ref: string };
+type Asset = { id: string; name: string; ref: string; company: Company | null };
+
+const COMPANY_LABEL: Record<Company, string> = { FENDER: 'Fender Steel', BS_SUPPLIES: 'BCS Products' };
 
 export function FuelEntryForm({ assets, defaultDriverName }: { assets: Asset[]; defaultDriverName: string }) {
   const [notOnSystem, setNotOnSystem] = useState(false);
+  const fender = assets.filter((a) => a.company === 'FENDER');
+  const bcs = assets.filter((a) => a.company === 'BS_SUPPLIES');
+  const shared = assets.filter((a) => !a.company);
   const [litresBefore, setLitresBefore] = useState('');
   const [litresAfter, setLitresAfter] = useState('');
 
@@ -26,7 +32,21 @@ export function FuelEntryForm({ assets, defaultDriverName }: { assets: Asset[]; 
         <div>
           <label className="label" htmlFor="assetId">Vehicle name or reg</label>
           <select id="assetId" name="assetId" required className="input">
-            {assets.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.ref})</option>)}
+            {shared.length > 0 && (
+              <optgroup label="Shared fleet">
+                {shared.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.ref})</option>)}
+              </optgroup>
+            )}
+            {fender.length > 0 && (
+              <optgroup label={COMPANY_LABEL.FENDER}>
+                {fender.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.ref})</option>)}
+              </optgroup>
+            )}
+            {bcs.length > 0 && (
+              <optgroup label={COMPANY_LABEL.BS_SUPPLIES}>
+                {bcs.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.ref})</option>)}
+              </optgroup>
+            )}
           </select>
         </div>
       )}

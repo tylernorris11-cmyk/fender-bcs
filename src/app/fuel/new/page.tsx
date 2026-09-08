@@ -3,7 +3,6 @@ import { ArrowLeft } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
-import { getActiveCompany } from '@/lib/company';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
 import { FuelEntryForm } from './FuelEntryForm';
@@ -11,12 +10,13 @@ import { FuelEntryForm } from './FuelEntryForm';
 export default async function NewFuelEntryPage() {
   const user = await requirePermission('fuel.create');
   const alerts = await getAlerts(user);
-  const company = getActiveCompany(user);
 
+  // Both companies' vehicles fill from the same yard tank, so anyone here
+  // might be fuelling either fleet — no company filter on the picker.
   const assets = await db.asset.findMany({
-    where: { type: 'VEHICLE', retired: false, OR: [{ company: null }, { company }] },
+    where: { type: 'VEHICLE', retired: false },
     orderBy: { name: 'asc' },
-    select: { id: true, name: true, ref: true },
+    select: { id: true, name: true, ref: true, company: true },
   });
 
   return (
