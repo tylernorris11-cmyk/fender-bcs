@@ -118,6 +118,7 @@ export async function logInspection(formData: FormData) {
     const field = {
       MOT: 'motDue', PUWER: 'puwerDue', LOLER: 'lolerDue',
       Service: 'serviceDue', Calibration: 'calibrationDue', 'Safety check': 'weeklyCheckDue',
+      'Emergency light test': 'emergencyLightTestDue', 'Emergency light duration test': 'emergencyLightDurationDue',
     }[kind];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (field) await db.asset.update({ where: { id: assetId }, data: { [field]: nextDueOn } as any });
@@ -126,6 +127,7 @@ export async function logInspection(formData: FormData) {
   await logActivity('Asset', assetId, `${kind} logged`, `${result}${nextDueOn ? `, next due ${nextDueOn.toDateString()}` : ''}`, user.id);
   revalidatePath(`/assets/${assetId}`);
   revalidatePath('/assets');
+  revalidatePath('/planning');
 }
 
 export async function addAssetNote(formData: FormData) {

@@ -151,6 +151,7 @@ export default async function PlanningPage({
       ['MOT', a.motDue], ['Road tax', a.taxDue], ['Safety inspection', a.weeklyCheckDue],
       ['PUWER inspection', a.puwerDue], ['LOLER exam', a.lolerDue], ['Service', a.serviceDue],
       ['Measurement calibration', a.calibrationDue],
+      ['Emergency light test', a.emergencyLightTestDue], ['Emergency light duration test', a.emergencyLightDurationDue],
     ];
     for (const [label, d] of due) {
       if (!d || d < from || d >= to) continue;

@@ -1,5 +1,6 @@
 export type StatutoryCheck =
-  | 'MOT' | 'Road tax' | 'Safety inspection' | 'PUWER inspection' | 'LOLER exam' | 'Service' | 'Measurement calibration';
+  | 'MOT' | 'Road tax' | 'Safety inspection' | 'PUWER inspection' | 'LOLER exam' | 'Service' | 'Measurement calibration'
+  | 'Emergency light test' | 'Emergency light duration test';
 
 type LatestCheckLike = { result: 'PASS' | 'FAIL'; items: { critical: boolean; ok: boolean; resolved: boolean }[] } | null | undefined;
 
@@ -25,6 +26,10 @@ export function isOutOfService(latestCheck: LatestCheckLike): boolean {
  */
 export function alertWindowDays(check: StatutoryCheck, category: string): number {
   if (check === 'Safety inspection') return 7;
+  // Only 30 days between tests to begin with, so a 21-day heads-up would
+  // fire almost immediately after the last one — 5 days is enough notice
+  // without nagging for most of the cycle.
+  if (check === 'Emergency light test') return 5;
   if (check === 'MOT') {
     if (category === 'HGV') return 90;
     if (category === 'Pickup') return 14;

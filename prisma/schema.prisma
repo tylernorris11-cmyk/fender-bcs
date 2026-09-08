@@ -718,6 +718,8 @@ model Asset {
   lolerDue       DateTime?
   serviceDue     DateTime?
   calibrationDue DateTime? // control of measuring devices — CARES requirement
+  emergencyLightTestDue     DateTime? // EN 50172 monthly functional test
+  emergencyLightDurationDue DateTime? // EN 50172 annual 3-hour full duration test
 
   inspections    Inspection[]
   notes          AssetNote[]

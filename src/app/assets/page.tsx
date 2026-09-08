@@ -49,7 +49,10 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
     include: { checks: { orderBy: { performedAt: 'desc' }, take: 1, select: { items: { select: { critical: true, ok: true, resolved: true } }, result: true } } },
   });
 
-  const dueDates = (a: (typeof assets)[number]) => [a.motDue, a.taxDue, a.weeklyCheckDue, a.puwerDue, a.lolerDue, a.serviceDue, a.calibrationDue].filter(Boolean) as Date[];
+  const dueDates = (a: (typeof assets)[number]) => [
+    a.motDue, a.taxDue, a.weeklyCheckDue, a.puwerDue, a.lolerDue, a.serviceDue, a.calibrationDue,
+    a.emergencyLightTestDue, a.emergencyLightDurationDue,
+  ].filter(Boolean) as Date[];
   if (searchParams.sort === 'due') {
     assets.sort((a, b) => {
       const earliestA = Math.min(...dueDates(a).map((d) => d.getTime()), Infinity);
@@ -67,6 +70,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
     ['MOT', a.motDue], ['Road tax', a.taxDue], ['Safety inspection', a.weeklyCheckDue],
     ['PUWER inspection', a.puwerDue], ['LOLER exam', a.lolerDue], ['Service', a.serviceDue],
     ['Measurement calibration', a.calibrationDue],
+    ['Emergency light test', a.emergencyLightTestDue], ['Emergency light duration test', a.emergencyLightDurationDue],
   ];
   const overdue = all.filter((a) => checksFor(a).some(([, d]) => d && daysUntil(d)! < 0)).length;
   const soon = all.filter((a) => checksFor(a).some(([label, d]) => d && daysUntil(d)! >= 0 && daysUntil(d)! <= alertWindowDays(label, a.category))).length;
@@ -130,6 +134,8 @@ export default async function AssetsPage({ searchParams }: { searchParams: { typ
                 <DueDate label="LOLER" due={a.lolerDue} windowDays={alertWindowDays('LOLER exam', a.category)} />
                 <DueDate label="Service" due={a.serviceDue} windowDays={alertWindowDays('Service', a.category)} />
                 <DueDate label="Calibration" due={a.calibrationDue} windowDays={alertWindowDays('Measurement calibration', a.category)} />
+                <DueDate label="Em. light test" due={a.emergencyLightTestDue} windowDays={alertWindowDays('Emergency light test', a.category)} />
+                <DueDate label="Em. light duration" due={a.emergencyLightDurationDue} windowDays={alertWindowDays('Emergency light duration test', a.category)} />
               </div>
               <ChevronRight size={18} className="text-ink-faint" aria-hidden />
             </Link>
