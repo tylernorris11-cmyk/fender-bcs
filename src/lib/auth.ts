@@ -163,20 +163,23 @@ export async function logActivity(entity: string, entityId: string, action: stri
 }
 
 /** Notifies every active Master Administrator by email, plus the shared
- * Telegram group if one's configured — for anything that needs someone
- * with full visibility to know right away (a holiday request, a flagged
- * issue). Builds the link from the current request's own host, so it
- * points at the right place in a preview deploy as well as production.
- * Neither sendEmail nor sendTelegramMessage ever throws on a failed send,
- * so a bad send here can't roll back whatever real thing was just saved. */
+ * Telegram group if one's configured and `telegram` isn't turned off — for
+ * anything that needs someone with full visibility to know right away (a
+ * holiday request, a flagged issue). Telegram defaults on since that's
+ * what most callers want; holiday requests turn it off deliberately, so
+ * that group only sees things worth a look right now, not routine admin.
+ * Builds the link from the current request's own host, so it points at
+ * the right place in a preview deploy as well as production. Neither
+ * sendEmail nor sendTelegramMessage ever throws on a failed send, so a
+ * bad send here can't roll back whatever real thing was just saved. */
 export async function notifyMasterAdmins({
-  subject, text, path,
-}: { subject: string; text: string; path: string }): Promise<void> {
+  subject, text, path, telegram = true,
+}: { subject: string; text: string; path: string; telegram?: boolean }): Promise<void> {
   const h = headers();
   const link = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host')}${path}`;
   const admins = await db.user.findMany({ where: { role: 'MASTER_ADMIN', active: true } });
   await Promise.all([
     ...admins.map((a) => sendEmail({ to: a.email, subject, text: `${text}\n\n${link}` })),
-    sendTelegramMessage(`${subject}\n\n${text}\n\n${link}`),
+    ...(telegram ? [sendTelegramMessage(`${subject}\n\n${text}\n\n${link}`)] : []),
   ]);
 }

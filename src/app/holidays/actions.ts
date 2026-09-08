@@ -32,6 +32,7 @@ export async function requestHoliday(formData: FormData) {
     subject: `Holiday request from ${user.name}`,
     text: `${user.name} has asked for ${workingDays} day(s) off, ${startDate.toDateString()} to ${endDate.toDateString()}.`,
     path: '/holidays',
+    telegram: false,
   });
 
   revalidatePath('/holidays');
