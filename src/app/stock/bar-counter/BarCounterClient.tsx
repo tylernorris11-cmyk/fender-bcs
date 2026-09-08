@@ -14,6 +14,7 @@ const MODE_LABEL: Record<BarCountMode, string> = {
   CIRCLE_DETECTOR: 'Circle detector',
   AI_ESTIMATE: 'AI estimate',
   BOTH: 'Both',
+  WATERSHED: 'Watershed',
 };
 
 function withIds(circles: DetectedCircle[]): Circle[] {
@@ -162,6 +163,13 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
               onClick={() => runMode('CIRCLE_DETECTOR')}
             >
               {detecting ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} Circle detector
+            </button>
+            <button
+              type="button" className="btn-secondary" disabled={detecting || !calibratedRadius}
+              title={calibratedRadius ? 'Segments touching/overlapping bar ends — unverified against a real photo, try it alongside Circle detector rather than instead of it' : 'Drag across one bar end below first, to show its size'}
+              onClick={() => runMode('WATERSHED')}
+            >
+              {detecting ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} Watershed
             </button>
             <button type="button" className="btn-secondary" disabled={detecting} onClick={() => runMode('AI_ESTIMATE')}>
               AI estimate

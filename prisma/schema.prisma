@@ -274,6 +274,7 @@ enum BarCountMode {
   CIRCLE_DETECTOR
   AI_ESTIMATE
   BOTH
+  WATERSHED
 }
 
 // A worker's photo of a bundle's cut end, counted by Hough Circle Transform
@@ -289,8 +290,8 @@ model BarCount {
   photoWidth       Int?
   photoHeight      Int?
   orderId          String?
-  detectedCount    Int? // raw Hough count — null in AI_ESTIMATE-only mode
-  detectedCircles  Json? // Hough's untouched [{x,y,r}], 0–1 normalized — null in AI_ESTIMATE-only mode
+  detectedCount    Int? // raw circle-detector count (Hough or watershed) — null in AI_ESTIMATE-only mode
+  detectedCircles  Json? // detector's untouched [{x,y,r}], 0–1 normalized — null in AI_ESTIMATE-only mode
   aiEstimateCount  Int? // Claude's rough total — null unless mode is AI_ESTIMATE or BOTH, or the call failed
   aiEstimateError  String       @default("")
   confirmedCount   Int // the worker's final number — always set

@@ -6,11 +6,11 @@ import { Prisma, type BarCountMode } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
-import { detectBarCircles, type DetectedCircle } from '@/lib/barDetection';
+import { detectBarCircles, detectBarCirclesWatershed, type DetectedCircle } from '@/lib/barDetection';
 import { estimateBarCount } from '@/lib/barCountAI';
 
 const ALLOWED_PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
-const VALID_MODES: BarCountMode[] = ['CIRCLE_DETECTOR', 'AI_ESTIMATE', 'BOTH'];
+const VALID_MODES: BarCountMode[] = ['CIRCLE_DETECTOR', 'AI_ESTIMATE', 'BOTH', 'WATERSHED'];
 
 export type BarDetectResult =
   | { ok: false; error: string }
@@ -40,7 +40,7 @@ export async function runBarDetection(formData: FormData): Promise<BarDetectResu
   }
 
   const mode = String(formData.get('mode') ?? '') as BarCountMode;
-  if (!VALID_MODES.includes(mode)) return { ok: false, error: 'Choose Circle detector, AI estimate, or Both.' };
+  if (!VALID_MODES.includes(mode)) return { ok: false, error: 'Choose Circle detector, Watershed, AI estimate, or Both.' };
 
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
@@ -59,6 +59,14 @@ export async function runBarDetection(formData: FormData): Promise<BarDetectResu
   let photoHeight = 0;
   if (mode === 'CIRCLE_DETECTOR' || mode === 'BOTH') {
     const result = await detectBarCircles(buffer, file.type, calibratedRadius);
+    if (result.error) return { ok: false, error: result.error };
+    circles = result.circles;
+    detectedCount = result.circles.length;
+    photoWidth = result.width;
+    photoHeight = result.height;
+  } else if (mode === 'WATERSHED') {
+    if (!calibratedRadius) return { ok: false, error: 'Drag across one bar end to show its size before running watershed detection.' };
+    const result = await detectBarCirclesWatershed(buffer, file.type, calibratedRadius);
     if (result.error) return { ok: false, error: result.error };
     circles = result.circles;
     detectedCount = result.circles.length;

@@ -162,3 +162,167 @@ export async function detectBarCircles(
     return { circles: [], width: 0, height: 0, error: err instanceof Error ? err.message : 'Unknown error detecting circles.' };
   }
 }
+
+// ---- Watershed segmentation ------------------------------------------------
+// HoughCircles above assumes each bar end is a roughly isolated circular
+// edge — real bundles pack bar ends tight enough that neighbouring ends
+// often touch or overlap in the photo, and that's exactly where Hough
+// merges or drops detections (the failure mode a fixed accumulator
+// threshold can't tune its way out of, whichever photo it's tuned against).
+//
+// Watershed instead treats the whole bundle-end blob as one region and
+// splits it at the "ridges" between bars using a distance transform: a
+// pixel's distance to the nearest background pixel dips right at the point
+// two bars meet, even when their edges are fused in the photo, so each bar
+// still gets its own peak to seed from. That's a structurally different way
+// of handling touching circles than anything already tried this session
+// (fixed-fraction tuning, manual calibration, AI estimation) — it doesn't
+// replace the circle detector, it's a second opinion to compare against it.
+//
+// Validated against the same two real photos referenced above (same
+// bundle, same true count of 112, very different framing/crop). A first
+// pass using a single global (Otsu) threshold to separate the bar-end blob
+// from the background performed badly — 84 at best on either photo, falling
+// as low as 12 — because a real yard photo's background (dirt, a bright
+// yellow rack, sky) isn't a uniform brightness the bar ends cleanly stand
+// out from, unlike the plain-background test images the textbook watershed
+// coin-counting approach assumes. Switching to a local/adaptive threshold
+// (see runWatershedDetection) fixed that: with the settings below it lands
+// at 110 and 84 against the true 112 — not exact, but a closer, more
+// consistent result than the fixed-fraction Hough settings ever got on the
+// same two photos (131 and a 67 that undercounted by 40%).
+const WATERSHED_SEED_RADIUS_FRACTION = 0.3; // a pixel seeds its own bar once its distance from the nearest background pixel exceeds this fraction of the calibrated bar radius
+const WATERSHED_MIN_AREA_FRACTION = 0.25; // discard fragments smaller than this fraction of one calibrated bar's expected area — noise and edge slivers, not real bars
+const WATERSHED_OPEN_KERNEL = 3; // structuring element size for the noise-removal opening pass
+const WATERSHED_BG_DILATE_ITER = 3; // how far to grow the "definitely background" region away from the bar blob
+const WATERSHED_ADAPTIVE_BLOCK_MULT = 6; // adaptive-threshold neighbourhood size, as a multiple of the calibrated bar radius — wide enough to span a lighting gradient across several bars, narrow enough not to wash out the difference between one bar and its neighbour
+const WATERSHED_ADAPTIVE_C = -2; // adaptiveThreshold's constant offset — slightly negative so the local mean itself doesn't get classified as foreground (a real gap between bars stays background even under a fairly flat local gradient)
+
+async function runWatershedDetection(
+  bytes: Buffer, mimeType: string, calibratedRadiusFraction: number,
+): Promise<{ circles: DetectedCircle[]; width: number; height: number }> {
+  if (!(calibratedRadiusFraction > 0)) {
+    throw new Error('Drag across one bar end to show its size before running watershed detection.');
+  }
+
+  const { data, width, height } = decodeToRgba(bytes, mimeType);
+  const cv = await getCv();
+
+  const mat = new cv.Mat(height, width, cv.CV_8UC4);
+  mat.data.set(data);
+
+  // Same working-resolution downscale as the Hough path, for the same
+  // reason — full upload resolution isn't needed to tell bars apart, and
+  // costs real time on a big photo.
+  const scale = Math.min(1, DETECTION_MAX_DIM / Math.max(width, height));
+  const workW = Math.max(1, Math.round(width * scale));
+  const workH = Math.max(1, Math.round(height * scale));
+  const resized = scale < 1 ? new cv.Mat() : null;
+  if (resized) cv.resize(mat, resized, new cv.Size(workW, workH), 0, 0, cv.INTER_AREA);
+  const working = resized ?? mat;
+
+  const gray = new cv.Mat();
+  const blurred = new cv.Mat();
+  const binary = new cv.Mat();
+  const kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(WATERSHED_OPEN_KERNEL, WATERSHED_OPEN_KERNEL));
+  const opened = new cv.Mat();
+  const sureBg = new cv.Mat();
+  const dist = new cv.Mat();
+  const sureFg = new cv.Mat();
+  const sureFg8 = new cv.Mat();
+  const unknown = new cv.Mat();
+  const markers = new cv.Mat();
+  const colorMat = new cv.Mat();
+  try {
+    cv.cvtColor(working, gray, cv.COLOR_RGBA2GRAY);
+    cv.medianBlur(gray, blurred, BLUR_KERNEL);
+    // A single global threshold (Otsu) assumes the whole photo splits
+    // cleanly into "bar ends" vs "everything else" at one brightness level
+    // — true for a lab photo on a plain background, not for a busy yard
+    // photo where the background itself spans a wide brightness range (see
+    // the comment above these constants). Thresholding against each pixel's
+    // local neighbourhood instead keeps the split meaningful across the
+    // photo's own lighting gradient.
+    const calibRpxForThreshold = calibratedRadiusFraction * workW;
+    let adaptiveBlockSize = Math.round(calibRpxForThreshold * WATERSHED_ADAPTIVE_BLOCK_MULT);
+    if (adaptiveBlockSize % 2 === 0) adaptiveBlockSize += 1; // adaptiveThreshold requires an odd block size
+    if (adaptiveBlockSize < 11) adaptiveBlockSize = 11;
+    cv.adaptiveThreshold(
+      blurred, binary, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY,
+      adaptiveBlockSize, WATERSHED_ADAPTIVE_C,
+    );
+    cv.morphologyEx(binary, opened, cv.MORPH_OPEN, kernel, new cv.Point(-1, -1), 2);
+    cv.dilate(opened, sureBg, kernel, new cv.Point(-1, -1), WATERSHED_BG_DILATE_ITER);
+
+    cv.distanceTransform(opened, dist, cv.DIST_L2, 5);
+    // Thresholding relative to the calibrated radius (rather than a
+    // fraction of this photo's single largest distance value, the usual
+    // textbook approach) keeps the seed threshold tied to a known
+    // real-world bar size instead of whatever the biggest touching cluster
+    // in this particular photo happens to look like.
+    const calibR = calibratedRadiusFraction * workW;
+    cv.threshold(dist, sureFg, calibR * WATERSHED_SEED_RADIUS_FRACTION, 255, cv.THRESH_BINARY);
+    sureFg.convertTo(sureFg8, cv.CV_8U);
+    cv.subtract(sureBg, sureFg8, unknown);
+
+    cv.connectedComponents(sureFg8, markers, 8, cv.CV_32S);
+    const markerData: Int32Array = markers.data32S;
+    const unknownData: Uint8Array = unknown.data;
+    for (let i = 0; i < markerData.length; i++) {
+      markerData[i] += 1; // connectedComponents' background label 0 becomes 1, so it reads as "known background" rather than "unlabeled" to watershed
+      if (unknownData[i] === 255) markerData[i] = 0; // 0 marks the region watershed still has to resolve
+    }
+
+    cv.cvtColor(working, colorMat, cv.COLOR_RGBA2RGB);
+    cv.watershed(colorMat, markers);
+
+    // watershed's output isn't binary, so connectedComponents can't run on
+    // it a second time to get per-bar stats — accumulate centroid and area
+    // per label directly from the final markers matrix instead.
+    const sums = new Map<number, { sx: number; sy: number; n: number }>();
+    for (let y = 0; y < workH; y++) {
+      for (let x = 0; x < workW; x++) {
+        const label = markerData[y * workW + x];
+        if (label <= 1) continue; // 1 = background, -1 = watershed boundary line
+        const entry = sums.get(label);
+        if (entry) { entry.sx += x; entry.sy += y; entry.n += 1; }
+        else sums.set(label, { sx: x, sy: y, n: 1 });
+      }
+    }
+
+    const expectedArea = Math.PI * calibR * calibR;
+    const minArea = expectedArea * WATERSHED_MIN_AREA_FRACTION;
+    const circles: DetectedCircle[] = [];
+    for (const { sx, sy, n } of sums.values()) {
+      if (n < minArea) continue;
+      const r = Math.sqrt(n / Math.PI); // area-equivalent radius — watershed regions aren't perfect circles, so this is the closest single number to report
+      circles.push({ x: sx / n / workW, y: sy / n / workH, r: r / workW });
+    }
+    return { circles, width, height };
+  } finally {
+    mat.delete(); resized?.delete(); gray.delete(); blurred.delete(); binary.delete();
+    kernel.delete(); opened.delete(); sureBg.delete(); dist.delete(); sureFg.delete(); sureFg8.delete();
+    unknown.delete(); markers.delete(); colorMat.delete();
+  }
+}
+
+/** Same contract as detectBarCircles, but segments the bundle-end blob with
+ * watershed instead of Hough — see the comment above runWatershedDetection
+ * for why, and for its unvalidated-against-a-real-photo caveat. Unlike the
+ * Hough path, calibratedRadiusFraction is required: watershed's seed
+ * threshold and noise filter are both expressed relative to it, and there's
+ * no fixed-fraction fallback that would mean anything across differently
+ * framed photos (the same problem that motivated calibration in the first
+ * place). */
+export async function detectBarCirclesWatershed(
+  bytes: Buffer, mimeType: string, calibratedRadiusFraction: number,
+): Promise<{ circles: DetectedCircle[]; width: number; height: number; error?: string }> {
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Detection took too long on this photo — try Both/AI estimate, or crop closer to the bundle end and retake it.')), DETECTION_TIMEOUT_MS);
+    });
+    return await Promise.race([runWatershedDetection(bytes, mimeType, calibratedRadiusFraction), timeout]);
+  } catch (err) {
+    return { circles: [], width: 0, height: 0, error: err instanceof Error ? err.message : 'Unknown error detecting circles.' };
+  }
+}
