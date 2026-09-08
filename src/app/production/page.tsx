@@ -118,7 +118,10 @@ function RecentJobs({ jobs, isFender }: { jobs: any[]; isFender: boolean }) {
   if (jobs.length === 0) return null;
   return (
     <section className="card card-pad mt-6">
-      <h2 className="text-lg font-bold mb-1">Recent jobs</h2>
+      <div className="flex items-start justify-between gap-4 mb-1">
+        <h2 className="text-lg font-bold">Recent jobs</h2>
+        <Link href="/production/history" className="text-sm font-semibold text-brand-700 hover:underline whitespace-nowrap">Full history →</Link>
+      </div>
       <p className="text-sm text-ink-muted mb-4">Finished tally sheets — print a copy for the file.</p>
       <Table head={<>
         <th className="th">Job</th><th className="th">{isFender ? 'Process' : 'Rows'}</th>

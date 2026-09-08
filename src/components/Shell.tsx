@@ -167,6 +167,7 @@ export const NAV: Record<string, NavItem[]> = {
   ],
   production: [
     { label: 'Work in progress', href: '/production' },
+    { label: 'History', href: '/production/history' },
     { label: 'Other work', href: '/production/other-work' },
     { label: 'Bar counter', href: '/stock/bar-counter', perm: 'stock.goodsIn' },
     // Bending and BS 8666 dimensional tolerances are rebar-specific — BCS
