@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { Camera, X } from 'lucide-react';
 import type { AssetType } from '@prisma/client';
@@ -19,6 +19,32 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [photo, setPhoto] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Leaving an item unticked is how an issue gets reported on this form —
+  // easy to do by accident (forget one, or tick through on autopilot) with
+  // real consequences (a critical item takes the asset out of service), so
+  // saving is interrupted with exactly what's about to be flagged rather
+  // than submitting silently.
+  const [pendingIssues, setPendingIssues] = useState<{ label: string; critical: boolean; note: string }[] | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const confirmedRef = useRef(false);
+
+  function handleChecklistSubmit(e: React.FormEvent<HTMLFormElement>) {
+    if (confirmedRef.current) { confirmedRef.current = false; return; }
+    const unticked = items
+      .filter(({ label }) => !(oks[label] ?? false))
+      .map(({ label, critical }) => ({ label, critical, note: notes[label] ?? '' }));
+    if (unticked.length > 0) {
+      e.preventDefault();
+      setPendingIssues(unticked);
+    }
+  }
+
+  function confirmAndSubmit() {
+    confirmedRef.current = true;
+    setPendingIssues(null);
+    formRef.current?.requestSubmit();
+  }
 
   async function onPhotoChosen(file: File | undefined) {
     if (!file) return;
@@ -84,7 +110,7 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
         </form>
       </section>
 
-      <form action={logAssetCheck} className="space-y-6">
+      <form ref={formRef} action={logAssetCheck} onSubmit={handleChecklistSubmit} className="space-y-6">
       <input type="hidden" name="assetId" value={assetId} />
       {asset && !asset.outOfService && (
         <section className="card card-pad">
@@ -172,6 +198,45 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
       </section>
       )}
       </form>
+
+      {pendingIssues && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6"
+          onClick={() => setPendingIssues(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-issue-heading"
+        >
+          <div className="card card-pad max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <h2 id="confirm-issue-heading" className="text-lg font-bold mb-1 text-signal">
+              {pendingIssues.length === 1 ? "You're about to report an issue" : `You're about to report ${pendingIssues.length} issues`}
+            </h2>
+            <p className="text-sm text-ink-muted mb-3">
+              {pendingIssues.length === 1 ? "This item isn't" : 'These items are not'} ticked OK, which will flag{' '}
+              {pendingIssues.length === 1 ? 'it' : 'them'} as an issue on {asset?.name ?? 'this asset'}:
+            </p>
+            <ul className="space-y-1.5 mb-3">
+              {pendingIssues.map(({ label, critical, note }) => (
+                <li key={label} className="text-sm bg-canvas rounded-lg p-2.5">
+                  <span className="font-medium">{label}</span>
+                  {critical && <span className="ml-2 text-xs font-bold text-signal uppercase tracking-wide">Critical</span>}
+                  {note && <span className="block text-xs text-ink-muted mt-0.5">{note}</span>}
+                </li>
+              ))}
+            </ul>
+            {pendingIssues.some((i) => i.critical) && (
+              <p className="text-xs text-signal font-medium mb-3">
+                This includes a critical item — {asset?.name ?? 'this asset'} will be marked out of service until it&apos;s resolved.
+              </p>
+            )}
+            <p className="text-sm font-medium mb-4">Do you want to confirm?</p>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setPendingIssues(null)}>Cancel</button>
+              <button type="button" className="btn-primary" onClick={confirmAndSubmit}>Confirm &amp; save check</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
