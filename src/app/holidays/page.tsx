@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { shortDate, clock } from '@/lib/format';
+import { holidayYearEnd, holidayYearLabel, holidayYearStart } from '@/lib/holidays';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, Empty, PageHeader, Pill, Stat, StatRow, Table } from '@/components/ui';
 import { adjustHolidayBalance, cancelHoliday, decideHoliday } from './actions';
@@ -13,10 +14,15 @@ export default async function HolidaysPage() {
   const user = await requirePermission('holidays.view');
   const alerts = await getAlerts(user);
   const isMaster = user.role === 'MASTER_ADMIN';
-  const currentYear = new Date().getUTCFullYear();
+  const today = new Date();
+  const currentYear = holidayYearLabel(today);
 
-  const yearStart = new Date(Date.UTC(currentYear, 0, 1));
-  const yearEnd = new Date(Date.UTC(currentYear, 11, 31));
+  // The holiday year runs 1 April to 31 March, not the calendar year — see
+  // lib/holidays.ts. Everything below ("used this year", "remaining", the
+  // adjustment log) is measured against this window, so it resets on 1
+  // April rather than 1 January.
+  const yearStart = holidayYearStart(today);
+  const yearEnd = holidayYearEnd(today);
 
   const [myRequests, myRecord, myAdjustments, pending, activeLive, everyone, recentAdjustments] = await Promise.all([
     db.holidayRequest.findMany({ where: { userId: user.id }, orderBy: { startDate: 'desc' } }),
@@ -68,6 +74,10 @@ export default async function HolidaysPage() {
         blurb="Request time off, see who else is away, and — if you're a Master Administrator — decide what's outstanding."
         actions={<Link href="/planning?view=month" className="btn-secondary">Open calendar</Link>}
       />
+
+      <p className="text-sm text-ink-muted -mt-4 mb-4">
+        This holiday year: {shortDate(yearStart)} – {shortDate(yearEnd)}
+      </p>
 
       <StatRow>
         <Stat value={myRecord.holidayAllowanceDays} label="Days a year" />

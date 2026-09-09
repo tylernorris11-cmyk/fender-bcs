@@ -120,3 +120,23 @@ export function eachDayInclusive(start: Date, end: Date): Date[] {
  */
 export const workingDaysBetween = (start: Date, end: Date) =>
   eachDayInclusive(start, end).filter(isWorkingDay).length;
+
+/**
+ * The holiday year runs 1 April to 31 March, not the calendar year — this
+ * is what "days used", "remaining" and the adjustment log are all measured
+ * against, so allowance resets on 1 April rather than 1 January. Labelled
+ * by the calendar year it starts in: 1 April 2026 to 31 March 2027 is "the
+ * 2026 holiday year".
+ */
+export function holidayYearStart(d: Date): Date {
+  const day = toUtcDay(d);
+  const year = day.getUTCMonth() >= 3 ? day.getUTCFullYear() : day.getUTCFullYear() - 1;
+  return utcDay(year, 3, 1);
+}
+
+export function holidayYearEnd(d: Date): Date {
+  const start = holidayYearStart(d);
+  return utcDay(start.getUTCFullYear() + 1, 2, 31);
+}
+
+export const holidayYearLabel = (d: Date): number => holidayYearStart(d).getUTCFullYear();
