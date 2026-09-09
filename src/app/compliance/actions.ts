@@ -2,7 +2,7 @@
 
 import { put } from '@vercel/blob';
 import { revalidatePath } from 'next/cache';
-import type { CertificateSize, Company } from '@prisma/client';
+import type { CertificateSize, Company, ComplianceDocumentCategory } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { assertCaresApplies, assertCompanyAccess, getActiveCompany } from '@/lib/company';
@@ -286,4 +286,49 @@ export async function rejectCastNumber(formData: FormData) {
   assertCompanyAccess(user, cast.certificate.company);
   await db.extractedCastNumber.delete({ where: { id } });
   revalidatePath('/compliance/test-certs');
+}
+
+// ------------------------------------------------- CARES documents
+// Reference material (procedures, CARES's own guidance, scope of approval)
+// rather than certificates — same upload/archive shape as HS documents.
+
+const ALLOWED_COMPLIANCE_DOC_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+
+export async function uploadComplianceDocument(formData: FormData) {
+  const user = await assertPermission('compliance.edit');
+  assertCaresApplies(user);
+  const company = getActiveCompany(user);
+
+  const title = String(formData.get('title') ?? '').trim();
+  if (!title) throw new Error('Give the document a title.');
+  const category = String(formData.get('category') ?? 'OTHER') as ComplianceDocumentCategory;
+
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) throw new Error('Choose a file to upload.');
+  if (!ALLOWED_COMPLIANCE_DOC_TYPES.includes(file.type)) throw new Error('Only PDF, PNG, JPEG or WebP files are supported.');
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error('File storage is not set up yet — add BLOB_READ_WRITE_TOKEN before uploading.');
+  }
+
+  const bytes = await file.arrayBuffer();
+  const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '-');
+  const blob = await put(`compliance-documents/${Date.now()}-${safeName}`, Buffer.from(bytes), { access: 'private' });
+
+  const doc = await db.complianceDocument.create({
+    data: { company, category, title, fileUrl: blob.url, fileName: file.name, uploadedById: user.id },
+  });
+  await logActivity('ComplianceDocument', doc.id, 'Uploaded', title, user.id);
+  revalidatePath('/compliance/documents');
+}
+
+export async function archiveComplianceDocument(formData: FormData) {
+  const user = await assertPermission('compliance.edit');
+  assertCaresApplies(user);
+  const id = String(formData.get('id') ?? '');
+  const doc = await db.complianceDocument.findUniqueOrThrow({ where: { id } });
+  assertCompanyAccess(user, doc.company);
+
+  await db.complianceDocument.update({ where: { id }, data: { archived: true } });
+  await logActivity('ComplianceDocument', id, 'Archived', doc.title, user.id);
+  revalidatePath('/compliance/documents');
 }

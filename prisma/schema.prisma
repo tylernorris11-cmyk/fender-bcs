@@ -78,6 +78,7 @@ model User {
   accessRequestsDecided AccessRequest[] @relation("decidedBy")
   testCertificatesUploaded TestCertificate[]
   castNumbersConfirmed     ExtractedCastNumber[] @relation("castConfirmedBy")
+  complianceDocumentsUploaded ComplianceDocument[]
   hseDocumentsUploaded   HseDocument[]
   trainingModulesCreated TrainingModule[]
   trainingCompletions    TrainingCompletion[]
@@ -1031,6 +1032,35 @@ model TestCertificate {
 
   @@index([company])
   @@index([company, size])
+}
+
+// Reference material — CARES's own guidance, Fender's written procedures for
+// meeting it, scope of approval documents — not certificates. Certificate
+// (above the suppliers section) and TestCertificate are for documents that
+// prove something (an approval, a batch's properties); this is just the
+// paperwork explaining what the scheme requires, for anyone to check against.
+enum ComplianceDocumentCategory {
+  PROCEDURE
+  CARES_GUIDANCE
+  SCOPE_OF_APPROVAL
+  OTHER
+}
+
+model ComplianceDocument {
+  id           String                     @id @default(cuid())
+  company      Company                    @default(FENDER)
+  category     ComplianceDocumentCategory @default(OTHER)
+  title        String
+  fileUrl      String
+  fileName     String
+  uploadedById String?
+  uploadedAt   DateTime                   @default(now())
+  archived     Boolean                    @default(false)
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id])
+
+  @@index([company])
+  @@index([category])
 }
 
 // ------------------------------------------------------------ holidays
