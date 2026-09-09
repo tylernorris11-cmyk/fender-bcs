@@ -1080,6 +1080,7 @@ model HolidayRequest {
   startDate    DateTime // UTC midnight, inclusive
   endDate      DateTime // UTC midnight, inclusive
   workingDays  Int // weekends and bank holidays already excluded
+  unpaidDays   Int           @default(0) // how many of workingDays exceeded the requester's remaining paid allowance at the moment they requested it — 0 means fully paid
   note         String        @default("")
   status       HolidayStatus @default(PENDING)
   requestedAt  DateTime      @default(now())

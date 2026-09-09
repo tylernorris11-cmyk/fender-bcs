@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { assertPermission, logActivity, notifyMasterAdmins, requireUser } from '@/lib/auth';
 import { sendEmail } from '@/lib/email';
 import { parseDayInput, workingDaysBetween } from '@/lib/holidays';
+import { holidayBalance } from '@/lib/holidayBalance';
 
 export async function requestHoliday(formData: FormData) {
   const user = await assertPermission('holidays.view');
@@ -17,20 +18,32 @@ export async function requestHoliday(formData: FormData) {
   const workingDays = workingDaysBetween(startDate, endDate);
   if (workingDays === 0) throw new Error('That range is entirely weekends and bank holidays — nothing to book off.');
 
+  // No days left doesn't block the request — it just comes through as
+  // unpaid holiday for whatever's left over. The requester confirms they
+  // understand that (see the modal in RequestHolidayForm) before this ever
+  // gets called; unpaidDays is locked in here, at request time, against
+  // today's balance, not re-worked out later at approval.
+  const { remaining } = await holidayBalance(user.id, startDate);
+  const unpaidDays = Math.max(0, workingDays - Math.max(0, remaining));
+
   const request = await db.holidayRequest.create({
     data: {
-      userId: user.id, startDate, endDate, workingDays,
+      userId: user.id, startDate, endDate, workingDays, unpaidDays,
       note: String(formData.get('note') ?? '').trim(),
     },
   });
 
-  await logActivity('HolidayRequest', request.id, 'Requested', `${workingDays} day(s) from ${startDate.toDateString()}`, user.id);
+  await logActivity(
+    'HolidayRequest', request.id, 'Requested',
+    `${workingDays} day(s) from ${startDate.toDateString()}${unpaidDays > 0 ? ` (${unpaidDays} unpaid)` : ''}`,
+    user.id,
+  );
 
   // Tell every Master Administrator there's something to look at — same
   // pattern as an access request landing in the approval queue.
   await notifyMasterAdmins({
     subject: `Holiday request from ${user.name}`,
-    text: `${user.name} has asked for ${workingDays} day(s) off, ${startDate.toDateString()} to ${endDate.toDateString()}.`,
+    text: `${user.name} has asked for ${workingDays} day(s) off, ${startDate.toDateString()} to ${endDate.toDateString()}.${unpaidDays > 0 ? ` ${unpaidDays} of these would be unpaid.` : ''}`,
     path: '/holidays',
     telegram: false,
   });
@@ -82,6 +95,7 @@ export async function decideHoliday(formData: FormData) {
       `Hi ${request.user.name},`,
       '',
       `Your request for ${request.workingDays} day(s), ${request.startDate.toDateString()} to ${request.endDate.toDateString()}, was ${decision === 'APPROVED' ? 'approved' : 'not approved'} by ${admin.name}.`,
+      request.unpaidDays > 0 ? `\n${request.unpaidDays} of these day(s) are unpaid, as agreed when you requested it.` : '',
       decisionNote ? `\nNote: ${decisionNote}` : '',
     ].join('\n'),
   });

@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { shortDate, clock } from '@/lib/format';
 import { holidayYearEnd, holidayYearLabel, holidayYearStart } from '@/lib/holidays';
+import { holidayBalance } from '@/lib/holidayBalance';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, Empty, PageHeader, Pill, Stat, StatRow, Table } from '@/components/ui';
 import { adjustHolidayBalance, cancelHoliday, decideHoliday } from './actions';
@@ -24,9 +25,9 @@ export default async function HolidaysPage() {
   const yearStart = holidayYearStart(today);
   const yearEnd = holidayYearEnd(today);
 
-  const [myRequests, myRecord, myAdjustments, pending, activeLive, everyone, recentAdjustments] = await Promise.all([
+  const [myRequests, myBalance, myAdjustments, pending, activeLive, everyone, recentAdjustments] = await Promise.all([
     db.holidayRequest.findMany({ where: { userId: user.id }, orderBy: { startDate: 'desc' } }),
-    db.user.findUniqueOrThrow({ where: { id: user.id }, select: { holidayAllowanceDays: true } }),
+    holidayBalance(user.id, today),
     db.holidayAdjustment.findMany({ where: { userId: user.id, year: currentYear }, orderBy: { createdAt: 'desc' } }),
     isMaster
       ? db.holidayRequest.findMany({
@@ -55,14 +56,15 @@ export default async function HolidaysPage() {
       : Promise.resolve([]),
   ]);
 
-  const used = myRequests
+  const used = myBalance.usedPaid;
+  const unpaidUsed = myRequests
     .filter((r) => r.status === 'APPROVED' && r.startDate >= yearStart && r.startDate <= yearEnd)
-    .reduce((s, r) => s + r.workingDays, 0);
+    .reduce((s, r) => s + r.unpaidDays, 0);
   const awaiting = myRequests
     .filter((r) => r.status === 'PENDING' && r.startDate >= yearStart && r.startDate <= yearEnd)
     .reduce((s, r) => s + r.workingDays, 0);
-  const adjustmentTotal = myAdjustments.reduce((s, a) => s + a.days, 0);
-  const remaining = myRecord.holidayAllowanceDays - used + adjustmentTotal;
+  const adjustmentTotal = myBalance.adjustmentTotal;
+  const remaining = myBalance.remaining;
 
   const conflictsFor = (reqId: string, requesterUserId: string, start: Date, end: Date) =>
     activeLive.filter((r) => r.id !== reqId && r.userId !== requesterUserId && r.startDate <= end && r.endDate >= start);
@@ -80,10 +82,11 @@ export default async function HolidaysPage() {
       </p>
 
       <StatRow>
-        <Stat value={myRecord.holidayAllowanceDays} label="Days a year" />
+        <Stat value={myBalance.allowance} label="Days a year" />
         <Stat value={used} label="Used this year" tone="good" />
         <Stat value={awaiting} label="Awaiting a decision" tone={awaiting ? 'warn' : 'default'} />
         <Stat value={remaining} label="Remaining" tone={remaining < 0 ? 'bad' : 'default'} />
+        {unpaidUsed > 0 && <Stat value={unpaidUsed} label="Unpaid this year" tone="warn" />}
       </StatRow>
 
       {myAdjustments.length > 0 && (
@@ -102,7 +105,7 @@ export default async function HolidaysPage() {
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
         <section className="card card-pad">
           <h2 className="text-lg font-bold mb-4">Request holiday</h2>
-          <RequestHolidayForm />
+          <RequestHolidayForm remainingDays={remaining} />
         </section>
 
         <section className="card card-pad">
@@ -117,6 +120,9 @@ export default async function HolidaysPage() {
                     <Pill tone={r.status === 'APPROVED' ? 'good' : r.status === 'REJECTED' ? 'bad' : r.status === 'CANCELLED' ? 'neutral' : 'warn'}>
                       {r.status.charAt(0) + r.status.slice(1).toLowerCase()}
                     </Pill>
+                    {r.unpaidDays > 0 && (
+                      <Pill tone="warn">{r.unpaidDays === r.workingDays ? 'Unpaid' : `${r.unpaidDays} unpaid`}</Pill>
+                    )}
                     {r.status === 'PENDING' && (
                       <form action={cancelHoliday} className="ml-auto">
                         <input type="hidden" name="requestId" value={r.id} />
@@ -150,6 +156,11 @@ export default async function HolidaysPage() {
                         <p className="font-semibold">{r.user.name} <span className="font-normal text-ink-faint">{r.user.jobTitle}</span></p>
                         <p className="text-sm text-ink-muted">
                           {shortDate(r.startDate)} – {shortDate(r.endDate)} · {r.workingDays} day{r.workingDays === 1 ? '' : 's'}
+                          {r.unpaidDays > 0 && (
+                            <span className="text-signal font-medium">
+                              {' '}· {r.unpaidDays === r.workingDays ? 'all unpaid' : `${r.unpaidDays} unpaid`}
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
