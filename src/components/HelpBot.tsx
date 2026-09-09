@@ -1,10 +1,35 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Loader2, Send, X } from 'lucide-react';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
+
+// Matches the [Label](/path) links the bot is instructed to write when it
+// names a specific page — only ever a path starting with "/", so there's
+// no way for a reply to turn into a link off the site. Anything else in
+// the message renders as plain text either side of it.
+const LINK_PATTERN = /\[([^\]]+)]\((\/[^\s)]*)\)/g;
+
+function renderWithLinks(content: string) {
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  for (const match of content.matchAll(LINK_PATTERN)) {
+    const [full, label, href] = match;
+    const index = match.index ?? 0;
+    if (index > lastIndex) nodes.push(<Fragment key={lastIndex}>{content.slice(lastIndex, index)}</Fragment>);
+    nodes.push(
+      <Link key={index} href={href} className="underline font-semibold decoration-2 underline-offset-2">
+        {label}
+      </Link>,
+    );
+    lastIndex = index + full.length;
+  }
+  if (lastIndex < content.length) nodes.push(<Fragment key={lastIndex}>{content.slice(lastIndex)}</Fragment>);
+  return nodes;
+}
 
 /**
  * A floating "how do I..." assistant, grounded only in a description of
@@ -104,7 +129,7 @@ export function HelpBot({ userName }: { userName: string }) {
                   m.role === 'user' ? 'bg-brand text-white' : 'bg-canvas text-ink'
                 }`}
                 >
-                  {m.content}
+                  {m.role === 'assistant' ? renderWithLinks(m.content) : m.content}
                 </p>
               </div>
             ))}
