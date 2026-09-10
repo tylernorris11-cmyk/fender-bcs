@@ -51,7 +51,13 @@ export async function extractCastNumbers({
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 1024,
+        max_tokens: 4096,
+        // Extended thinking is on by default for this model and was eating the
+        // whole max_tokens budget on some larger certificates (mesh ones especially
+        // — more casts per page) before any text got written, so the response came
+        // back empty and JSON.parse blew up. Reading cast numbers off a page is a
+        // plain lookup task, not something that benefits from reasoning.
+        thinking: { type: 'disabled' },
         messages: [{ role: 'user', content }],
       }),
     });
@@ -63,8 +69,12 @@ export async function extractCastNumbers({
 
     const data = await res.json();
     const raw = (data.content ?? []).map((b: { text?: string }) => b.text ?? '').join('').trim();
-    const cleaned = raw.replace(/^```(json)?/i, '').replace(/```$/, '').trim();
-    const parsed = JSON.parse(cleaned);
+    // With thinking disabled the model occasionally wraps the array in a
+    // sentence or a markdown fence instead of replying with just the array
+    // as asked — pull out the [...] rather than assuming the reply is clean.
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) return { castNumbers: [], error: 'Could not find a JSON array in the response.' };
+    const parsed = JSON.parse(match[0]);
     if (!Array.isArray(parsed)) return { castNumbers: [], error: 'Unexpected response shape from Anthropic.' };
     const castNumbers = parsed.map((v) => String(v).trim()).filter(Boolean);
     return { castNumbers };
