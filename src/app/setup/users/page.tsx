@@ -43,7 +43,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
           <SortTh label="Role" field="role" basePath="/setup/users" searchParams={searchParams} />
           <SortTh label="Last signed in" field="lastLogin" basePath="/setup/users" searchParams={searchParams} />
           <th className="th">Company access</th>
-          <th className="th">Holiday days/yr</th>
+          <th className="th" title="The full year total, including bank holidays — not on top of them.">Holiday days/yr</th>
           <th className="th">Status</th><th className="th sr-only">Reset password</th>
         </>}>
           {users.map((u) => {
