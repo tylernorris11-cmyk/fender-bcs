@@ -153,10 +153,12 @@ export default async function Launcher() {
             const inProgress = !STABLE_MODULE_KEYS.has(m.key);
             return (
               <Link key={m.key} href={m.href} className="card relative overflow-hidden p-6 pb-8 group hover:shadow-pop transition-shadow">
-                {inProgress && <span className="absolute top-0 left-0 right-0 h-1.5 hazard-stripe" aria-hidden />}
                 <span className={`absolute bottom-0 left-0 right-0 h-1 ${tone.bar}`} aria-hidden />
                 {inProgress && (
-                  <span className="absolute top-3.5 right-3.5 rounded-pill bg-[#16110A] text-[#F5C518] text-[10px] font-semibold uppercase tracking-wide px-2 py-1">
+                  <span
+                    className="absolute top-3.5 -right-[34px] w-[130px] rotate-45 text-center py-0.5 bg-[#16110A] text-[#F5C518] text-[9px] font-bold tracking-wider uppercase"
+                    aria-hidden
+                  >
                     In progress
                   </span>
                 )}
