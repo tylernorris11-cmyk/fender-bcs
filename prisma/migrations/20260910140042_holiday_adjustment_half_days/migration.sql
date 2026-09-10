@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "HolidayAdjustment" ALTER COLUMN "days" SET DATA TYPE DOUBLE PRECISION;

@@ -248,7 +248,7 @@ export default async function HolidaysPage() {
             </div>
             <div>
               <label className="label text-xs" htmlFor="days">Days (+ to add, − to take away)</label>
-              <input id="days" name="days" type="number" required placeholder="-6" className="input w-32" />
+              <input id="days" name="days" type="number" step="0.5" required placeholder="-6" className="input w-32" />
             </div>
             <div className="flex-1 min-w-[220px]">
               <label className="label text-xs" htmlFor="reason">Reason</label>

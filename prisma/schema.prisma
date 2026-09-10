@@ -1111,7 +1111,7 @@ model HolidayAdjustment {
   id          String   @id @default(cuid())
   userId      String
   year        Int
-  days        Int // positive = added, negative = taken away
+  days        Float // positive = added, negative = taken away; half-day (0.5) steps allowed
   reason      String
   createdAt   DateTime @default(now())
   createdById String

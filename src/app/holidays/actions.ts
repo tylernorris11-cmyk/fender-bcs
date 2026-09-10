@@ -135,7 +135,9 @@ export async function adjustHolidayBalance(formData: FormData) {
   const reason = String(formData.get('reason') ?? '').trim();
 
   if (!Number.isInteger(year) || year < 2020 || year > 2100) throw new Error('Enter a valid year.');
-  if (!Number.isInteger(days) || days === 0) throw new Error('Enter a number of days — positive to add, negative to take away.');
+  if (!Number.isFinite(days) || days === 0 || !Number.isInteger(days * 2)) {
+    throw new Error('Enter a number of days in half-day steps (e.g. -6 or 2.5) — positive to add, negative to take away.');
+  }
   if (!reason) throw new Error('Say why, so it’s on record.');
 
   await db.user.findUniqueOrThrow({ where: { id: userId } });
