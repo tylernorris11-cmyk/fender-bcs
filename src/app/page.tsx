@@ -28,6 +28,10 @@ const TONES = {
   hs: { icon: 'bg-teal-100 text-teal-700', bar: 'bg-teal-500', arrow: 'border-teal-500 text-teal-600' },
 } as const;
 
+// Assets, Checks and Fuel have had enough real use and testing this far —
+// every other tile gets a hazard-stripe flag until the same is true there.
+const STABLE_MODULE_KEYS = new Set(['assets', 'checks', 'fuel']);
+
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
@@ -146,9 +150,16 @@ export default async function Launcher() {
           {tiles.map((m) => {
             const Icon = MODULE_ICONS[m.key];
             const tone = TONES[m.key];
+            const inProgress = !STABLE_MODULE_KEYS.has(m.key);
             return (
               <Link key={m.key} href={m.href} className="card relative overflow-hidden p-6 pb-8 group hover:shadow-pop transition-shadow">
+                {inProgress && <span className="absolute top-0 left-0 right-0 h-1.5 hazard-stripe" aria-hidden />}
                 <span className={`absolute bottom-0 left-0 right-0 h-1 ${tone.bar}`} aria-hidden />
+                {inProgress && (
+                  <span className="absolute top-3.5 right-3.5 rounded-pill bg-[#16110A] text-[#F5C518] text-[10px] font-semibold uppercase tracking-wide px-2 py-1">
+                    In progress
+                  </span>
+                )}
                 <span className={`inline-grid place-items-center h-14 w-14 rounded-2xl ${tone.icon}`} aria-hidden>
                   <Icon size={26} />
                 </span>
