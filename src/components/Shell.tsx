@@ -5,7 +5,7 @@ import { Bell, Bug, Home, LogOut } from 'lucide-react';
 import type { Company } from '@prisma/client';
 import { can, MODULES, ROLE_LABELS, type Permission, type SessionUser } from '@/lib/rbac';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
-import { STABLE_MODULE_KEYS } from '@/lib/moduleIcons';
+import { isStableModule } from '@/lib/moduleIcons';
 import { Avatar } from './ui';
 import { ModuleSwitcher } from './ModuleSwitcher';
 import { GlobalSearch } from './GlobalSearch';
@@ -35,8 +35,9 @@ export function Shell({
   const isBsSupplies = active === 'BS_SUPPLIES';
   const visible = nav.filter((n) => (!n.perm || can(user, n.perm)) && (!n.company || n.company === active));
   const switcherItems = [
-    ...MODULES.filter((m) => can(user, m.perm) && (!('company' in m) || m.company === active)).map((m) => ({ key: m.key, label: m.label, href: m.href })),
-    ...(can(user, 'setup.view') ? [{ key: 'setup', label: 'Set Up', href: '/setup/pricing' }] : []),
+    ...MODULES.filter((m) => can(user, m.perm) && (!('company' in m) || m.company === active))
+      .map((m) => ({ key: m.key, label: m.label, href: m.href, inProgress: !isStableModule(m.key, active) })),
+    ...(can(user, 'setup.view') ? [{ key: 'setup', label: 'Set Up', href: '/setup/pricing', inProgress: !isStableModule('setup', active) }] : []),
   ];
 
   return (
@@ -149,7 +150,7 @@ export function Shell({
           </div>
         </header>
 
-        {!STABLE_MODULE_KEYS.has(module) && <InProgressBanner />}
+        {!isStableModule(module, active) && <InProgressBanner />}
 
         <main className="p-4 sm:p-7 max-w-[1200px]">{children}</main>
       </div>

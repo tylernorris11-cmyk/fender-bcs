@@ -2,6 +2,7 @@ import {
   CalendarDays, CalendarHeart, CircleDot, ClipboardCheck, ClipboardList, Factory, Fuel, HardHat, Layers,
   Settings, ShieldCheck, ShoppingCart, Truck, Users, type LucideIcon,
 } from 'lucide-react';
+import type { Company } from '@prisma/client';
 
 /** One icon per module key — shared between the home screen tiles and the
  * module switcher dropdown, so the two never drift out of sync. */
@@ -21,6 +22,17 @@ export const MODULE_COLORS: Record<string, string> = {
 
 /** Modules with real use and testing behind them — everywhere else still
  * gets an in-progress flag (the corner ribbon on the home tiles, the
- * hazard banner in Shell, the WIP tag in the module switcher). One set so
- * all three can't drift out of sync with each other. */
-export const STABLE_MODULE_KEYS = new Set(['assets', 'checks', 'fuel']);
+ * hazard banner in Shell, the WIP tag in the module switcher). One
+ * function so all three can't drift out of sync with each other. */
+const STABLE_MODULE_KEYS = new Set(['assets', 'checks', 'fuel']);
+
+/** Stable only on the BCS Products side — its production process (cutting
+ * fence post to length from coil) is much simpler than Fender's
+ * cut-and-bend-to-BS-8666 workflow and has had enough real use there,
+ * while Fender's side hasn't. */
+const STABLE_FOR_BS_SUPPLIES_ONLY = new Set(['production']);
+
+export function isStableModule(key: string, company: Company | null | undefined): boolean {
+  if (STABLE_MODULE_KEYS.has(key)) return true;
+  return company === 'BS_SUPPLIES' && STABLE_FOR_BS_SUPPLIES_ONLY.has(key);
+}

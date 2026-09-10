@@ -3,9 +3,12 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { MODULE_COLORS, MODULE_ICONS, STABLE_MODULE_KEYS } from '@/lib/moduleIcons';
+import { MODULE_COLORS, MODULE_ICONS } from '@/lib/moduleIcons';
 
-export type SwitcherItem = { key: string; label: string; href: string };
+// inProgress is worked out server-side in Shell (it needs to know the
+// active company, which this client component doesn't), then just
+// rendered here — keeps the company-aware logic in one place.
+export type SwitcherItem = { key: string; label: string; href: string; inProgress?: boolean };
 
 /** The module pill in the header — click it to jump straight to any area
  * the signed-in user has access to, instead of going home first. */
@@ -67,7 +70,7 @@ export function ModuleSwitcher({
               >
                 {Icon && <Icon size={16} className={`shrink-0 ${item.key === current ? '' : color}`} aria-hidden />}
                 <span className="flex-1">{item.label}</span>
-                {!STABLE_MODULE_KEYS.has(item.key) && (
+                {item.inProgress && (
                   <span className="shrink-0 bg-[#16110A] text-[#F5C518] text-[9px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded">
                     WIP
                   </span>

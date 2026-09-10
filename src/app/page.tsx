@@ -7,7 +7,7 @@ import { getAlerts } from '@/lib/alerts';
 import { incompleteRequiredModulesFor } from '@/lib/training';
 import { longDate } from '@/lib/format';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
-import { MODULE_ICONS, STABLE_MODULE_KEYS } from '@/lib/moduleIcons';
+import { isStableModule, MODULE_ICONS } from '@/lib/moduleIcons';
 import { Avatar } from '@/components/ui';
 import { GlobalSearch } from '@/components/GlobalSearch';
 
@@ -146,7 +146,7 @@ export default async function Launcher() {
           {tiles.map((m) => {
             const Icon = MODULE_ICONS[m.key];
             const tone = TONES[m.key];
-            const inProgress = !STABLE_MODULE_KEYS.has(m.key);
+            const inProgress = !isStableModule(m.key, active);
             return (
               <Link key={m.key} href={m.href} className="card relative overflow-hidden p-6 pb-8 group hover:shadow-pop transition-shadow">
                 <span className={`absolute bottom-0 left-0 right-0 h-1 ${tone.bar}`} aria-hidden />
