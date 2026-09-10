@@ -28,7 +28,7 @@ type Entry = {
 // point-in-time list item like a delivery or inspection, it's "who's away on
 // this calendar day", derived from a UTC-midnight date *range*
 // (HolidayRequest.startDate/endDate) rather than a single instant.
-type HolidayEntry = { id: string; name: string; colour: string; status: HolidayStatus };
+type HolidayEntry = { id: string; name: string; colour: string; status: HolidayStatus; half: 'AM' | 'PM' | null };
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
@@ -173,7 +173,7 @@ export default async function PlanningPage({
   for (const r of holidayRequests) {
     for (const day of eachDayInclusive(r.startDate, r.endDate)) {
       const key = isoDay(day);
-      const entry: HolidayEntry = { id: r.id, name: r.user.name, colour: r.user.colour, status: r.status };
+      const entry: HolidayEntry = { id: r.id, name: r.user.name, colour: r.user.colour, status: r.status, half: r.half };
       const list = holidaysByDay.get(key);
       if (list) list.push(entry); else holidaysByDay.set(key, [entry]);
     }
@@ -276,9 +276,9 @@ export default async function PlanningPage({
                       <li key={h.id}
                           className={`flex items-center gap-1 text-[11px] rounded px-1 py-0.5 ${h.status === 'PENDING' ? 'border border-dashed border-hairline' : ''}`}
                           style={{ background: h.status === 'APPROVED' ? `${h.colour}22` : undefined }}
-                          title={`${h.name}${h.status === 'PENDING' ? ' (pending)' : ''}`}>
+                          title={`${h.name}${h.half ? ` (${h.half === 'AM' ? 'morning' : 'afternoon'})` : ''}${h.status === 'PENDING' ? ' (pending)' : ''}`}>
                         <Avatar name={h.name} colour={h.colour} size={14} />
-                        <span className="truncate">{h.name.split(' ')[0]}</span>
+                        <span className="truncate">{h.name.split(' ')[0]}{h.half ? ` (${h.half})` : ''}</span>
                       </li>
                     ))}
                   </ul>

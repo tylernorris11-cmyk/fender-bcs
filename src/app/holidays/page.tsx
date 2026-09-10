@@ -4,7 +4,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { shortDate, clock } from '@/lib/format';
-import { holidayYearEnd, holidayYearLabel, holidayYearStart } from '@/lib/holidays';
+import { describeHolidayLength, holidayYearEnd, holidayYearLabel, holidayYearStart } from '@/lib/holidays';
 import { holidayBalance } from '@/lib/holidayBalance';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, Empty, PageHeader, Pill, Stat, StatRow, Table } from '@/components/ui';
@@ -135,7 +135,7 @@ export default async function HolidaysPage() {
                 <li key={r.id} className="py-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold">{shortDate(r.startDate)} – {shortDate(r.endDate)}</span>
-                    <span className="text-ink-muted">{r.workingDays} day{r.workingDays === 1 ? '' : 's'}</span>
+                    <span className="text-ink-muted">{describeHolidayLength(r.workingDays, r.half)}</span>
                     <Pill tone={r.status === 'APPROVED' ? 'good' : r.status === 'REJECTED' ? 'bad' : r.status === 'CANCELLED' ? 'neutral' : 'warn'}>
                       {r.status.charAt(0) + r.status.slice(1).toLowerCase()}
                     </Pill>
@@ -174,7 +174,7 @@ export default async function HolidaysPage() {
                       <div>
                         <p className="font-semibold">{r.user.name} <span className="font-normal text-ink-faint">{r.user.jobTitle}</span></p>
                         <p className="text-sm text-ink-muted">
-                          {shortDate(r.startDate)} – {shortDate(r.endDate)} · {r.workingDays} day{r.workingDays === 1 ? '' : 's'}
+                          {shortDate(r.startDate)} – {shortDate(r.endDate)} · {describeHolidayLength(r.workingDays, r.half)}
                           {r.unpaidDays > 0 && (
                             <span className="text-signal font-medium">
                               {' '}· {r.unpaidDays === r.workingDays ? 'all unpaid' : `${r.unpaidDays} unpaid`}

@@ -4,19 +4,32 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity, notifyMasterAdmins, requireUser } from '@/lib/auth';
 import { sendEmail } from '@/lib/email';
-import { parseDayInput, workingDaysBetween } from '@/lib/holidays';
+import { describeHolidayLength, isWorkingDay, parseDayInput, workingDaysBetween } from '@/lib/holidays';
 import { holidayBalance } from '@/lib/holidayBalance';
 
 export async function requestHoliday(formData: FormData) {
   const user = await assertPermission('holidays.view');
 
   const startDate = parseDayInput(String(formData.get('startDate') ?? ''));
-  const endDate = parseDayInput(String(formData.get('endDate') ?? ''));
-  if (!startDate || !endDate) throw new Error('Enter a start and end date.');
+  if (!startDate) throw new Error('Enter a start date.');
+
+  const halfRaw = String(formData.get('half') ?? '');
+  const half = halfRaw === 'AM' || halfRaw === 'PM' ? halfRaw : null;
+
+  // A half day is always a single day — the form doesn't even submit an
+  // endDate for one (the "Last day" field is swapped for the AM/PM picker).
+  const endDate = half ? startDate : parseDayInput(String(formData.get('endDate') ?? ''));
+  if (!endDate) throw new Error('Enter an end date.');
   if (endDate < startDate) throw new Error('The end date is before the start date.');
 
-  const workingDays = workingDaysBetween(startDate, endDate);
-  if (workingDays === 0) throw new Error('That range is entirely weekends and bank holidays — nothing to book off.');
+  let workingDays: number;
+  if (half) {
+    if (!isWorkingDay(startDate)) throw new Error('That day is a weekend or bank holiday — nothing to book off.');
+    workingDays = 0.5;
+  } else {
+    workingDays = workingDaysBetween(startDate, endDate);
+    if (workingDays === 0) throw new Error('That range is entirely weekends and bank holidays — nothing to book off.');
+  }
 
   // No days left doesn't block the request — it just comes through as
   // unpaid holiday for whatever's left over. The requester confirms they
@@ -28,14 +41,15 @@ export async function requestHoliday(formData: FormData) {
 
   const request = await db.holidayRequest.create({
     data: {
-      userId: user.id, startDate, endDate, workingDays, unpaidDays,
+      userId: user.id, startDate, endDate, workingDays, unpaidDays, half,
       note: String(formData.get('note') ?? '').trim(),
     },
   });
 
+  const length = describeHolidayLength(workingDays, half);
   await logActivity(
     'HolidayRequest', request.id, 'Requested',
-    `${workingDays} day(s) from ${startDate.toDateString()}${unpaidDays > 0 ? ` (${unpaidDays} unpaid)` : ''}`,
+    `${length} from ${startDate.toDateString()}${unpaidDays > 0 ? ` (${unpaidDays} unpaid)` : ''}`,
     user.id,
   );
 
@@ -43,7 +57,7 @@ export async function requestHoliday(formData: FormData) {
   // pattern as an access request landing in the approval queue.
   await notifyMasterAdmins({
     subject: `Holiday request from ${user.name}`,
-    text: `${user.name} has asked for ${workingDays} day(s) off, ${startDate.toDateString()} to ${endDate.toDateString()}.${unpaidDays > 0 ? ` ${unpaidDays} of these would be unpaid.` : ''}`,
+    text: `${user.name} has asked for ${length.toLowerCase()} off, ${startDate.toDateString()} to ${endDate.toDateString()}.${unpaidDays > 0 ? ` ${unpaidDays} of these would be unpaid.` : ''}`,
     path: '/holidays',
     telegram: false,
   });
@@ -88,13 +102,14 @@ export async function decideHoliday(formData: FormData) {
 
   await logActivity('HolidayRequest', id, decision === 'APPROVED' ? 'Approved' : 'Rejected', decisionNote, admin.id);
 
+  const length = describeHolidayLength(request.workingDays, request.half);
   await sendEmail({
     to: request.user.email,
     subject: decision === 'APPROVED' ? 'Your holiday request was approved' : 'Your holiday request was not approved',
     text: [
       `Hi ${request.user.name},`,
       '',
-      `Your request for ${request.workingDays} day(s), ${request.startDate.toDateString()} to ${request.endDate.toDateString()}, was ${decision === 'APPROVED' ? 'approved' : 'not approved'} by ${admin.name}.`,
+      `Your request for ${length.toLowerCase()}, ${request.startDate.toDateString()} to ${request.endDate.toDateString()}, was ${decision === 'APPROVED' ? 'approved' : 'not approved'} by ${admin.name}.`,
       request.unpaidDays > 0 ? `\n${request.unpaidDays} of these day(s) are unpaid, as agreed when you requested it.` : '',
       decisionNote ? `\nNote: ${decisionNote}` : '',
     ].join('\n'),

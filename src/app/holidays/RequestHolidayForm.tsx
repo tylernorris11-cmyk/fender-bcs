@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { parseDayInput, workingDaysBetween } from '@/lib/holidays';
+import { describeHolidayLength, isWorkingDay, parseDayInput, workingDaysBetween } from '@/lib/holidays';
 import { SubmitButton } from '@/components/SubmitButton';
 import { requestHoliday } from './actions';
 
@@ -15,6 +15,7 @@ type Conflict = { name: string; colour: string; status: 'PENDING' | 'APPROVED'; 
 export function RequestHolidayForm({ remainingDays }: { remainingDays: number }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [half, setHalf] = useState<'' | 'AM' | 'PM'>('');
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [checking, setChecking] = useState(false);
   const [pendingUnpaidDays, setPendingUnpaidDays] = useState<number | null>(null);
@@ -22,24 +23,29 @@ export function RequestHolidayForm({ remainingDays }: { remainingDays: number })
   const confirmedRef = useRef(false);
 
   const start = parseDayInput(startDate);
-  const end = parseDayInput(endDate);
-  const workingDays = start && end && end >= start ? workingDaysBetween(start, end) : null;
+  const end = half ? start : parseDayInput(endDate);
+  const workingDays = !start || !end || end < start ? null
+    : half ? (isWorkingDay(start) ? 0.5 : 0)
+    : workingDaysBetween(start, end);
   const unpaidDays = workingDays !== null ? Math.max(0, workingDays - Math.max(0, remainingDays)) : 0;
+  const length = workingDays !== null ? describeHolidayLength(workingDays, half || null) : null;
 
   // Debounced live conflict check — the point of showing it here, before
-  // submitting, not just after someone's already asked.
+  // submitting, not just after someone's already asked. A half day still
+  // checks the whole day: this app doesn't track who's off morning vs
+  // afternoon for conflict purposes, only which day.
   useEffect(() => {
     if (!start || !end || end < start) { setConflicts([]); return; }
     setChecking(true);
     const timer = setTimeout(() => {
-      fetch(`/api/holidays/conflicts?start=${startDate}&end=${endDate}`)
+      fetch(`/api/holidays/conflicts?start=${startDate}&end=${half ? startDate : endDate}`)
         .then((r) => r.json())
         .then((data) => setConflicts(data.conflicts ?? []))
         .catch(() => setConflicts([]))
         .finally(() => setChecking(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [startDate, endDate]);
+  }, [startDate, endDate, half, start, end]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     if (confirmedRef.current) { confirmedRef.current = false; return; }
@@ -64,16 +70,33 @@ export function RequestHolidayForm({ remainingDays }: { remainingDays: number })
             <input id="startDate" name="startDate" type="date" required className="input"
                    value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </div>
-          <div>
-            <label className="label" htmlFor="endDate">Last day</label>
-            <input id="endDate" name="endDate" type="date" required className="input"
-                   value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-          </div>
+          {half ? (
+            <div>
+              <label className="label" htmlFor="half">Which half</label>
+              <select id="half" name="half" required className="input" value={half}
+                      onChange={(e) => setHalf(e.target.value as 'AM' | 'PM')}>
+                <option value="AM">Morning</option>
+                <option value="PM">Afternoon</option>
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="label" htmlFor="endDate">Last day</label>
+              <input id="endDate" name="endDate" type="date" required className="input"
+                     value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
+          )}
         </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" className="h-4 w-4 accent-brand" checked={!!half}
+                 onChange={(e) => setHalf(e.target.checked ? 'AM' : '')} />
+          Just a half day
+        </label>
 
         {workingDays !== null && (
           <p className="text-sm text-ink-muted">
-            <strong className="text-ink">{workingDays} working day{workingDays === 1 ? '' : 's'}</strong> — weekends and bank holidays don&apos;t count against your allowance.
+            <strong className="text-ink">{length}</strong> — weekends and bank holidays don&apos;t count against your allowance.
             {unpaidDays > 0 && (
               <span className="block text-signal font-medium mt-1">
                 You have {Math.max(0, remainingDays)} paid day{Math.max(0, remainingDays) === 1 ? '' : 's'} left —
@@ -125,7 +148,7 @@ export function RequestHolidayForm({ remainingDays }: { remainingDays: number })
             </h2>
             <p className="text-sm text-ink-muted mb-4">
               You have {Math.max(0, remainingDays)} paid day{Math.max(0, remainingDays) === 1 ? '' : 's'} left this holiday year.
-              This request is for {workingDays} day{workingDays === 1 ? '' : 's'}, so{' '}
+              This request is for {length?.toLowerCase()}, so{' '}
               <strong className="text-ink">{pendingUnpaidDays} of {workingDays} would be unpaid holiday</strong>.
             </p>
             <p className="text-sm font-medium mb-4">Do you want to continue?</p>

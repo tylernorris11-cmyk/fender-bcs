@@ -1074,13 +1074,22 @@ enum HolidayStatus {
   CANCELLED
 }
 
+// Set only for a half-day request, which is always a single day
+// (startDate === endDate) worth 0.5 of workingDays — which half just says
+// whether they're off in the morning or the afternoon.
+enum HolidayHalf {
+  AM
+  PM
+}
+
 model HolidayRequest {
   id           String        @id @default(cuid())
   userId       String
   startDate    DateTime // UTC midnight, inclusive
   endDate      DateTime // UTC midnight, inclusive
-  workingDays  Int // weekends and bank holidays already excluded
-  unpaidDays   Int           @default(0) // how many of workingDays exceeded the requester's remaining paid allowance at the moment they requested it — 0 means fully paid
+  workingDays  Float // weekends and bank holidays already excluded; 0.5 for a half day
+  unpaidDays   Float         @default(0) // how many of workingDays exceeded the requester's remaining paid allowance at the moment they requested it — 0 means fully paid
+  half         HolidayHalf? // set only when workingDays is a single half day
   note         String        @default("")
   status       HolidayStatus @default(PENDING)
   requestedAt  DateTime      @default(now())

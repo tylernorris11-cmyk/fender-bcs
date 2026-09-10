@@ -121,6 +121,14 @@ export function eachDayInclusive(start: Date, end: Date): Date[] {
 export const workingDaysBetween = (start: Date, end: Date) =>
   eachDayInclusive(start, end).filter(isWorkingDay).length;
 
+/** "3 days" / "1 day" / "Half day (morning)" — shared so the wording of a
+ * request's length never drifts between the request list, the approval
+ * queue, and the email a decision sends. */
+export function describeHolidayLength(workingDays: number, half: 'AM' | 'PM' | null): string {
+  if (half) return `Half day (${half === 'AM' ? 'morning' : 'afternoon'})`;
+  return `${workingDays} day${workingDays === 1 ? '' : 's'}`;
+}
+
 /**
  * The holiday year runs 1 April to 31 March, not the calendar year — this
  * is what "days used", "remaining" and the adjustment log are all measured
