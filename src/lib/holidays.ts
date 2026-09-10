@@ -140,3 +140,20 @@ export function holidayYearEnd(d: Date): Date {
 }
 
 export const holidayYearLabel = (d: Date): number => holidayYearStart(d).getUTCFullYear();
+
+/** How many bank holidays fall within [start, end] inclusive — spans two
+ * calendar years correctly, since the holiday year (1 April to 31 March)
+ * always straddles one. Used to work out the accrual rate: bank holidays
+ * are fixed and free (see isWorkingDay/bankHolidayName above), never
+ * something anyone books, so they come off the allowance before dividing
+ * the rest across 12 months. */
+export function bankHolidayCountBetween(start: Date, end: Date): number {
+  let count = 0;
+  for (let year = start.getUTCFullYear(); year <= end.getUTCFullYear(); year++) {
+    for (const key of bankHolidaysFor(year).keys()) {
+      const d = parseDayInput(key);
+      if (d && d >= start && d <= end) count += 1;
+    }
+  }
+  return count;
+}

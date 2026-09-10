@@ -69,6 +69,13 @@ export default async function HolidaysPage() {
   const conflictsFor = (reqId: string, requesterUserId: string, start: Date, end: Date) =>
     activeLive.filter((r) => r.id !== reqId && r.userId !== requesterUserId && r.startDate <= end && r.endDate >= start);
 
+  // Each requester's current accrual balance, for the admin deciding —
+  // purely informational (doesn't block anything), so it's worked out
+  // fresh here rather than stored on the request itself.
+  const pendingAccrualBalances = new Map(
+    await Promise.all(pending.map(async (r) => [r.id, (await holidayBalance(r.userId, today)).accrualBalance] as const)),
+  );
+
   return (
     <Shell user={user} module="holidays" nav={NAV.holidays} current="/holidays" alerts={alerts.length}>
       <PageHeader
@@ -86,8 +93,19 @@ export default async function HolidaysPage() {
         <Stat value={used} label="Used this year" tone="good" />
         <Stat value={awaiting} label="Awaiting a decision" tone={awaiting ? 'warn' : 'default'} />
         <Stat value={remaining} label="Remaining" tone={remaining < 0 ? 'bad' : 'default'} />
+        <Stat value={myBalance.accrued.toFixed(1)} label="Accrued so far" />
+        <Stat
+          value={myBalance.accrualBalance.toFixed(1)}
+          label="Accrual balance"
+          tone={myBalance.accrualBalance < 0 ? 'bad' : 'default'}
+        />
         {unpaidUsed > 0 && <Stat value={unpaidUsed} label="Unpaid this year" tone="warn" />}
       </StatRow>
+      <p className="text-xs text-ink-faint -mt-4 mb-6">
+        Accrued so far is your share of the year&apos;s bookable days (allowance minus bank holidays) earned at 1/12th a
+        month, credited from the 1st. Accrual balance is that minus what you&apos;ve actually taken — it can go negative
+        if a request gets approved ahead of what&apos;s been earned yet.
+      </p>
 
       {myAdjustments.length > 0 && (
         <div className="card card-pad mb-6 text-sm">
@@ -161,6 +179,16 @@ export default async function HolidaysPage() {
                               {' '}· {r.unpaidDays === r.workingDays ? 'all unpaid' : `${r.unpaidDays} unpaid`}
                             </span>
                           )}
+                          {(() => {
+                            const bal = pendingAccrualBalances.get(r.id) ?? 0;
+                            const paidDays = r.workingDays - r.unpaidDays; // unpaid days already sit outside the allowance, so they don't touch accrual either
+                            const after = Math.round((bal - paidDays) * 100) / 100;
+                            return (
+                              <span className={after < 0 ? 'text-signal font-medium' : ''}>
+                                {' '}· accrued {bal.toFixed(1)}, {after.toFixed(1)} if approved
+                              </span>
+                            );
+                          })()}
                         </p>
                       </div>
                     </div>
