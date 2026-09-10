@@ -7,7 +7,7 @@ import { getAlerts } from '@/lib/alerts';
 import { incompleteRequiredModulesFor } from '@/lib/training';
 import { longDate } from '@/lib/format';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
-import { MODULE_ICONS } from '@/lib/moduleIcons';
+import { MODULE_ICONS, STABLE_MODULE_KEYS } from '@/lib/moduleIcons';
 import { Avatar } from '@/components/ui';
 import { GlobalSearch } from '@/components/GlobalSearch';
 
@@ -27,10 +27,6 @@ const TONES = {
   holidays: { icon: 'bg-rose-100 text-rose-700', bar: 'bg-rose-500', arrow: 'border-rose-500 text-rose-600' },
   hs: { icon: 'bg-teal-100 text-teal-700', bar: 'bg-teal-500', arrow: 'border-teal-500 text-teal-600' },
 } as const;
-
-// Assets, Checks and Fuel have had enough real use and testing this far —
-// every other tile gets a hazard-stripe flag until the same is true there.
-const STABLE_MODULE_KEYS = new Set(['assets', 'checks', 'fuel']);
 
 function greeting() {
   const h = new Date().getHours();

@@ -18,3 +18,9 @@ export const MODULE_COLORS: Record<string, string> = {
   customers: 'text-emerald-700', compliance: 'text-signal', stock: 'text-amber-700', barCounter: 'text-fuchsia-700', assets: 'text-indigo-700',
   checks: 'text-lime-700', fuel: 'text-orange-700', holidays: 'text-rose-700', hs: 'text-teal-700', setup: 'text-ink-muted',
 };
+
+/** Modules with real use and testing behind them — everywhere else still
+ * gets an in-progress flag (the corner ribbon on the home tiles, the
+ * hazard banner in Shell, the WIP tag in the module switcher). One set so
+ * all three can't drift out of sync with each other. */
+export const STABLE_MODULE_KEYS = new Set(['assets', 'checks', 'fuel']);

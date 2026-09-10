@@ -5,14 +5,11 @@ import { Bell, Bug, Home, LogOut } from 'lucide-react';
 import type { Company } from '@prisma/client';
 import { can, MODULES, ROLE_LABELS, type Permission, type SessionUser } from '@/lib/rbac';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
+import { STABLE_MODULE_KEYS } from '@/lib/moduleIcons';
 import { Avatar } from './ui';
 import { ModuleSwitcher } from './ModuleSwitcher';
 import { GlobalSearch } from './GlobalSearch';
 import { InProgressBanner } from './InProgressBanner';
-
-// Assets, Checks and Fuel have had enough real use and testing this far —
-// everywhere else still gets the hazard banner until the same is true there.
-const STABLE_MODULES = new Set(['assets', 'checks', 'fuel']);
 
 // `company`, when set, only shows this nav item while that company's view is
 // active — for things like BCS Products' cost centres that don't exist on
@@ -152,7 +149,7 @@ export function Shell({
           </div>
         </header>
 
-        {!STABLE_MODULES.has(module) && <InProgressBanner />}
+        {!STABLE_MODULE_KEYS.has(module) && <InProgressBanner />}
 
         <main className="p-4 sm:p-7 max-w-[1200px]">{children}</main>
       </div>
