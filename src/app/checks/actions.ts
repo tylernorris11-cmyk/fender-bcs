@@ -120,7 +120,7 @@ export async function resolveAssetIssue(formData: FormData) {
   const id = String(formData.get('issueId'));
   const resolutionNote = String(formData.get('resolutionNote') ?? '').trim();
 
-  const issue = await db.assetIssue.findUniqueOrThrow({ where: { id } });
+  const issue = await db.assetIssue.findUniqueOrThrow({ where: { id }, include: { asset: true } });
   if (issue.resolved) return;
 
   await db.assetIssue.update({
@@ -129,6 +129,16 @@ export async function resolveAssetIssue(formData: FormData) {
   });
 
   await logActivity('Asset', issue.assetId, 'Issue resolved', resolutionNote, user.id);
+  await notifyMasterAdmins({
+    subject: `Issue fixed: ${issue.asset.name}`,
+    text: [
+      `${user.name} marked an issue on ${issue.asset.name} (${issue.asset.ref}) as fixed:`,
+      `"${issue.description}"`,
+      resolutionNote ? `\n${resolutionNote}` : '',
+    ].join('\n'),
+    path: `/assets/${issue.assetId}`,
+    email: false,
+  });
   revalidatePath('/checks');
   revalidatePath(`/assets/${issue.assetId}`);
 }
