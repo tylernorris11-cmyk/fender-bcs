@@ -24,6 +24,9 @@ export type Permission =
   | 'stock.goodsIn'
   | 'stock.pick'
   | 'stock.adjust' // write-offs, scrap, manual corrections
+  // Bar Counter — its own permission (not under stock.*) so it can be shown
+  // or hidden independently of the rest of Stock; see MODULES below.
+  | 'barCounter.view'
   // Production
   | 'production.view'
   | 'production.progress'
@@ -71,7 +74,7 @@ const ALL: Permission[] = [
   'orders.view', 'orders.create', 'orders.edit', 'orders.approve', 'orders.progress',
   'orders.archive', 'orders.markPaid', 'orders.export',
   'customers.view', 'customers.edit', 'customers.credit',
-  'stock.view', 'stock.goodsIn', 'stock.pick', 'stock.adjust',
+  'stock.view', 'stock.goodsIn', 'stock.pick', 'stock.adjust', 'barCounter.view',
   'production.view', 'production.progress', 'production.qc', 'production.assign',
   'compliance.view', 'compliance.edit', 'compliance.ncr',
   'assets.view', 'assets.edit',
@@ -100,7 +103,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'orders.view', 'orders.create', 'orders.edit', 'orders.approve', 'orders.progress',
     'orders.archive', 'orders.markPaid', 'orders.export',
     'customers.view', 'customers.edit',
-    'stock.view', 'stock.goodsIn', 'stock.pick', 'stock.adjust',
+    'stock.view', 'stock.goodsIn', 'stock.pick', 'stock.adjust', 'barCounter.view',
     'production.view', 'production.progress', 'production.qc',
     'compliance.view', 'compliance.ncr',
     'assets.view', 'assets.edit',
@@ -165,7 +168,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
   // Yard and production staff.
   YARD: [
     'orders.view', 'orders.progress',
-    'stock.view', 'stock.goodsIn', 'stock.pick',
+    'stock.view', 'stock.goodsIn', 'stock.pick', 'barCounter.view',
     'production.view', 'production.progress',
     'compliance.view', 'compliance.ncr',
     'assets.view',
@@ -177,8 +180,12 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'hs.view',
   ],
 
-  // Drivers see the run and mark deliveries done.
-  DRIVER: ['orders.view', 'orders.progress', 'planning.view', 'holidays.view', 'assets.view', 'checks.view', 'checks.create', 'fuel.view', 'fuel.create', 'hs.view'],
+  // Drivers see the run and mark deliveries done. Also get Bar Counter —
+  // they're often the ones unloading a bundle at goods-in or on site.
+  DRIVER: [
+    'orders.view', 'orders.progress', 'planning.view', 'holidays.view', 'assets.view',
+    'checks.view', 'checks.create', 'fuel.view', 'fuel.create', 'hs.view', 'barCounter.view',
+  ],
 
   // Read only — auditors, office cover, new starters.
   VIEWER: [
@@ -219,7 +226,7 @@ export const MODULES = [
   { key: 'customers', label: 'Customers', href: '/customers', perm: 'customers.view' as Permission, blurb: 'Manage customer profiles, contacts and history.' },
   { key: 'compliance', label: 'Compliance', href: '/compliance', perm: 'compliance.view' as Permission, blurb: 'CARES approval, certificates and full steel traceability.', company: 'FENDER' as Company },
   { key: 'stock', label: 'Stock', href: '/stock', perm: 'stock.view' as Permission, blurb: 'Track inventory levels, materials and movements.' },
-  { key: 'barCounter', label: 'Bar Counter', href: '/stock/bar-counter', perm: 'stock.goodsIn' as Permission, blurb: 'Photograph a bundle end and count the bars automatically.' },
+  { key: 'barCounter', label: 'Bar Counter', href: '/stock/bar-counter', perm: 'barCounter.view' as Permission, blurb: 'Photograph a bundle end and count the bars automatically.' },
   { key: 'assets', label: 'Assets', href: '/assets', perm: 'assets.view' as Permission, blurb: 'Manage company assets, equipment and maintenance.' },
   { key: 'checks', label: 'Checks', href: '/checks', perm: 'checks.view' as Permission, blurb: 'Morning checks on machines, lorries and pickups before use.' },
   { key: 'fuel', label: 'Fuel', href: '/fuel', perm: 'fuel.view' as Permission, blurb: 'Log fuel taken from the yard tank against each vehicle.' },

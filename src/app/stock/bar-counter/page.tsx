@@ -9,7 +9,7 @@ import { Empty, PageHeader } from '@/components/ui';
 import { BarCounterClient } from './BarCounterClient';
 
 export default async function BarCounterPage() {
-  const user = await requirePermission('stock.goodsIn');
+  const user = await requirePermission('barCounter.view');
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
 

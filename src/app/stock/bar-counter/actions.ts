@@ -30,7 +30,7 @@ export type BarDetectResult =
  * No DB write here — a BarCount row only exists once confirmed, so trying a
  * different photo or mode before confirming just leaves an unused Blob file. */
 export async function runBarDetection(formData: FormData): Promise<BarDetectResult> {
-  await assertPermission('stock.goodsIn');
+  await assertPermission('barCounter.view');
 
   const file = formData.get('photo');
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: 'Choose a photo first.' };
@@ -93,7 +93,7 @@ export async function runBarDetection(formData: FormData): Promise<BarDetectResu
  * side, so the stored number can never drift from the stored positions —
  * only AI-only mode (no overlay to correct) takes a typed count directly. */
 export async function confirmBarCount(formData: FormData): Promise<void> {
-  const user = await assertPermission('stock.goodsIn');
+  const user = await assertPermission('barCounter.view');
   const company = getActiveCompany(user);
 
   const mode = String(formData.get('mode') ?? '') as BarCountMode;
