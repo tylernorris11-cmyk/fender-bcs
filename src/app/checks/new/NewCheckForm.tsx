@@ -107,7 +107,7 @@ export function NewCheckForm({ assets, initialAssetId }: { assets: Asset[]; init
             <label className="label text-xs" htmlFor="description">What&apos;s wrong</label>
             <input id="description" name="description" required className="input" placeholder="Nearside indicator not working" />
           </div>
-          <button type="submit" className="btn-secondary" disabled={!asset}>Report issue</button>
+          <SubmitButton className="btn-secondary" pendingLabel="Reporting…" disabled={!asset}>Report issue</SubmitButton>
         </form>
       </section>
 

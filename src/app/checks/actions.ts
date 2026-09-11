@@ -88,6 +88,19 @@ export async function reportAssetIssue(formData: FormData) {
   if (!description) throw new Error('Say what the issue is.');
 
   const asset = await db.asset.findUniqueOrThrow({ where: { id: assetId } });
+
+  // A second tap while the first report is still in flight (no page feedback
+  // in between makes that easy to do) creates two identical issues for the
+  // same asset, seconds apart — and each one notifies Master Admins, so it
+  // shows up as the same issue landing in Telegram twice. The button itself
+  // now disables while saving, but this catches it either way.
+  const recentDuplicate = await db.assetIssue.findFirst({
+    where: { assetId, description, reportedAt: { gte: new Date(Date.now() - 30_000) } },
+  });
+  if (recentDuplicate) {
+    throw new Error('That looks like the same issue you just reported a moment ago — check the list below before reporting it again.');
+  }
+
   const issue = await db.assetIssue.create({ data: { assetId, description, reportedById: user.id } });
 
   await logActivity('Asset', assetId, 'Issue reported', description, user.id);
