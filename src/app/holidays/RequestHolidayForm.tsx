@@ -45,7 +45,14 @@ export function RequestHolidayForm({ remainingDays }: { remainingDays: number })
         .finally(() => setChecking(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [startDate, endDate, half, start, end]);
+    // start/end are deliberately not deps: they're new Date objects every
+    // render (parseDayInput isn't memoized), which would re-fire this on
+    // every render and never let the debounce timer survive 300ms — the
+    // conflict check would fire dozens of times but the result would never
+    // actually reach the screen. startDate/endDate (the raw strings) are
+    // what actually changes when the user picks a different date.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, half]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     if (confirmedRef.current) { confirmedRef.current = false; return; }
