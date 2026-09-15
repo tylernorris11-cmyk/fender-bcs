@@ -1,12 +1,20 @@
 import { notFound } from 'next/navigation';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Factory, HardHat, ShieldCheck } from 'lucide-react';
+import type { TrainingCategory } from '@prisma/client';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { shortDate, clock } from '@/lib/format';
+import { iconForTrainingLine, splitTrainingLine } from '@/lib/trainingIcons';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
 import { acknowledgeTraining } from '../../actions';
+
+const CATEGORY_HERO: Record<TrainingCategory, { icon: typeof HardHat; tone: string }> = {
+  GENERAL: { icon: HardHat, tone: 'bg-forest text-white' },
+  PPE: { icon: ShieldCheck, tone: 'bg-teal-600 text-white' },
+  MACHINE: { icon: Factory, tone: 'bg-violet-600 text-white' },
+};
 
 export default async function TrainingModulePage({ params }: { params: { id: string } }) {
   const user = await requirePermission('hs.view');
@@ -20,20 +28,46 @@ export default async function TrainingModulePage({ params }: { params: { id: str
     where: { userId_moduleId: { userId: user.id, moduleId: trainingModule.id } },
   });
 
+  const hero = CATEGORY_HERO[trainingModule.category];
+  const HeroIcon = hero.icon;
+
   return (
     <Shell user={user} module="hs" nav={NAV.hs} current="/hs/training" alerts={alerts.length}>
-      <PageHeader
-        title={trainingModule.title}
-        blurb={trainingModule.machineName ? `Machine-specific — ${trainingModule.machineName}` : undefined}
-      />
+      <PageHeader title={trainingModule.title} />
 
-      {trainingModule.summary && <p className="text-ink-muted mb-6">{trainingModule.summary}</p>}
+      <div className="card overflow-hidden mb-6">
+        <div className={`${hero.tone} px-6 py-8 flex items-center gap-5`}>
+          <span className="inline-grid place-items-center h-16 w-16 rounded-2xl bg-white/15 shrink-0">
+            <HeroIcon size={32} aria-hidden />
+          </span>
+          <div>
+            {trainingModule.machineName && (
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-1">
+                Machine-specific — {trainingModule.machineName}
+              </p>
+            )}
+            {trainingModule.summary && <p className="text-white/90 leading-snug">{trainingModule.summary}</p>}
+          </div>
+        </div>
 
-      <section className="card card-pad mb-6">
-        <ul className="list-disc pl-5 space-y-2">
-          {trainingModule.content.map((line, i) => <li key={i}>{line}</li>)}
+        <ul className="divide-y divide-hairline">
+          {trainingModule.content.map((line, i) => {
+            const { heading, body } = splitTrainingLine(line);
+            const { icon: Icon, tone, warning } = iconForTrainingLine(line, heading);
+            return (
+              <li key={i} className={`flex items-start gap-4 px-6 py-4 ${warning ? 'bg-signal/5' : ''}`}>
+                <span className={`inline-grid place-items-center h-10 w-10 rounded-xl shrink-0 ${tone}`} aria-hidden>
+                  <Icon size={18} />
+                </span>
+                <p className="text-sm leading-relaxed pt-1.5">
+                  {heading && <span className="font-semibold text-ink">{heading}: </span>}
+                  <span className={warning ? 'text-signal' : 'text-ink-muted'}>{body}</span>
+                </p>
+              </li>
+            );
+          })}
         </ul>
-      </section>
+      </div>
 
       {trainingModule.category === 'MACHINE' && (
         <div className="banner-warn mb-6 items-start">
