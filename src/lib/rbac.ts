@@ -143,7 +143,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'compliance.view',
     'finance.debtors',
     'assets.view',
-    'checks.view',
+    'checks.view', 'checks.create',
     'fuel.view', 'fuel.create',
     'hs.view',
   ],
