@@ -13,11 +13,25 @@ export default async function NewFuelEntryPage() {
 
   // Both companies' vehicles fill from the same yard tank, so anyone here
   // might be fuelling either fleet — no company filter on the picker.
-  const assets = await db.asset.findMany({
-    where: { type: 'VEHICLE', retired: false },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true, ref: true, company: true },
-  });
+  const [assets, latestMileages] = await Promise.all([
+    db.asset.findMany({
+      where: { type: 'VEHICLE', retired: false },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, ref: true, company: true },
+    }),
+    // Most recent logged mileage per vehicle — one row per assetId, since
+    // distinct + orderBy keeps only the first (most recent) match. Used to
+    // warn if a new entry's mileage looks like a typo rather than block it;
+    // a vehicle can legitimately rack up big miles between fill-ups.
+    db.fuelEntry.findMany({
+      where: { assetId: { not: null } },
+      distinct: ['assetId'],
+      orderBy: { loggedAt: 'desc' },
+      select: { assetId: true, mileage: true },
+    }),
+  ]);
+  const lastMileageByAsset = new Map(latestMileages.map((e) => [e.assetId as string, e.mileage]));
+  const assetsWithMileage = assets.map((a) => ({ ...a, lastMileage: lastMileageByAsset.get(a.id) ?? null }));
 
   return (
     <Shell user={user} module="fuel" nav={NAV.fuel} current="/fuel/new" alerts={alerts.length}>
@@ -27,7 +41,7 @@ export default async function NewFuelEntryPage() {
 
       <PageHeader title="Add fuel entry" blurb="Readings off the yard tank meter — litres used works itself out." />
 
-      <FuelEntryForm assets={assets} defaultDriverName={user.name} />
+      <FuelEntryForm assets={assetsWithMileage} defaultDriverName={user.name} />
     </Shell>
   );
 }
