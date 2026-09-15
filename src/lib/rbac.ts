@@ -144,7 +144,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'finance.debtors',
     'assets.view',
     'checks.view',
-    'fuel.view',
+    'fuel.view', 'fuel.create',
     'hs.view',
   ],
 
@@ -253,7 +253,7 @@ export const ROLE_BLURBS: Record<Role, string> = {
   ADMIN: 'Everything, including purchase costs, pricing and user accounts — locked to a single company.',
   MANAGER: 'Runs the yard. No purchase costs, pricing or user management.',
   SALES: 'Orders and customers. Cannot approve over a credit limit.',
-  OFFICE: 'General office admin — orders, accounts, vehicles and checks. No pricing or cost data.',
+  OFFICE: 'General office admin — orders, accounts, vehicles, checks and fuel. No pricing or cost data.',
   QUALITY: 'Owns the audit file — certificates, NCRs, calibration, returns.',
   YARD: 'Goods in, picking, production and delivery progress.',
   DRIVER: 'Their runs and delivery sheets.',
