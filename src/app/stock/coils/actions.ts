@@ -35,7 +35,10 @@ export async function allocateCoilNumbers(formData: FormData) {
   // time not actually be the highest number, handing out a ref that's
   // already in use.
   const existing = await db.coil.findMany({ select: { ref: true } });
-  const start = existing.length > 0 ? Math.max(...existing.map((c) => Number(c.ref))) + 1 : 1;
+  // Numbering starts at 0022 — 0001–0021 were already used before the coil
+  // system went live, so the floor keeps the sequence picking up where the
+  // real paper tally left off rather than restarting at 1.
+  const start = Math.max(21, ...existing.map((c) => Number(c.ref))) + 1;
   const refs = Array.from({ length: count }, (_, i) => String(start + i).padStart(4, '0'));
 
   const coils = await db.$transaction(
