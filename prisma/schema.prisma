@@ -40,60 +40,62 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  jobTitle     String   @default("")
-  role         Role     @default(VIEWER)
-  passwordHash String
-  active       Boolean  @default(true)
-  initials     String   @default("")
-  colour       String   @default("#16A085")
-  mustReset    Boolean  @default(false)
-  lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  resetTokenHash    String?   // sha256 of the token emailed for "forgot password" — never the plain token
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String
+  jobTitle          String    @default("")
+  role              Role      @default(VIEWER)
+  passwordHash      String
+  active            Boolean   @default(true)
+  initials          String    @default("")
+  colour            String    @default("#16A085")
+  mustReset         Boolean   @default(false)
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  resetTokenHash    String? // sha256 of the token emailed for "forgot password" — never the plain token
   resetTokenExpires DateTime?
-  companies    Company[] @default([FENDER]) // which companies this account may view
+  companies         Company[] @default([FENDER]) // which companies this account may view
 
-  ordersRaised     Order[]          @relation("raisedBy")
-  accountsManaged  Customer[]       @relation("accountManager")
-  movements        StockMovement[]
-  ncrsRaised       Ncr[]
-  checklistDone    ChecklistItem[]
-  inspections      Inspection[]
-  activity         ActivityLog[]
-  assetNotes       AssetNote[]
-  qcChecks         QcCheck[]
-  productionEvents ProductionEvent[]
-  productionJobs        ProductionJob[]
-  otherWorkTasksCreated OtherWorkTask[] @relation("otherWorkCreatedBy")
-  otherWorkTasksDone    OtherWorkTask[] @relation("otherWorkDoneBy")
-  barCountsCreated      BarCount[]      @relation("barCountCreatedBy")
-  driver                Driver?
-  purchaseOrdersRaised PurchaseOrder[] @relation("poRaisedBy")
-  assetChecks      AssetCheck[]
-  notes            Note[]
-  bugReports       BugReport[]
-  accessRequestsDecided AccessRequest[] @relation("decidedBy")
-  testCertificatesUploaded TestCertificate[]
-  castNumbersConfirmed     ExtractedCastNumber[] @relation("castConfirmedBy")
+  ordersRaised                Order[]                  @relation("raisedBy")
+  accountsManaged             Customer[]               @relation("accountManager")
+  movements                   StockMovement[]
+  ncrsRaised                  Ncr[]
+  checklistDone               ChecklistItem[]
+  inspections                 Inspection[]
+  activity                    ActivityLog[]
+  assetNotes                  AssetNote[]
+  qcChecks                    QcCheck[]
+  productionEvents            ProductionEvent[]
+  productionJobs              ProductionJob[]
+  otherWorkTasksCreated       OtherWorkTask[]          @relation("otherWorkCreatedBy")
+  otherWorkTasksDone          OtherWorkTask[]          @relation("otherWorkDoneBy")
+  barCountsCreated            BarCount[]               @relation("barCountCreatedBy")
+  driver                      Driver?
+  purchaseOrdersRaised        PurchaseOrder[]          @relation("poRaisedBy")
+  assetChecks                 AssetCheck[]
+  notes                       Note[]
+  bugReports                  BugReport[]
+  accessRequestsDecided       AccessRequest[]          @relation("decidedBy")
+  testCertificatesUploaded    TestCertificate[]
+  castNumbersConfirmed        ExtractedCastNumber[]    @relation("castConfirmedBy")
   complianceDocumentsUploaded ComplianceDocument[]
-  hseDocumentsUploaded   HseDocument[]
-  trainingModulesCreated TrainingModule[]
-  trainingCompletions    TrainingCompletion[]
-  trainingAssignedTo     UserTrainingAssignment[] @relation("trainingAssignedTo")
-  trainingAssignedBy     UserTrainingAssignment[] @relation("trainingAssignedBy")
-  holidayAllowanceDays Int              @default(28) // working days a year — editable in Set Up
-  hiddenModules        String[]         @default([]) // module keys hidden for this person regardless of role — never applies to MASTER_ADMIN
-  holidaysRequested    HolidayRequest[] @relation("holidayRequestedBy")
-  holidaysDecided      HolidayRequest[] @relation("holidayDecidedBy")
-  holidayAdjustmentsReceived HolidayAdjustment[] @relation("holidayAdjustmentFor")
-  holidayAdjustmentsMade     HolidayAdjustment[] @relation("holidayAdjustmentBy")
-  assetIssuesReported        AssetIssue[]        @relation("assetIssueReportedBy")
-  assetIssuesResolved        AssetIssue[]        @relation("assetIssueResolvedBy")
-  assetCheckItemsResolved    AssetCheckItem[]    @relation("assetCheckItemResolvedBy")
-  fuelEntriesLogged          FuelEntry[]
+  hseDocumentsUploaded        HseDocument[]
+  trainingModulesCreated      TrainingModule[]
+  trainingCompletions         TrainingCompletion[]
+  trainingAssignedTo          UserTrainingAssignment[] @relation("trainingAssignedTo")
+  trainingAssignedBy          UserTrainingAssignment[] @relation("trainingAssignedBy")
+  holidayAllowanceDays        Int                      @default(28) // working days a year — editable in Set Up
+  hiddenModules               String[]                 @default([]) // module keys hidden for this person regardless of role — never applies to MASTER_ADMIN
+  holidaysRequested           HolidayRequest[]         @relation("holidayRequestedBy")
+  holidaysDecided             HolidayRequest[]         @relation("holidayDecidedBy")
+  holidayAdjustmentsReceived  HolidayAdjustment[]      @relation("holidayAdjustmentFor")
+  holidayAdjustmentsMade      HolidayAdjustment[]      @relation("holidayAdjustmentBy")
+  assetIssuesReported         AssetIssue[]             @relation("assetIssueReportedBy")
+  assetIssuesResolved         AssetIssue[]             @relation("assetIssueResolvedBy")
+  assetCheckItemsResolved     AssetCheckItem[]         @relation("assetCheckItemResolvedBy")
+  fuelEntriesLogged           FuelEntry[]
+  coilsAllocated              Coil[]                   @relation("coilAllocatedBy")
+  coilsReceived               Coil[]                   @relation("coilReceivedBy")
 }
 
 // ------------------------------------------------------------- customers
@@ -116,7 +118,7 @@ model Customer {
   customerSince    DateTime @default(now())
   notes            String   @default("")
 
-  accountManager User?   @relation("accountManager", fields: [accountManagerId], references: [id])
+  accountManager User?              @relation("accountManager", fields: [accountManagerId], references: [id])
   orders         Order[]
   ncrs           Ncr[]
   documents      CustomerDocument[]
@@ -137,17 +139,17 @@ model CustomerDocument {
 // -------------------------------------------------------- products/price
 
 model Product {
-  id          String  @id @default(cuid())
-  company     Company @default(FENDER)
-  code        String  @unique // RB12-500B
-  name        String
-  category    String // Reinforcing bar | Mesh fabric | Cut & bent | Dowels | ...
-  unit        String  @default("t") // t | each | sheets | m
-  kgPerUnit   Decimal @default(1000) @db.Decimal(12, 3)
-  standard    String  @default("") // BS 4449:2005 B500B etc.
-  reorderAt   Decimal @default(0) @db.Decimal(12, 3)
-  active      Boolean @default(true)
-  isRebar     Boolean @default(false) // drives traceability + FIFO batch picking
+  id        String  @id @default(cuid())
+  company   Company @default(FENDER)
+  code      String  @unique // RB12-500B
+  name      String
+  category  String // Reinforcing bar | Mesh fabric | Cut & bent | Dowels | ...
+  unit      String  @default("t") // t | each | sheets | m
+  kgPerUnit Decimal @default(1000) @db.Decimal(12, 3)
+  standard  String  @default("") // BS 4449:2005 B500B etc.
+  reorderAt Decimal @default(0) @db.Decimal(12, 3)
+  active    Boolean @default(true)
+  isRebar   Boolean @default(false) // drives traceability + FIFO batch picking
 
   // Sizing for products sold by length, e.g. BCS Products' fence posts —
   // null on anything else. Bundle weight is reference/handling info, separate
@@ -157,10 +159,10 @@ model Product {
   thicknessMm    Decimal? @db.Decimal(6, 2)
   bundleWeightKg Decimal? @db.Decimal(10, 2)
 
-  prices     Price[]
-  batches    Batch[]
-  orderLines OrderLine[]
-  movements  StockMovement[]
+  prices             Price[]
+  batches            Batch[]
+  orderLines         OrderLine[]
+  movements          StockMovement[]
   purchaseOrderLines PurchaseOrderLine[]
 
   @@index([company])
@@ -205,9 +207,9 @@ model Supplier {
   blocked     Boolean  @default(false)
   createdAt   DateTime @default(now())
 
-  batches      Batch[]
-  certificates Certificate[]
-  ncrs         Ncr[]
+  batches        Batch[]
+  certificates   Certificate[]
+  ncrs           Ncr[]
   purchaseOrders PurchaseOrder[]
 
   @@index([company])
@@ -232,11 +234,11 @@ model Batch {
   status        String   @default("Available") // Available | Quarantined | Consumed | Rejected
   quarantineRef String   @default("")
 
-  product   Product         @relation(fields: [productId], references: [id])
-  supplier  Supplier        @relation(fields: [supplierId], references: [id])
-  movements StockMovement[]
-  orderLines OrderLine[]
-  ncrs      Ncr[]
+  product            Product               @relation(fields: [productId], references: [id])
+  supplier           Supplier              @relation(fields: [supplierId], references: [id])
+  movements          StockMovement[]
+  orderLines         OrderLine[]
+  ncrs               Ncr[]
   matchedCastNumbers ExtractedCastNumber[]
 
   @@unique([heatNumber, productId])
@@ -308,6 +310,40 @@ model BarCount {
   @@index([orderId])
 }
 
+// ---------------------------------------------------- coil stock (BCS)
+// BCS Products' raw material — coiled wire/rod straightened and cut to
+// length for fence post. Each physical coil gets its own 4-digit
+// identification number, generated ahead of the steel actually arriving
+// so it can be printed on a ticket and tied to the coil at the gate.
+// A coil isn't real stock until its grade and weight are entered —
+// receivedAt null means the number's been issued but nothing's arrived
+// yet, so it doesn't count as stock on hand.
+
+enum CoilGrade {
+  SOFT
+  MEDIUM
+  HIGH_CARBON
+}
+
+model Coil {
+  id            String     @id @default(cuid())
+  company       Company    @default(BS_SUPPLIES)
+  ref           String     @unique // 4-digit identification number, e.g. "0427"
+  grade         CoilGrade?
+  weightKg      Decimal?   @db.Decimal(10, 2)
+  note          String     @default("")
+  allocatedAt   DateTime   @default(now())
+  allocatedById String?
+  receivedAt    DateTime?
+  receivedById  String?
+
+  allocatedBy User? @relation("coilAllocatedBy", fields: [allocatedById], references: [id])
+  receivedBy  User? @relation("coilReceivedBy", fields: [receivedById], references: [id])
+
+  @@index([company])
+  @@index([company, receivedAt])
+}
+
 // ------------------------------------------------------------- ordering
 
 enum OrderStage {
@@ -329,39 +365,39 @@ enum PaymentStatus {
 }
 
 model Order {
-  id            String        @id @default(cuid())
-  company       Company       @default(FENDER)
-  number        String        @unique // FS-26-05301
-  customerId    String
-  stage         OrderStage    @default(DRAFT)
-  paymentStatus PaymentStatus @default(UNPAID)
-  deliveryDate  DateTime?
-  town          String        @default("")
-  address       String        @default("")
-  poNumber      String        @default("")
-  yardNotes     String        @default("")
-  depot         String        @default("Scunthorpe") // which yard is raising and dispatching this order
-  raisedById    String?
-  archived      Boolean       @default(false)
-  overrideCredit Boolean      @default(false)
-  approvedAt    DateTime?
-  approvedBy    String        @default("")
-  deliveredAt   DateTime?
-  paidAt        DateTime?
-  completedAt   DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  company        Company       @default(FENDER)
+  number         String        @unique // FS-26-05301
+  customerId     String
+  stage          OrderStage    @default(DRAFT)
+  paymentStatus  PaymentStatus @default(UNPAID)
+  deliveryDate   DateTime?
+  town           String        @default("")
+  address        String        @default("")
+  poNumber       String        @default("")
+  yardNotes      String        @default("")
+  depot          String        @default("Scunthorpe") // which yard is raising and dispatching this order
+  raisedById     String?
+  archived       Boolean       @default(false)
+  overrideCredit Boolean       @default(false)
+  approvedAt     DateTime?
+  approvedBy     String        @default("")
+  deliveredAt    DateTime?
+  paidAt         DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  customer  Customer        @relation(fields: [customerId], references: [id])
-  raisedBy  User?           @relation("raisedBy", fields: [raisedById], references: [id])
-  lines     OrderLine[]
-  barMarks  BarMark[]
-  checklist ChecklistItem[]
-  events    PlanningEvent[]
-  ncrs      Ncr[]
-  production ProductionEvent[]
+  customer       Customer          @relation(fields: [customerId], references: [id])
+  raisedBy       User?             @relation("raisedBy", fields: [raisedById], references: [id])
+  lines          OrderLine[]
+  barMarks       BarMark[]
+  checklist      ChecklistItem[]
+  events         PlanningEvent[]
+  ncrs           Ncr[]
+  production     ProductionEvent[]
   productionJobs ProductionJob[]
-  barCounts BarCount[]
+  barCounts      BarCount[]
 
   @@index([stage, deliveryDate])
   @@index([company])
@@ -416,9 +452,9 @@ model PurchaseOrder {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 
-  supplier   Supplier    @relation(fields: [supplierId], references: [id])
-  raisedBy   User?       @relation("poRaisedBy", fields: [raisedById], references: [id])
-  costCentre CostCentre? @relation(fields: [costCentreId], references: [id])
+  supplier   Supplier            @relation(fields: [supplierId], references: [id])
+  raisedBy   User?               @relation("poRaisedBy", fields: [raisedById], references: [id])
+  costCentre CostCentre?         @relation(fields: [costCentreId], references: [id])
   lines      PurchaseOrderLine[]
 
   @@index([status, expectedDate])
@@ -497,14 +533,14 @@ model ChecklistTemplate {
 // ------------------------------------------------------------ production
 
 model ProductionEvent {
-  id        String   @id @default(cuid())
-  orderId   String
-  station   String // Shear line | Bar bender | Link bender | Mesh | Loading
-  assetId   String?
-  action    String // Started | Paused | Completed | Checked
-  note      String   @default("")
-  userId    String?
-  at        DateTime @default(now())
+  id      String   @id @default(cuid())
+  orderId String
+  station String // Shear line | Bar bender | Link bender | Mesh | Loading
+  assetId String?
+  action  String // Started | Paused | Completed | Checked
+  note    String   @default("")
+  userId  String?
+  at      DateTime @default(now())
 
   order Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
   user  User?  @relation(fields: [userId], references: [id])
@@ -681,7 +717,7 @@ model AuditAction {
 model QuarterlyReturn {
   id          String    @id @default(cuid())
   company     Company   @default(FENDER)
-  period      String    // 2026-Q2
+  period      String // 2026-Q2
   tonnage     Decimal   @db.Decimal(12, 3)
   preparedBy  String    @default("")
   submittedAt DateTime?
@@ -699,27 +735,27 @@ enum AssetType {
 }
 
 model Asset {
-  id             String    @id @default(cuid())
-  ref            String    @unique // VH-001 / MC-001
-  type           AssetType
-  name           String // registration or machine name
-  category       String // HGV | Van | Pickup | Bar bender | Shear line ...
-  company        Company?  // null = shared fleet (same yard, same lorries); set = only that company's side
-  makeModel      String    @default("")
-  year           Int?
-  serialNumber   String    @default("")
-  depot          String    @default("Scunthorpe")
-  hours          Int?
-  liftingEquipment Boolean @default(false)
-  retired        Boolean   @default(false)
+  id               String    @id @default(cuid())
+  ref              String    @unique // VH-001 / MC-001
+  type             AssetType
+  name             String // registration or machine name
+  category         String // HGV | Van | Pickup | Bar bender | Shear line ...
+  company          Company? // null = shared fleet (same yard, same lorries); set = only that company's side
+  makeModel        String    @default("")
+  year             Int?
+  serialNumber     String    @default("")
+  depot            String    @default("Scunthorpe")
+  hours            Int?
+  liftingEquipment Boolean   @default(false)
+  retired          Boolean   @default(false)
 
-  motDue         DateTime?
-  taxDue         DateTime?
-  weeklyCheckDue DateTime? // 13-week / periodic safety inspection
-  puwerDue       DateTime?
-  lolerDue       DateTime?
-  serviceDue     DateTime?
-  calibrationDue DateTime? // control of measuring devices — CARES requirement
+  motDue                    DateTime?
+  taxDue                    DateTime?
+  weeklyCheckDue            DateTime? // 13-week / periodic safety inspection
+  puwerDue                  DateTime?
+  lolerDue                  DateTime?
+  serviceDue                DateTime?
+  calibrationDue            DateTime? // control of measuring devices — CARES requirement
   emergencyLightTestDue     DateTime? // EN 50172 monthly functional test
   emergencyLightDurationDue DateTime? // EN 50172 annual 3-hour full duration test
 
@@ -795,16 +831,16 @@ model AssetChecklistItem {
 }
 
 model Inspection {
-  id           String   @id @default(cuid())
-  assetId      String
-  kind         String // MOT | PUWER | LOLER | Service | Calibration | Safety check
-  result       String   @default("Pass") // Pass | Fail | Advisory
-  provider     String   @default("")
-  performedOn  DateTime
-  nextDueOn    DateTime?
-  certificate  String   @default("")
-  notes        String   @default("")
-  loggedById   String?
+  id          String    @id @default(cuid())
+  assetId     String
+  kind        String // MOT | PUWER | LOLER | Service | Calibration | Safety check
+  result      String    @default("Pass") // Pass | Fail | Advisory
+  provider    String    @default("")
+  performedOn DateTime
+  nextDueOn   DateTime?
+  certificate String    @default("")
+  notes       String    @default("")
+  loggedById  String?
 
   asset    Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
   loggedBy User? @relation(fields: [loggedById], references: [id])
@@ -940,14 +976,14 @@ model Note {
 }
 
 model Driver {
-  id       String  @id @default(cuid())
-  name     String
-  phone    String  @default("")
-  licence  String  @default("")
+  id        String    @id @default(cuid())
+  name      String
+  phone     String    @default("")
+  licence   String    @default("")
   cpcExpiry DateTime?
-  depot    String  @default("Scunthorpe")
-  active   Boolean @default(true)
-  userId   String? @unique // set when this row was auto-created from a User with role DRIVER
+  depot     String    @default("Scunthorpe")
+  active    Boolean   @default(true)
+  userId    String?   @unique // set when this row was auto-created from a User with role DRIVER
 
   user User? @relation(fields: [userId], references: [id])
 }
@@ -1164,7 +1200,7 @@ enum HseDocumentCategory {
 
 model HseDocument {
   id           String              @id @default(cuid())
-  company      Company?            // null = shared across both companies, same pattern as Asset.company
+  company      Company? // null = shared across both companies, same pattern as Asset.company
   category     HseDocumentCategory @default(OTHER)
   title        String
   fileUrl      String
@@ -1181,7 +1217,7 @@ model HseDocument {
 
 enum TrainingCategory {
   GENERAL // required for everyone
-  PPE     // required for everyone
+  PPE // required for everyone
   MACHINE // required only for people this module is assigned to — machineName names the machine
 }
 
@@ -1190,7 +1226,7 @@ enum TrainingCategory {
 // always checks against whatever this row currently says, never a snapshot.
 model TrainingModule {
   id          String           @id @default(cuid())
-  company     Company?         // null = shared across both companies
+  company     Company? // null = shared across both companies
   category    TrainingCategory
   machineName String           @default("") // only meaningful when category = MACHINE, e.g. "Power Bender"
   title       String
@@ -1202,7 +1238,7 @@ model TrainingModule {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  createdBy   User?                     @relation(fields: [createdById], references: [id])
+  createdBy   User?                    @relation(fields: [createdById], references: [id])
   completions TrainingCompletion[]
   assignments UserTrainingAssignment[]
 

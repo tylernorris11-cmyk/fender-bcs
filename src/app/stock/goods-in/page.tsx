@@ -88,12 +88,17 @@ export default async function GoodsInPage({ searchParams }: { searchParams: { pr
           <input id="deliveryNote" name="deliveryNote" className="input" />
         </div>
 
-        <div>
-          <label className="label" htmlFor="depot">Depot</label>
-          <select id="depot" name="depot" defaultValue={locations[0]?.name ?? 'Scunthorpe'} className="input">
-            {locations.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
-          </select>
-        </div>
+        {caresApplies ? (
+          <div>
+            <label className="label" htmlFor="depot">Depot</label>
+            <select id="depot" name="depot" defaultValue={locations[0]?.name ?? 'Scunthorpe'} className="input">
+              {locations.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
+            </select>
+          </div>
+        ) : (
+          // BCS only has the one depot — no picker needed, just always Scunthorpe.
+          <input type="hidden" name="depot" value="Scunthorpe" />
+        )}
 
         <div>
           <label className="label" htmlFor="location">Yard location</label>

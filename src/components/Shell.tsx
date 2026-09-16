@@ -204,6 +204,7 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'Goods in', href: '/stock/goods-in', perm: 'stock.goodsIn' },
     { label: 'Movements', href: '/stock/movements' },
     { label: 'Bar counter', href: '/stock/bar-counter', perm: 'barCounter.view' },
+    { label: 'Coils', href: '/stock/coils', company: 'BS_SUPPLIES' },
   ],
   assets: [
     { label: 'Both', href: '/assets' },
