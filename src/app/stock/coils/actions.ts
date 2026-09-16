@@ -25,13 +25,17 @@ export async function allocateCoilNumbers(formData: FormData) {
     throw new Error('Enter how many numbers you need (1–200 at a time).');
   }
 
-  // Plain sequential 4-digit numbers — read the last one issued and count up
-  // from there, same pattern as every other reference number in this app
-  // (order/PO/asset refs). Sorted by when a number was actually issued, not
-  // by the ref string itself, so this can't be thrown off by width once the
-  // count eventually needs a 5th digit.
-  const last = await db.coil.findFirst({ orderBy: { allocatedAt: 'desc' }, select: { ref: true } });
-  const start = last ? Number(last.ref) + 1 : 1;
+  // Plain sequential 4-digit numbers — find the highest one issued so far
+  // and count up from there, same idea as every other reference number in
+  // this app (order/PO/asset refs). Computed from the refs themselves
+  // rather than "whichever row has the latest allocatedAt" — that sounds
+  // equivalent but isn't: allocatedAt is a timestamp, not the sequence
+  // itself, and anything that ever disagrees with strict ref order (a
+  // backfilled batch, a clock correction) would make the "last" row by
+  // time not actually be the highest number, handing out a ref that's
+  // already in use.
+  const existing = await db.coil.findMany({ select: { ref: true } });
+  const start = existing.length > 0 ? Math.max(...existing.map((c) => Number(c.ref))) + 1 : 1;
   const refs = Array.from({ length: count }, (_, i) => String(start + i).padStart(4, '0'));
 
   const coils = await db.$transaction(
