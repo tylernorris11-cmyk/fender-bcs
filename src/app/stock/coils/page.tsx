@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { Printer } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
@@ -48,16 +47,14 @@ export default async function AddCoilsPage() {
         <div className="card card-pad mb-6">
           <h2 className="text-lg font-bold mb-1">Pre-allocate numbers</h2>
           <p className="text-sm text-ink-muted mb-3">
-            For a delivery on its way in — generates the next numbers in sequence, ready to print as tickets.
+            For a delivery on its way in — generates the next numbers in sequence, ready to write onto the coils as they arrive.
           </p>
           <form action={allocateCoilNumbers} className="flex flex-wrap items-end gap-3">
             <div>
               <label className="label" htmlFor="count">How many coils</label>
               <input id="count" name="count" type="number" min="1" max="200" required className="input w-28" placeholder="10" />
             </div>
-            <SubmitButton pendingLabel="Generating…">
-              <Printer size={16} /> Generate &amp; print
-            </SubmitButton>
+            <SubmitButton pendingLabel="Generating…">Generate numbers</SubmitButton>
           </form>
         </div>
       )}

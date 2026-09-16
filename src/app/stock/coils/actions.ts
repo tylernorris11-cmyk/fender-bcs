@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import type { CoilGrade } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
@@ -11,7 +10,7 @@ const GRADES: CoilGrade[] = ['SOFT', 'MEDIUM', 'HIGH_CARBON'];
 
 /**
  * Issues a batch of 4-digit coil numbers ahead of the steel actually
- * arriving, so they can be printed and stuck on the coils at the gate.
+ * arriving, so they're ready to write onto the coils at the gate.
  * A number on its own isn't stock — see receiveCoil — it's just a ticket
  * waiting for a coil to be matched up against it.
  */
@@ -47,7 +46,6 @@ export async function allocateCoilNumbers(formData: FormData) {
 
   await logActivity('Coil', coils[0].id, 'Numbers allocated', `${refs[0]}–${refs[refs.length - 1]} (${count})`, user.id);
   revalidatePath('/stock/coils');
-  redirect(`/stock/coils/print?refs=${refs.join(',')}`);
 }
 
 /**
