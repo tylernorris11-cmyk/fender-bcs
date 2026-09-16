@@ -994,6 +994,18 @@ model Setting {
   value String
 }
 
+// One row per file already copied out to Google Drive — see lib/backupSync.
+// sourceUrl is the private Blob URL it came from; checking against this is
+// how a nightly run knows what's new since the last one instead of
+// re-uploading everything every time.
+model BlobBackup {
+  id          String   @id @default(cuid())
+  sourceUrl   String   @unique
+  fileName    String
+  driveFileId String
+  backedUpAt  DateTime @default(now())
+}
+
 // "Report a bug" — always saved here first so nothing is lost even if the
 // outgoing email fails or RESEND_API_KEY isn't configured yet.
 model BugReport {
