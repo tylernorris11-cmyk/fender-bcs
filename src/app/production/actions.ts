@@ -103,8 +103,23 @@ export async function startProductionJob(formData: FormData) {
 
   // A worker can run more than one job at once (several machines in
   // parallel) — only stop them opening the exact same job number twice.
-  const duplicate = await db.productionJob.findFirst({ where: { userId: user.id, company, jobNumber, finishedAt: null } });
-  if (duplicate) throw new Error(`You already have job ${jobNumber} open.`);
+  // On the BCS side a job is shared once started (anyone can add to or
+  // finish it, see the ownership checks below), so the duplicate check
+  // there is against the job number full stop, not just this user's own —
+  // otherwise a second person starting the same job number would fork it
+  // into two separate tallies instead of adding to the one already open.
+  const duplicate = await db.productionJob.findFirst({
+    where: company === 'BS_SUPPLIES'
+      ? { company, jobNumber, finishedAt: null }
+      : { userId: user.id, company, jobNumber, finishedAt: null },
+  });
+  if (duplicate) {
+    throw new Error(
+      company === 'BS_SUPPLIES'
+        ? `Job ${jobNumber} is already open — add to it from the list below instead of starting it again.`
+        : `You already have job ${jobNumber} open.`,
+    );
+  }
 
   const matchedOrder = await db.order.findFirst({ where: { company, number: jobNumber } });
 
@@ -120,7 +135,10 @@ export async function finishProductionJob(formData: FormData) {
   const user = await assertPermission('production.progress');
   const jobId = String(formData.get('jobId'));
   const job = await db.productionJob.findUniqueOrThrow({ where: { id: jobId } });
-  if (job.userId !== user.id) throw new Error('You can only finish your own job.');
+  assertCompanyAccess(user, job.company);
+  // BCS jobs are shared once started — anyone can finish one, not just
+  // whoever opened it. Fender's tally sheets stay one person's own.
+  if (job.company === 'FENDER' && job.userId !== user.id) throw new Error('You can only finish your own job.');
   if (job.finishedAt) return;
 
   await db.productionJob.update({ where: { id: jobId }, data: { finishedAt: new Date() } });
@@ -139,7 +157,8 @@ export async function partFinishProductionJob(formData: FormData) {
   const user = await assertPermission('production.progress');
   const jobId = String(formData.get('jobId'));
   const job = await db.productionJob.findUniqueOrThrow({ where: { id: jobId } });
-  if (job.userId !== user.id) throw new Error('You can only part-finish your own job.');
+  assertCompanyAccess(user, job.company);
+  if (job.company === 'FENDER' && job.userId !== user.id) throw new Error('You can only part-finish your own job.');
   if (job.finishedAt) return;
 
   await db.productionJob.update({ where: { id: jobId }, data: { lastPartFinishedAt: new Date() } });
@@ -151,7 +170,8 @@ export async function addProductionJobRow(formData: FormData) {
   const user = await assertPermission('production.progress');
   const jobId = String(formData.get('jobId'));
   const job = await db.productionJob.findUniqueOrThrow({ where: { id: jobId }, include: { rows: true } });
-  if (job.userId !== user.id) throw new Error('You can only add rows to your own job.');
+  assertCompanyAccess(user, job.company);
+  if (job.company === 'FENDER' && job.userId !== user.id) throw new Error('You can only add rows to your own job.');
   if (job.finishedAt) throw new Error('This job has already finished.');
 
   const machine = String(formData.get('machine') ?? '').trim();

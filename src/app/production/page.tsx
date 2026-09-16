@@ -22,10 +22,13 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
   const isFender = company === 'FENDER';
 
   // A worker can have more than one job open at once — several machines
-  // running in parallel — so this is every open job of theirs, not just one.
+  // running in parallel — so on Fender this is every open job of theirs,
+  // not just one. On BCS a job is shared once started (anyone can add to
+  // or finish one another person opened, see actions.ts), so every open
+  // BCS job is "active" for everyone, not just whoever started it.
   const activeJobs = await db.productionJob.findMany({
-    where: { userId: user.id, company, finishedAt: null },
-    include: { rows: { orderBy: { sortOrder: 'asc' } }, order: true },
+    where: isFender ? { userId: user.id, company, finishedAt: null } : { company, finishedAt: null },
+    include: { rows: { orderBy: { sortOrder: 'asc' } }, order: true, user: true },
     orderBy: { startedAt: 'asc' },
   });
 
@@ -66,7 +69,7 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
   return (
     <Shell user={user} module="production" nav={NAV.production} current="/production" alerts={alerts.length}>
       <OtherWorkCallout openCount={openOtherWork} />
-      {activeJobs.map((job) => <CurrentJobView key={job.id} job={job} />)}
+      {activeJobs.map((job) => <CurrentJobView key={job.id} job={job} viewerId={user.id} />)}
       {isFender ? (
         <FenderView orders={orders} sort={searchParams.sort} user={user} />
       ) : (
@@ -247,8 +250,9 @@ function FenderView({ orders, sort, user }: { orders: any[]; sort?: string; user
 
 // ------------------------------------------------------- current tally job
 
-async function CurrentJobView({ job }: { job: any }) {
+async function CurrentJobView({ job, viewerId }: { job: any; viewerId: string }) {
   const isFenderJob = job.company === 'FENDER';
+  const startedByOther = !isFenderJob && job.userId !== viewerId;
   const totalWeight = job.rows.reduce((s: number, r: any) => s + Number(r.tallyWeightKg), 0);
   const lastRow = job.rows.length > 0 ? job.rows[job.rows.length - 1] : null;
   const lastCastNumber = lastRow?.castNumber ?? '';
@@ -275,7 +279,7 @@ async function CurrentJobView({ job }: { job: any }) {
         blurb={
           isFenderJob
             ? `${PROCESS_LABEL[job.process]}${job.order ? ` · linked to order ${job.order.number}` : ''}`
-            : `Fence post cutting${job.order ? ` · linked to order ${job.order.number}` : ''}`
+            : `Fence post cutting${job.order ? ` · linked to order ${job.order.number}` : ''}${startedByOther ? ` · started by ${job.user?.name ?? 'someone else'} — anyone can add to it` : ''}`
         }
         actions={(
           <>
