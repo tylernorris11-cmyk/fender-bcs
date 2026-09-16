@@ -137,3 +137,29 @@ export async function addExistingCoil(formData: FormData) {
   await logActivity('Coil', coil.id, 'Added to stock', `${ref} — already in the yard, ${grade.replace('_', ' ').toLowerCase()}, ${diameterMm}mm, ${weightKg} kg`, user.id);
   revalidatePath('/stock/coils');
 }
+
+/**
+ * Removes a coil that's already real stock — used up, scrapped, entered
+ * wrong and easier to redo than fix. A stock.adjust action rather than
+ * stock.goodsIn, since this is a write-off of stock that exists, not
+ * undoing a number that was never matched to anything (see
+ * cancelCoilAllocation for that one).
+ */
+export async function removeCoilFromStock(formData: FormData) {
+  const user = await assertPermission('stock.adjust');
+  const id = String(formData.get('coilId'));
+  const coil = await db.coil.findUniqueOrThrow({ where: { id } });
+  if (coil.company !== 'BS_SUPPLIES') throw new Error('Not found.');
+  if (!coil.receivedAt) throw new Error("This coil isn't in stock yet — cancel the allocation instead.");
+
+  await db.coil.delete({ where: { id } });
+  await logActivity(
+    'Coil',
+    id,
+    'Removed from stock',
+    `${coil.ref} — ${coil.grade ? coil.grade.replace('_', ' ').toLowerCase() : 'no grade'}, ${coil.diameterMm}mm, ${coil.weightKg} kg`,
+    user.id,
+  );
+  revalidatePath('/stock/coils/stock');
+  revalidatePath('/stock/coils');
+}

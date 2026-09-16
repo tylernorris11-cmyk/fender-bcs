@@ -2,10 +2,12 @@ import Link from 'next/link';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
-import { tonnes } from '@/lib/format';
+import { clock, shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Stat, StatRow } from '@/components/ui';
+import { CoilChip, type CoilChipData } from './CoilChip';
 
 const GRADES = ['SOFT', 'MEDIUM', 'HIGH_CARBON'] as const;
 const GRADE_LABEL = { SOFT: 'Soft', MEDIUM: 'Medium', HIGH_CARBON: 'High carbon' } as const;
@@ -27,7 +29,27 @@ export default async function CoilStockPage() {
   const inStock = await db.coil.findMany({
     where: { company, receivedAt: { not: null } },
     orderBy: { ref: 'asc' },
+    include: { allocatedBy: { select: { name: true } }, receivedBy: { select: { name: true } } },
   });
+
+  const canAdjust = can(user, 'stock.adjust');
+  const chipData: Record<string, CoilChipData> = Object.fromEntries(
+    inStock.map((c) => [
+      c.id,
+      {
+        id: c.id,
+        ref: c.ref,
+        grade: c.grade,
+        diameterMm: Number(c.diameterMm),
+        weightKg: Number(c.weightKg),
+        note: c.note,
+        receivedLabel: c.receivedAt ? `${shortDate(c.receivedAt)} at ${clock(c.receivedAt)}` : '—',
+        receivedByName: c.receivedBy?.name ?? null,
+        allocatedLabel: `${shortDate(c.allocatedAt)} at ${clock(c.allocatedAt)}`,
+        allocatedByName: c.allocatedBy?.name ?? null,
+      },
+    ]),
+  );
 
   const totalWeightKg = inStock.reduce((s, c) => s + Number(c.weightKg ?? 0), 0);
 
@@ -79,10 +101,7 @@ export default async function CoilStockPage() {
                         ) : (
                           <div className="grid grid-cols-3 gap-1.5">
                             {coils.map((c) => (
-                              <div key={c.id} className="rounded-lg bg-canvas px-1.5 py-1.5 text-center">
-                                <p className="text-sm font-bold leading-tight">{c.ref}</p>
-                                <p className="text-[11px] text-ink-muted leading-tight">{Number(c.weightKg).toLocaleString('en-GB')}</p>
-                              </div>
+                              <CoilChip key={c.id} coil={chipData[c.id]} canAdjust={canAdjust} />
                             ))}
                           </div>
                         )}
