@@ -82,3 +82,60 @@ export async function receiveCoil(formData: FormData) {
   await logActivity('Coil', id, 'Received', `${coil.ref} — ${grade.replace('_', ' ').toLowerCase()}, ${diameterMm}mm, ${weightKg} kg`, user.id);
   revalidatePath('/stock/coils');
 }
+
+/**
+ * Cancels a number that was issued but never matched to a coil — printed
+ * wrong, the delivery didn't turn up, whatever. Only allowed before it's
+ * received: once a coil is real stock it needs an adjustment, not a delete.
+ */
+export async function cancelCoilAllocation(formData: FormData) {
+  const user = await assertPermission('stock.goodsIn');
+  const id = String(formData.get('coilId'));
+  const coil = await db.coil.findUniqueOrThrow({ where: { id } });
+  if (coil.company !== 'BS_SUPPLIES') throw new Error('Not found.');
+  if (coil.receivedAt) throw new Error('This coil is already in stock — it can only be removed as a stock adjustment.');
+
+  await db.coil.delete({ where: { id } });
+  await logActivity('Coil', id, 'Allocation cancelled', `${coil.ref} — removed before a coil was matched to it`, user.id);
+  revalidatePath('/stock/coils');
+}
+
+/**
+ * A coil that's already on site with its own 4-digit code already written
+ * on it — from before the system went live, or one that got missed —
+ * rather than a number this system generated. Goes straight into stock in
+ * one step, keyed to whatever code is already on it instead of the next
+ * number in sequence.
+ */
+export async function addExistingCoil(formData: FormData) {
+  const user = await assertPermission('stock.goodsIn');
+  const company = getActiveCompany(user);
+  if (company !== 'BS_SUPPLIES') throw new Error('Coil numbers are a BCS Products thing.');
+
+  const refInput = String(formData.get('ref') ?? '').trim();
+  if (!/^\d{1,4}$/.test(refInput)) throw new Error('Enter the 4-digit number written on the coil.');
+  const ref = refInput.padStart(4, '0');
+
+  const clash = await db.coil.findUnique({ where: { ref } });
+  if (clash) throw new Error(`${ref} is already in the system${clash.receivedAt ? '' : ' — allocated but not yet received'}.`);
+
+  const grade = String(formData.get('grade') ?? '') as CoilGrade;
+  if (!GRADES.includes(grade)) throw new Error('Choose the grade — soft, medium or high carbon.');
+  const diameterMm = Number(formData.get('diameterMm'));
+  if (!(diameterMm > 0)) throw new Error('Enter the diameter.');
+  const weightKg = Number(formData.get('weightKg'));
+  if (!(weightKg > 0)) throw new Error('Enter the weight.');
+
+  const coil = await db.coil.create({
+    data: {
+      ref, company, grade, diameterMm, weightKg,
+      note: String(formData.get('note') ?? '').trim(),
+      allocatedById: user.id,
+      receivedAt: new Date(),
+      receivedById: user.id,
+    },
+  });
+
+  await logActivity('Coil', coil.id, 'Added to stock', `${ref} — already in the yard, ${grade.replace('_', ' ').toLowerCase()}, ${diameterMm}mm, ${weightKg} kg`, user.id);
+  revalidatePath('/stock/coils');
+}

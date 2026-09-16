@@ -9,7 +9,7 @@ import { tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Stat, StatRow } from '@/components/ui';
 import { SubmitButton } from '@/components/SubmitButton';
-import { allocateCoilNumbers, receiveCoil } from './actions';
+import { addExistingCoil, allocateCoilNumbers, cancelCoilAllocation, receiveCoil } from './actions';
 
 const GRADE_LABEL = { SOFT: 'Soft', MEDIUM: 'Medium', HIGH_CARBON: 'High carbon' } as const;
 
@@ -62,6 +62,43 @@ export default async function AddCoilsPage() {
         </div>
       )}
 
+      {can(user, 'stock.goodsIn') && (
+        <div className="card card-pad mb-6">
+          <h2 className="text-lg font-bold mb-1">Add a coil already in the yard</h2>
+          <p className="text-sm text-ink-muted mb-3">
+            For a coil that&apos;s already got its own 4-digit code written on it — goes straight into stock.
+          </p>
+          <form action={addExistingCoil} className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="label text-xs" htmlFor="ref">Code on the coil</label>
+              <input id="ref" name="ref" inputMode="numeric" pattern="\d{1,4}" maxLength={4} required className="input w-24" placeholder="0427" />
+            </div>
+            <div>
+              <label className="label text-xs" htmlFor="new-grade">Grade</label>
+              <select id="new-grade" name="grade" required defaultValue="" className="input w-36 py-2">
+                <option value="" disabled>Choose…</option>
+                {(Object.keys(GRADE_LABEL) as (keyof typeof GRADE_LABEL)[]).map((g) => (
+                  <option key={g} value={g}>{GRADE_LABEL[g]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label text-xs" htmlFor="new-dia">Diameter (mm)</label>
+              <input id="new-dia" name="diameterMm" type="number" step="0.1" min="0" required className="input w-24 py-2" placeholder="5.5" />
+            </div>
+            <div>
+              <label className="label text-xs" htmlFor="new-weight">Weight (kg)</label>
+              <input id="new-weight" name="weightKg" type="number" step="0.1" min="0" required className="input w-28 py-2" />
+            </div>
+            <div className="flex-1 min-w-[140px]">
+              <label className="label text-xs" htmlFor="new-note">Note (optional)</label>
+              <input id="new-note" name="note" className="input py-2" />
+            </div>
+            <SubmitButton className="btn-secondary" pendingLabel="Adding…">Add to stock</SubmitButton>
+          </form>
+        </div>
+      )}
+
       <section className="card card-pad">
         <h2 className="text-lg font-bold mb-1">Awaiting a coil</h2>
         <p className="text-sm text-ink-muted mb-4">
@@ -73,32 +110,38 @@ export default async function AddCoilsPage() {
           <ul className="divide-y divide-hairline">
             {awaiting.map((coil) => (
               <li key={coil.id} className="py-3">
-                <form action={receiveCoil} className="flex flex-wrap items-end gap-3">
-                  <input type="hidden" name="coilId" value={coil.id} />
-                  <span className="label w-16 shrink-0 mb-0 text-lg font-bold tracking-wide">{coil.ref}</span>
-                  <div>
-                    <label className="label text-xs" htmlFor={`grade-${coil.id}`}>Grade</label>
-                    <select id={`grade-${coil.id}`} name="grade" required defaultValue="" className="input w-36 py-2">
-                      <option value="" disabled>Choose…</option>
-                      {(Object.keys(GRADE_LABEL) as (keyof typeof GRADE_LABEL)[]).map((g) => (
-                        <option key={g} value={g}>{GRADE_LABEL[g]}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label text-xs" htmlFor={`dia-${coil.id}`}>Diameter (mm)</label>
-                    <input id={`dia-${coil.id}`} name="diameterMm" type="number" step="0.1" min="0" required className="input w-24 py-2" placeholder="5.5" />
-                  </div>
-                  <div>
-                    <label className="label text-xs" htmlFor={`weight-${coil.id}`}>Weight (kg)</label>
-                    <input id={`weight-${coil.id}`} name="weightKg" type="number" step="0.1" min="0" required className="input w-28 py-2" />
-                  </div>
-                  <div className="flex-1 min-w-[140px]">
-                    <label className="label text-xs" htmlFor={`note-${coil.id}`}>Note (optional)</label>
-                    <input id={`note-${coil.id}`} name="note" className="input py-2" />
-                  </div>
-                  <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">Receive</SubmitButton>
-                </form>
+                <div className="flex flex-wrap items-end gap-3">
+                  <form action={receiveCoil} className="flex flex-1 flex-wrap items-end gap-3">
+                    <input type="hidden" name="coilId" value={coil.id} />
+                    <span className="label w-16 shrink-0 mb-0 text-lg font-bold tracking-wide">{coil.ref}</span>
+                    <div>
+                      <label className="label text-xs" htmlFor={`grade-${coil.id}`}>Grade</label>
+                      <select id={`grade-${coil.id}`} name="grade" required defaultValue="" className="input w-36 py-2">
+                        <option value="" disabled>Choose…</option>
+                        {(Object.keys(GRADE_LABEL) as (keyof typeof GRADE_LABEL)[]).map((g) => (
+                          <option key={g} value={g}>{GRADE_LABEL[g]}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label text-xs" htmlFor={`dia-${coil.id}`}>Diameter (mm)</label>
+                      <input id={`dia-${coil.id}`} name="diameterMm" type="number" step="0.1" min="0" required className="input w-24 py-2" placeholder="5.5" />
+                    </div>
+                    <div>
+                      <label className="label text-xs" htmlFor={`weight-${coil.id}`}>Weight (kg)</label>
+                      <input id={`weight-${coil.id}`} name="weightKg" type="number" step="0.1" min="0" required className="input w-28 py-2" />
+                    </div>
+                    <div className="flex-1 min-w-[140px]">
+                      <label className="label text-xs" htmlFor={`note-${coil.id}`}>Note (optional)</label>
+                      <input id={`note-${coil.id}`} name="note" className="input py-2" />
+                    </div>
+                    <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">Receive</SubmitButton>
+                  </form>
+                  <form action={cancelCoilAllocation}>
+                    <input type="hidden" name="coilId" value={coil.id} />
+                    <SubmitButton className="btn-danger btn-sm" pendingLabel="Removing…">Remove</SubmitButton>
+                  </form>
+                </div>
               </li>
             ))}
           </ul>
