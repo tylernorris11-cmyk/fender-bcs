@@ -54,7 +54,10 @@ export default async function StockPage({ searchParams }: { searchParams: { cate
         actions={
           <>
             {!caresApplies && (
-              <Link href="/stock/coils" className="btn-secondary">Coils</Link>
+              <>
+                <Link href="/stock/coils/stock" className="btn-secondary">Coil Stock</Link>
+                <Link href="/stock/coils" className="btn-secondary">Add Coils</Link>
+              </>
             )}
             {can(user, 'stock.adjust') && (
               <Link href="/stock/new" className="btn-secondary"><Plus size={16} /> Add product</Link>

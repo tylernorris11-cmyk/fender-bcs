@@ -330,6 +330,7 @@ model Coil {
   company       Company    @default(BS_SUPPLIES)
   ref           String     @unique // 4-digit identification number, e.g. "0427"
   grade         CoilGrade?
+  diameterMm    Decimal?   @db.Decimal(6, 2)
   weightKg      Decimal?   @db.Decimal(10, 2)
   note          String     @default("")
   allocatedAt   DateTime   @default(now())

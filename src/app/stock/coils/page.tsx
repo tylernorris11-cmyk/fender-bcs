@@ -5,15 +5,15 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
-import { shortDate, clock, tonnes } from '@/lib/format';
+import { tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { Empty, PageHeader, Pill, Stat, StatRow, Table } from '@/components/ui';
+import { PageHeader, Stat, StatRow } from '@/components/ui';
 import { SubmitButton } from '@/components/SubmitButton';
 import { allocateCoilNumbers, receiveCoil } from './actions';
 
 const GRADE_LABEL = { SOFT: 'Soft', MEDIUM: 'Medium', HIGH_CARBON: 'High carbon' } as const;
 
-export default async function CoilsPage() {
+export default async function AddCoilsPage() {
   const user = await requirePermission('stock.view');
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
@@ -21,38 +21,27 @@ export default async function CoilsPage() {
   if (company !== 'BS_SUPPLIES') {
     return (
       <Shell user={user} module="stock" nav={NAV.stock} current="/stock/coils" alerts={alerts.length}>
-        <PageHeader title="Coils" />
+        <PageHeader title="Add Coils" />
         <div className="banner-warn">Coil stock is a BCS Products thing — Fender doesn&apos;t use this.</div>
       </Shell>
     );
   }
 
-  const [awaiting, inStock, recentlyReceived] = await Promise.all([
+  const [awaiting, inStockCount] = await Promise.all([
     db.coil.findMany({ where: { company, receivedAt: null }, orderBy: { ref: 'asc' } }),
-    db.coil.findMany({ where: { company, receivedAt: { not: null } }, orderBy: { receivedAt: 'desc' } }),
-    db.coil.findMany({
-      where: { company, receivedAt: { not: null } },
-      include: { receivedBy: true },
-      orderBy: { receivedAt: 'desc' },
-      take: 20,
-    }),
+    db.coil.count({ where: { company, receivedAt: { not: null } } }),
   ]);
-
-  const totalWeightKg = inStock.reduce((s, c) => s + Number(c.weightKg ?? 0), 0);
-  const byGrade = (grade: keyof typeof GRADE_LABEL) => inStock.filter((c) => c.grade === grade).length;
 
   return (
     <Shell user={user} module="stock" nav={NAV.stock} current="/stock/coils" alerts={alerts.length}>
       <PageHeader
-        title="Coils"
-        blurb="Raw coil for the straightening lines. Numbers get issued ahead of a delivery so they can be printed and tied to the steel at the gate — a coil only counts as stock once its grade and weight are entered."
+        title="Add Coils"
+        blurb="Issue numbers ahead of a delivery, then fill each one in as the coil actually arrives — see Coil Stock for what's currently on hand."
       />
 
       <StatRow>
-        <Stat value={inStock.length} label="Coils in stock" />
-        <Stat value={tonnes(totalWeightKg)} label="Total weight" />
+        <Stat value={inStockCount} label="Coils in stock" href="/stock/coils/stock" />
         <Stat value={awaiting.length} label="Numbers awaiting a coil" tone={awaiting.length ? 'warn' : 'default'} />
-        <Stat value={byGrade('SOFT')} label="Soft in stock" />
       </StatRow>
 
       {can(user, 'stock.goodsIn') && (
@@ -73,12 +62,14 @@ export default async function CoilsPage() {
         </div>
       )}
 
-      {awaiting.length > 0 && (
-        <section className="card card-pad mb-6">
-          <h2 className="text-lg font-bold mb-1">Awaiting a coil</h2>
-          <p className="text-sm text-ink-muted mb-4">
-            Numbers already issued and printed — fill this in once the coil they&apos;re on actually arrives.
-          </p>
+      <section className="card card-pad">
+        <h2 className="text-lg font-bold mb-1">Awaiting a coil</h2>
+        <p className="text-sm text-ink-muted mb-4">
+          Numbers already issued and printed — fill this in once the coil they&apos;re on actually arrives.
+        </p>
+        {awaiting.length === 0 ? (
+          <p className="text-sm text-ink-muted">Nothing waiting — pre-allocate some numbers above before the next delivery.</p>
+        ) : (
           <ul className="divide-y divide-hairline">
             {awaiting.map((coil) => (
               <li key={coil.id} className="py-3">
@@ -95,6 +86,10 @@ export default async function CoilsPage() {
                     </select>
                   </div>
                   <div>
+                    <label className="label text-xs" htmlFor={`dia-${coil.id}`}>Diameter (mm)</label>
+                    <input id={`dia-${coil.id}`} name="diameterMm" type="number" step="0.1" min="0" required className="input w-24 py-2" placeholder="5.5" />
+                  </div>
+                  <div>
                     <label className="label text-xs" htmlFor={`weight-${coil.id}`}>Weight (kg)</label>
                     <input id={`weight-${coil.id}`} name="weightKg" type="number" step="0.1" min="0" required className="input w-28 py-2" />
                   </div>
@@ -107,28 +102,6 @@ export default async function CoilsPage() {
               </li>
             ))}
           </ul>
-        </section>
-      )}
-
-      <section className="card card-pad">
-        <h2 className="text-lg font-bold mb-1">Recently received</h2>
-        <p className="text-sm text-ink-muted mb-4">In stock now — {inStock.length} coil{inStock.length === 1 ? '' : 's'} on hand across all grades.</p>
-        {recentlyReceived.length === 0 ? <Empty title="No coils received yet." /> : (
-          <Table head={<>
-            <th className="th">No.</th><th className="th">Grade</th><th className="th">Weight</th>
-            <th className="th">Received</th><th className="th">By</th><th className="th">Note</th>
-          </>}>
-            {recentlyReceived.map((c) => (
-              <tr key={c.id} className="row">
-                <td className="td font-bold">{c.ref}</td>
-                <td className="td"><Pill tone="neutral">{GRADE_LABEL[c.grade!]}</Pill></td>
-                <td className="td">{Number(c.weightKg).toLocaleString('en-GB')} kg</td>
-                <td className="td text-ink-muted whitespace-nowrap">{shortDate(c.receivedAt!)} {clock(c.receivedAt!)}</td>
-                <td className="td text-ink-muted">{c.receivedBy?.name ?? '—'}</td>
-                <td className="td text-ink-muted">{c.note || '—'}</td>
-              </tr>
-            ))}
-          </Table>
         )}
       </section>
 

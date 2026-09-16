@@ -200,11 +200,12 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'Returns & actions', href: '/compliance/returns' },
   ],
   stock: [
+    { label: 'Coil Stock', href: '/stock/coils/stock', company: 'BS_SUPPLIES' },
+    { label: 'Add Coils', href: '/stock/coils', company: 'BS_SUPPLIES' },
     { label: 'All stock', href: '/stock' },
     { label: 'Goods in', href: '/stock/goods-in', perm: 'stock.goodsIn' },
     { label: 'Movements', href: '/stock/movements' },
     { label: 'Bar counter', href: '/stock/bar-counter', perm: 'barCounter.view' },
-    { label: 'Coils', href: '/stock/coils', company: 'BS_SUPPLIES' },
   ],
   assets: [
     { label: 'Both', href: '/assets' },

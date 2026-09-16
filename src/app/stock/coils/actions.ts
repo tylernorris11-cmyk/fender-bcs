@@ -57,19 +57,21 @@ export async function receiveCoil(formData: FormData) {
 
   const grade = String(formData.get('grade') ?? '') as CoilGrade;
   if (!GRADES.includes(grade)) throw new Error('Choose the grade — soft, medium or high carbon.');
+  const diameterMm = Number(formData.get('diameterMm'));
+  if (!(diameterMm > 0)) throw new Error('Enter the diameter.');
   const weightKg = Number(formData.get('weightKg'));
   if (!(weightKg > 0)) throw new Error('Enter the weight.');
 
   await db.coil.update({
     where: { id },
     data: {
-      grade, weightKg,
+      grade, diameterMm, weightKg,
       note: String(formData.get('note') ?? '').trim(),
       receivedAt: new Date(),
       receivedById: user.id,
     },
   });
 
-  await logActivity('Coil', id, 'Received', `${coil.ref} — ${grade.replace('_', ' ').toLowerCase()}, ${weightKg} kg`, user.id);
+  await logActivity('Coil', id, 'Received', `${coil.ref} — ${grade.replace('_', ' ').toLowerCase()}, ${diameterMm}mm, ${weightKg} kg`, user.id);
   revalidatePath('/stock/coils');
 }
