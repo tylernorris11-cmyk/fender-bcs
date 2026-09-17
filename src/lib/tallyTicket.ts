@@ -18,6 +18,18 @@ const COL = {
   newLabel: 3, shapeCode: 10, date: 13, weight: 49,
 };
 
+// ESC/P printer control codes — only meaningful for the raw .txt route, sent
+// straight to the printer's own ESC/P interpreter (never the browser-print
+// pages: a browser has no idea what to do with a raw ESC byte, it'd just
+// show up as an odd character). Plain text prints at the printer's lightest,
+// draft-mode strike by default — next to the pre-printed boxes' own bold
+// ink this came out barely readable ("like it's low on ink"), even though
+// nothing here touches a ribbon. Emphasized + Double-Strike make the pins
+// hit twice, close to how the boxes themselves are printed.
+const ESC = '\x1B';
+export const PRINTER_BOLD_ON = `${ESC}E${ESC}G`;
+export const PRINTER_BOLD_OFF = `${ESC}H${ESC}F`;
+
 const ddmmyyyy = (d: Date | null) => {
   if (!d) return '';
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
