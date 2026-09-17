@@ -20,9 +20,18 @@ export default async function TallyCalibrationPage() {
       <PrintActions maxWidth={700} />
 
       <div className="print:hidden max-w-[700px] mx-auto px-10 pt-2 text-sm text-ink-muted">
-        Print this on the real tally stock, then for each box on the form note the line number (down the left) and
-        column number (top ruler — read the tens digit above the units digit) where it starts. Send those back and
-        the real layout can be built from them.
+        <p className="mb-2">
+          Print this on the real tally stock, then for each box on the form note the line number (down the left) and
+          column number (top ruler — read the tens digit above the units digit) where it starts. Send those back and
+          the real layout can be built from them.
+        </p>
+        <p>
+          If the Print button doesn&apos;t come out right on the tally printer,{' '}
+          <a href="/api/tally-calibration" className="text-brand-700 font-semibold hover:underline">
+            download the .txt file instead
+          </a>{' '}
+          and copy that straight to the printer&apos;s queue — the same route that worked for the ticket itself.
+        </p>
       </div>
 
       <pre
