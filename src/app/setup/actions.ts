@@ -4,11 +4,14 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { db } from '@/lib/db';
 import type { Company, Role } from '@prisma/client';
-import { assertPermission, hashPassword, logActivity, passwordProblem } from '@/lib/auth';
+import { assertPermission, hashPassword, logActivity, notifyMasterAdmins, passwordProblem } from '@/lib/auth';
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { initialsOf } from '@/lib/format';
 import { sendEmail } from '@/lib/email';
-import { TOGGLEABLE_MODULES } from '@/lib/rbac';
+import { ROLE_LABELS, TOGGLEABLE_MODULES } from '@/lib/rbac';
+
+/** MASTER_ADMIN and ADMIN both carry the full permission set (ALL) — company scope is the only difference. */
+const isHighPrivilege = (role: Role) => role === 'MASTER_ADMIN' || role === 'ADMIN';
 
 // ------------------------------------------------------------- pricing
 
@@ -81,6 +84,13 @@ export async function createUser(formData: FormData) {
     },
   });
   await logActivity('User', created.id, 'Account created', `${name} as ${role}`, admin.id);
+  if (isHighPrivilege(role)) {
+    await notifyMasterAdmins({
+      subject: `New ${ROLE_LABELS[role]} account created`,
+      text: `${admin.name} just created a new ${ROLE_LABELS[role]} account for ${name} (${email}). If that wasn't expected, check Set Up → Users.`,
+      path: '/setup/users',
+    });
+  }
   revalidatePath('/setup/users');
 }
 
@@ -104,6 +114,14 @@ export async function updateUserRole(formData: FormData) {
 
   await db.user.update({ where: { id: userId }, data: { role } });
   await logActivity('User', userId, 'Role changed', role, admin.id);
+  if (isHighPrivilege(role) && target.role !== role) {
+    const article = role === 'ADMIN' ? 'an' : 'a';
+    await notifyMasterAdmins({
+      subject: `${target.name} was made ${article} ${ROLE_LABELS[role]}`,
+      text: `${admin.name} changed ${target.name}'s role from ${ROLE_LABELS[target.role]} to ${ROLE_LABELS[role]}. If that wasn't expected, check Set Up → Users.`,
+      path: '/setup/users',
+    });
+  }
   revalidatePath('/setup/users');
 }
 
@@ -342,6 +360,13 @@ export async function approveAccessRequest(formData: FormData) {
     where: { id }, data: { status: 'APPROVED', decidedAt: new Date(), decidedById: admin.id },
   });
   await logActivity('AccessRequest', id, 'Approved', `${request.email} as ${role}`, admin.id);
+  if (isHighPrivilege(role)) {
+    await notifyMasterAdmins({
+      subject: `New ${ROLE_LABELS[role]} account approved`,
+      text: `${admin.name} approved an access request for ${request.name} (${request.email}) as ${ROLE_LABELS[role]}. If that wasn't expected, check Set Up → Users.`,
+      path: '/setup/users',
+    });
+  }
 
   const h = headers();
   const origin = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host')}`;
