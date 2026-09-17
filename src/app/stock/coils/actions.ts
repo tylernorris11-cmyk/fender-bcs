@@ -7,12 +7,13 @@ import { assertPermission, logActivity } from '@/lib/auth';
 import { getActiveCompany } from '@/lib/company';
 
 const GRADES: CoilGrade[] = ['SOFT', 'MEDIUM', 'HIGH_CARBON'];
+const NEXT_COIL_REF_KEY = 'nextCoilRef';
 
 /**
  * Issues a batch of 4-digit coil numbers ahead of the steel actually
  * arriving, so they're ready to write onto the coils at the gate.
  * A number on its own isn't stock — see receiveCoil — it's just a ticket
- * waiting for a coil to be matched up against it.
+ * waiting for a coil to be matched up to it.
  */
 export async function allocateCoilNumbers(formData: FormData) {
   const user = await assertPermission('stock.goodsIn');
@@ -24,25 +25,36 @@ export async function allocateCoilNumbers(formData: FormData) {
     throw new Error('Enter how many numbers you need (1–200 at a time).');
   }
 
-  // Plain sequential 4-digit numbers — find the highest one issued so far
-  // and count up from there, same idea as every other reference number in
-  // this app (order/PO/asset refs). Computed from the refs themselves
-  // rather than "whichever row has the latest allocatedAt" — that sounds
-  // equivalent but isn't: allocatedAt is a timestamp, not the sequence
-  // itself, and anything that ever disagrees with strict ref order (a
-  // backfilled batch, a clock correction) would make the "last" row by
-  // time not actually be the highest number, handing out a ref that's
-  // already in use.
-  const existing = await db.coil.findMany({ select: { ref: true } });
-  // Numbering starts at 0022 — 0001–0021 were already used before the coil
-  // system went live, so the floor keeps the sequence picking up where the
-  // real paper tally left off rather than restarting at 1.
-  const start = Math.max(21, ...existing.map((c) => Number(c.ref))) + 1;
-  const refs = Array.from({ length: count }, (_, i) => String(start + i).padStart(4, '0'));
+  // The sequence is tracked on its own in Setting rather than derived from
+  // the highest ref in the table — a coil added via "already in the yard"
+  // (addExistingCoil, below) carries whatever code was already written on
+  // it, some of them from well before this system existed (into the
+  // thousands), and MAX(ref) across every coil picked those up too, jumping
+  // the generator straight past them instead of carrying on cleanly from
+  // where the sequence itself had actually got to.
+  const setting = await db.setting.findUnique({ where: { key: NEXT_COIL_REF_KEY } });
+  // First-ever run: 0001–0031 were already used (0001–0021 before this
+  // system went live, 0022–0031 issued since) — 32 picks up where that left
+  // off rather than restarting at 1.
+  let next = setting ? Number(setting.value) : 32;
+
+  const taken = new Set((await db.coil.findMany({ select: { ref: true } })).map((c) => c.ref));
+  const refs: string[] = [];
+  while (refs.length < count) {
+    const candidate = String(next).padStart(4, '0');
+    next += 1;
+    if (taken.has(candidate)) continue; // an old "already in the yard" code happens to sit in the sequence's path — skip it, never hand out a ref twice
+    refs.push(candidate);
+  }
 
   const coils = await db.$transaction(
     refs.map((ref) => db.coil.create({ data: { ref, company, allocatedById: user.id } })),
   );
+  await db.setting.upsert({
+    where: { key: NEXT_COIL_REF_KEY },
+    create: { key: NEXT_COIL_REF_KEY, value: String(next) },
+    update: { value: String(next) },
+  });
 
   await logActivity('Coil', coils[0].id, 'Numbers allocated', `${refs[0]}–${refs[refs.length - 1]} (${count})`, user.id);
   revalidatePath('/stock/coils');
