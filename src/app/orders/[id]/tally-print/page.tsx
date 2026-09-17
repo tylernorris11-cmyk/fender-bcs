@@ -12,9 +12,15 @@ import { PrintActions } from '@/components/PrintActions';
  *
  * Every position below was measured from that PDF's own content stream,
  * not eyeballed: it declares an exact "0.75 0 0 -0.75 0 841.92 cm" page
- * transform (10pt Courier, 6pt/char — 10 characters per inch, a standard
- * printer pitch), so each field's true position is its raw PDF coordinate
- * times 0.75. See the conversation this shipped in for the working-out.
+ * transform (10pt Courier, 6pt/char — 12 characters per inch, "Elite"
+ * pitch), so each field's true position is its raw PDF coordinate times
+ * 0.75. See the conversation this shipped in for the working-out.
+ *
+ * This is the version for a normal printer (or Save as PDF). If the
+ * physical tally printer garbles a graphical print job — an Epson
+ * FX-890IIN did, almost certainly its Windows driver mistranslating —
+ * /api/orders/[id]/tally-text gives the identical layout as plain
+ * ASCII text instead, which bypasses that translation entirely.
  */
 
 const PAGE_WIDTH_PT = 595.32; // A4
@@ -78,8 +84,16 @@ export default async function TallyPrintPage({ params }: { params: { id: string 
       <style>{'@page { size: A4; margin: 0; }'}</style>
       <PrintActions maxWidth={700} />
 
-      <div className="print:hidden max-w-[700px] mx-auto px-10 pt-2">
+      <div className="print:hidden max-w-[700px] mx-auto px-10 pt-2 flex items-center justify-between gap-3">
         <Link href={`/orders/${order.id}`} className="text-sm font-semibold text-brand-700 hover:underline">← Back to order</Link>
+        <div className="flex items-center gap-2">
+          <a href={`/orders/${order.id}/tally-print/text`} className="btn-secondary btn-sm">
+            Print as text (for the tally printer)
+          </a>
+          <a href={`/api/orders/${order.id}/tally-text`} className="text-sm text-ink-faint hover:underline">
+            or download the .txt file
+          </a>
+        </div>
       </div>
 
       {pages.length === 0 ? (
