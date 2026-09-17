@@ -98,6 +98,7 @@ export async function createOrder(formData: FormData) {
           return {
             mark: r.mark,
             diaMm: dia,
+            grade: (r.grade || 'H').toUpperCase(),
             shapeCode: r.shapeCode || '99',
             shapeName: shapeName(r.shapeCode || '99'),
             lengthMm,

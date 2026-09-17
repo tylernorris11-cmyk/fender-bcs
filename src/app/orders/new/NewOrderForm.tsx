@@ -9,7 +9,7 @@ type Customer = { id: string; name: string; address: string; town: string; credi
 type Product = { id: string; name: string; code: string; category: string; unit: string; kgPerUnit: string; price: number };
 
 type Line = { key: number; productId: string; qty: string; unitPrice: string };
-type Bar = { key: number; mark: string; diaMm: string; shapeCode: string; lengthMm: string; bars: string; a: string; b: string; c: string; d: string; ef: string; unitPrice: string };
+type Bar = { key: number; mark: string; diaMm: string; grade: string; shapeCode: string; lengthMm: string; bars: string; a: string; b: string; c: string; d: string; ef: string; unitPrice: string };
 type Fence = { key: number; lengthFt: string; lengthIn: string; thicknessMm: string; qty: string; unitPrice: string };
 
 const VAT = 0.2;
@@ -17,7 +17,7 @@ const gbp = (n: number) => n.toLocaleString('en-GB', { style: 'currency', curren
 
 let seq = 0;
 const newLine = (): Line => ({ key: seq++, productId: '', qty: '', unitPrice: '' });
-const newBar = (): Bar => ({ key: seq++, mark: '', diaMm: '12', shapeCode: '21', lengthMm: '', bars: '', a: '', b: '', c: '', d: '', ef: '', unitPrice: '' });
+const newBar = (): Bar => ({ key: seq++, mark: '', diaMm: '12', grade: 'H', shapeCode: '21', lengthMm: '', bars: '', a: '', b: '', c: '', d: '', ef: '', unitPrice: '' });
 const newFence = (): Fence => ({ key: seq++, lengthFt: '', lengthIn: '', thicknessMm: '', qty: '', unitPrice: '' });
 
 export function NewOrderForm({
@@ -166,7 +166,7 @@ export function NewOrderForm({
             <table className="w-full min-w-[900px] text-sm">
               <thead>
                 <tr>
-                  {['Mark', 'Dia', 'Shape code', 'Length (mm)', 'Bars', 'A', 'B', 'C', 'D', 'E/F', '£ per bar', ''].map((h) => (
+                  {['Mark', 'Dia', 'Grade', 'Shape code', 'Length (mm)', 'Bars', 'A', 'B', 'C', 'D', 'E/F', '£ per bar', ''].map((h) => (
                     <th key={h} className="th pb-2">{h}</th>
                   ))}
                 </tr>
@@ -187,6 +187,10 @@ export function NewOrderForm({
                               onChange={(e) => setBars((p) => p.map((b) => b.key === bar.key ? { ...b, diaMm: e.target.value } : b))}>
                         {BAR_SIZES.map((s) => <option key={s} value={s}>{s} mm</option>)}
                       </select>
+                    </td>
+                    <td className="py-2 pr-2">
+                      <input name={`bar[${i}][grade]`} type="text" maxLength={2} placeholder="H" className="input w-14 px-2 py-1.5 uppercase"
+                             value={bar.grade} onChange={(e) => setBars((p) => p.map((b) => b.key === bar.key ? { ...b, grade: e.target.value.toUpperCase() } : b))} />
                     </td>
                     <td className="py-2 pr-2">
                       <select name={`bar[${i}][shapeCode]`} value={bar.shapeCode} className="input w-56 px-2 py-1.5"

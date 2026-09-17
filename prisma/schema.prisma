@@ -485,6 +485,7 @@ model BarMark {
   orderId   String
   mark      String // B01
   diaMm     Int
+  grade     String  @default("H") // BS4449 grade letter — H (high yield deformed) is the default, but not the only one used
   shapeCode String // "21", "51", "99"...
   shapeName String  @default("")
   lengthMm  Int // total cutting length

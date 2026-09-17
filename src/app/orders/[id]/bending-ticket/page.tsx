@@ -45,7 +45,7 @@ export default async function BendingTicket({ params }: { params: { id: string }
             return (
               <tr key={b.id} className="border-b border-black/10">
                 <td className="py-2 font-bold">{b.mark}</td>
-                <td className="py-2">{b.diaMm} mm</td>
+                <td className="py-2">{b.grade}{b.diaMm} mm</td>
                 <td className="py-2">{b.shapeCode} — {b.shapeName}</td>
                 <td className="py-2 text-right">{b.lengthMm} mm</td>
                 <td className="py-2 text-right">{b.bars}</td>

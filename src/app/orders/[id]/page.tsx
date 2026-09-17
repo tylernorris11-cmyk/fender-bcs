@@ -61,7 +61,10 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
             )}
             <a href={`/orders/${order.id}/delivery-sheet`} className="btn-secondary"><Printer size={16} /> Delivery sheet</a>
             {hasSchedule && (
-              <a href={`/orders/${order.id}/bending-ticket`} className="btn-secondary"><Printer size={16} /> Bending ticket</a>
+              <>
+                <a href={`/orders/${order.id}/bending-ticket`} className="btn-secondary"><Printer size={16} /> Bending ticket</a>
+                <a href={`/orders/${order.id}/tally-print`} className="btn-secondary"><Printer size={16} /> Print tally</a>
+              </>
             )}
           </>
         }
@@ -180,7 +183,7 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
                 return (
                   <tr key={b.id} className="row">
                     <td className="td font-semibold">{b.mark}</td>
-                    <td className="td">{b.diaMm} mm</td>
+                    <td className="td">{b.grade}{b.diaMm} mm</td>
                     <td className="td">{b.shapeCode} — {b.shapeName}</td>
                     <td className="td text-right tabular-nums">{b.lengthMm.toLocaleString('en-GB')} mm</td>
                     <td className="td text-right tabular-nums">{b.bars}</td>
