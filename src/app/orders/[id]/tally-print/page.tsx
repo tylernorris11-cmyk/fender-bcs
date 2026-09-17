@@ -93,6 +93,9 @@ export default async function TallyPrintPage({ params }: { params: { id: string 
           <a href={`/api/orders/${order.id}/tally-text`} className="text-sm text-ink-faint hover:underline">
             or download the .txt file
           </a>
+          <a href="/orders/tally-calibration" className="text-sm text-ink-faint hover:underline">
+            · line up the boxes on the real stock
+          </a>
         </div>
       </div>
 
