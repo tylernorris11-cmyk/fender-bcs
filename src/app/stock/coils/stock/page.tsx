@@ -91,10 +91,12 @@ export default async function CoilStockPage() {
                 <div className="grid gap-4 sm:grid-cols-3">
                   {GRADES.map((grade) => {
                     const coils = cellFor(dia, grade);
+                    const gradeWeightKg = coils.reduce((s, c) => s + Number(c.weightKg ?? 0), 0);
                     return (
                       <div key={grade} className="rounded-xl border border-hairline p-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint mb-2">
                           {GRADE_LABEL[grade]} · {coils.length}
+                          {coils.length > 0 && <> · {tonnes(gradeWeightKg)}</>}
                         </p>
                         {coils.length === 0 ? (
                           <p className="text-sm text-ink-faint">None in stock</p>
