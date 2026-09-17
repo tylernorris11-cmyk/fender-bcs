@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Info, Plus, Trash2 } from 'lucide-react';
 import { SHAPE_CODES, BAR_SIZES, MASS_PER_M } from '@/lib/bs8666';
 import { createOrder } from '../actions';
@@ -15,16 +15,26 @@ type Fence = { key: number; lengthFt: string; lengthIn: string; thicknessMm: str
 const VAT = 0.2;
 const gbp = (n: number) => n.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 });
 
-let seq = 0;
-const newLine = (): Line => ({ key: seq++, productId: '', qty: '', unitPrice: '' });
-const newBar = (): Bar => ({ key: seq++, mark: '', diaMm: '12', grade: 'H', shapeCode: '21', lengthMm: '', bars: '', a: '', b: '', c: '', d: '', ef: '', unitPrice: '' });
-const newFence = (): Fence => ({ key: seq++, lengthFt: '', lengthIn: '', thicknessMm: '', qty: '', unitPrice: '' });
-
 export function NewOrderForm({
   customers, products, towns, locations, cutBentPrice, isFender,
 }: { customers: Customer[]; products: Product[]; towns: string[]; locations: string[]; cutBentPrice: number; isFender: boolean }) {
+  // Per-instance, not module-level: a shared `let seq` counter drifts between
+  // the server (a long-lived process that keeps counting across requests)
+  // and a freshly-loaded client bundle (starting back at 0), producing
+  // different keys for the same row and a hydration mismatch on the
+  // id/htmlFor pair. Scoping it to a ref means every fresh mount — server
+  // or client — starts from the same 0.
+  const seqRef = useRef(0);
+  const nextKey = () => seqRef.current++;
+  const newLine = (): Line => ({ key: nextKey(), productId: '', qty: '', unitPrice: '' });
+  const newBar = (): Bar => ({ key: nextKey(), mark: '', diaMm: '12', grade: 'H', shapeCode: '21', lengthMm: '', bars: '', a: '', b: '', c: '', d: '', ef: '', unitPrice: '' });
+  const newFence = (): Fence => ({ key: nextKey(), lengthFt: '', lengthIn: '', thicknessMm: '', qty: '', unitPrice: '' });
+
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
-  const [lines, setLines] = useState<Line[]>([newLine()]);
+  // Lazy initializer — passing [newLine()] directly would call newLine() (and
+  // so nextKey()) on every render, not just the first, since JS evaluates
+  // the argument before useState ever sees it.
+  const [lines, setLines] = useState<Line[]>(() => [newLine()]);
   const [bars, setBars] = useState<Bar[]>([]);
   const [fences, setFences] = useState<Fence[]>([]);
   const [address, setAddress] = useState(customers[0]?.address ?? '');
