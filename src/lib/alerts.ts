@@ -4,7 +4,7 @@ import { db } from './db';
 import { daysUntil, shortDate } from './format';
 import { can, type SessionUser } from './rbac';
 import { getActiveCompany } from './company';
-import { alertWindowDays, isOutOfService, type StatutoryCheck } from './assets';
+import { alertWindowDays, isOutOfService, SERVICE_MILEAGE_WARN_WINDOW, type StatutoryCheck } from './assets';
 import { findFuelDiscrepancies } from './fuel';
 
 export type Alert = {
@@ -40,7 +40,7 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
     db.supplier.findMany({ where: { company, blocked: false }, include: { certificates: true, batches: { take: 1 } } }),
     db.asset.findMany({
       where: { retired: false, OR: [{ company: null }, { company }] },
-      include: { checks: { orderBy: { performedAt: 'desc' }, take: 1, select: { items: { select: { critical: true, ok: true, resolved: true } }, result: true } } },
+      include: { checks: { orderBy: { performedAt: 'desc' }, take: 1, select: { items: { select: { critical: true, ok: true, resolved: true } }, result: true, mileage: true } } },
     }),
     db.customer.findMany({ where: { company }, include: { orders: { where: { paymentStatus: 'UNPAID', stage: { notIn: ['CANCELLED'] } } } } }),
     db.order.count({ where: { company, stage: 'PENDING_APPROVAL', archived: false } }),
@@ -187,6 +187,21 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
         href: `/assets/${a.id}`,
         perm: 'assets.view',
       });
+    }
+
+    const currentMileage = a.checks[0]?.mileage ?? null;
+    if (a.serviceDueMileage != null && currentMileage != null) {
+      const remaining = a.serviceDueMileage - currentMileage;
+      if (remaining <= SERVICE_MILEAGE_WARN_WINDOW) {
+        out.push({
+          id: `asset-${a.id}-Service-mileage`,
+          severity: remaining < 0 ? 'bad' : 'warn',
+          title: `${a.name} — Service ${remaining < 0 ? `overdue by ${(-remaining).toLocaleString('en-GB')} miles` : `due in ${remaining.toLocaleString('en-GB')} miles`}`,
+          detail: `${a.ref} · ${a.category} · ${a.depot}`,
+          href: `/assets/${a.id}`,
+          perm: 'assets.view',
+        });
+      }
     }
   }
 

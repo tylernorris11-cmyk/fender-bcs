@@ -24,6 +24,9 @@ export function isOutOfService(latestCheck: LatestCheckLike): boolean {
  * inspection is booked at short notice, so a week's warning is enough.
  * Everything else keeps the original three-week heads-up.
  */
+/** How close to a mileage-interval service due point to start flagging it — same idea as alertWindowDays, just in miles instead of days. */
+export const SERVICE_MILEAGE_WARN_WINDOW = 1000;
+
 export function alertWindowDays(check: StatutoryCheck, category: string): number {
   if (check === 'Safety inspection') return 7;
   // Only 30 days between tests to begin with, so a 21-day heads-up would

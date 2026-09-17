@@ -757,6 +757,7 @@ model Asset {
   puwerDue                  DateTime?
   lolerDue                  DateTime?
   serviceDue                DateTime?
+  serviceDueMileage         Int? // mileage-interval alternative to serviceDue — whichever comes first, in practice
   calibrationDue            DateTime? // control of measuring devices — CARES requirement
   emergencyLightTestDue     DateTime? // EN 50172 monthly functional test
   emergencyLightDurationDue DateTime? // EN 50172 annual 3-hour full duration test
@@ -833,16 +834,18 @@ model AssetChecklistItem {
 }
 
 model Inspection {
-  id          String    @id @default(cuid())
-  assetId     String
-  kind        String // MOT | PUWER | LOLER | Service | Calibration | Safety check
-  result      String    @default("Pass") // Pass | Fail | Advisory
-  provider    String    @default("")
-  performedOn DateTime
-  nextDueOn   DateTime?
-  certificate String    @default("")
-  notes       String    @default("")
-  loggedById  String?
+  id             String    @id @default(cuid())
+  assetId        String
+  kind           String // MOT | PUWER | LOLER | Service | Calibration | Safety check
+  result         String    @default("Pass") // Pass | Fail | Advisory
+  provider       String    @default("")
+  performedOn    DateTime
+  nextDueOn      DateTime?
+  mileageAt      Int? // odometer reading this was done at — mainly Service, on a vehicle
+  nextDueMileage Int? // mileageAt + however many miles until the next one — computed, not typed directly
+  certificate    String    @default("")
+  notes          String    @default("")
+  loggedById     String?
 
   asset    Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
   loggedBy User? @relation(fields: [loggedById], references: [id])

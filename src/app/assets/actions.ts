@@ -104,9 +104,17 @@ export async function logInspection(formData: FormData) {
   const nextDueOn = formData.get('nextDueOn') ? new Date(String(formData.get('nextDueOn'))) : null;
   const result = String(formData.get('result') ?? 'Pass');
 
+  // Mileage-interval alternative to a due date — "was at 109,000, next due in
+  // 15,000" — the due mileage itself (124,000) is computed here rather than
+  // typed directly, same reasoning as barWeightKg elsewhere: derive it once
+  // from what was actually entered instead of trusting a separately-typed total.
+  const mileageAt = formData.get('mileageAt') ? Number(formData.get('mileageAt')) : null;
+  const dueInMiles = formData.get('dueInMiles') ? Number(formData.get('dueInMiles')) : null;
+  const nextDueMileage = mileageAt != null && dueInMiles != null ? mileageAt + dueInMiles : null;
+
   await db.inspection.create({
     data: {
-      assetId, kind, result, performedOn, nextDueOn,
+      assetId, kind, result, performedOn, nextDueOn, mileageAt, nextDueMileage,
       provider: String(formData.get('provider') ?? ''),
       certificate: String(formData.get('certificate') ?? ''),
       notes: String(formData.get('notes') ?? ''),
@@ -123,8 +131,15 @@ export async function logInspection(formData: FormData) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (field) await db.asset.update({ where: { id: assetId }, data: { [field]: nextDueOn } as any });
   }
+  if (kind === 'Service' && nextDueMileage != null) {
+    await db.asset.update({ where: { id: assetId }, data: { serviceDueMileage: nextDueMileage } });
+  }
 
-  await logActivity('Asset', assetId, `${kind} logged`, `${result}${nextDueOn ? `, next due ${nextDueOn.toDateString()}` : ''}`, user.id);
+  const dueBits = [
+    nextDueOn ? `next due ${nextDueOn.toDateString()}` : null,
+    nextDueMileage != null ? `next due at ${nextDueMileage.toLocaleString('en-GB')} miles` : null,
+  ].filter(Boolean).join(', ');
+  await logActivity('Asset', assetId, `${kind} logged`, `${result}${dueBits ? `, ${dueBits}` : ''}`, user.id);
   revalidatePath(`/assets/${assetId}`);
   revalidatePath('/assets');
   revalidatePath('/planning');

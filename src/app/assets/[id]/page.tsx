@@ -6,7 +6,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { clock, daysUntil, shortDate } from '@/lib/format';
-import { alertWindowDays, isOutOfService } from '@/lib/assets';
+import { alertWindowDays, isOutOfService, SERVICE_MILEAGE_WARN_WINDOW } from '@/lib/assets';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill } from '@/components/ui';
 import { addAssetChecklistItem, addAssetNote, logInspection, removeAssetChecklistItem, retireAsset } from '../actions';
@@ -23,6 +23,24 @@ function Due({ label, due, windowDays }: { label: string; due: Date | null; wind
         {days < 0 ? <Pill tone="bad">{shortDate(due)} · overdue</Pill>
           : days <= windowDays ? <Pill tone="warn">{shortDate(due)} · {days}d</Pill>
           : shortDate(due)}
+      </dd>
+    </div>
+  );
+}
+
+/** Same idea as Due, but for a mileage-interval service schedule instead of a calendar date. */
+function DueMileage({ label, dueAt, currentMileage }: { label: string; dueAt: number | null; currentMileage: number | null }) {
+  if (!dueAt) return null;
+  const dueLabel = `${dueAt.toLocaleString('en-GB')} miles`;
+  const remaining = currentMileage != null ? dueAt - currentMileage : null;
+  return (
+    <div className="flex justify-between gap-4 py-2 border-b border-hairline last:border-0">
+      <dt className="text-ink-muted">{label}</dt>
+      <dd className="font-semibold">
+        {remaining == null ? dueLabel
+          : remaining < 0 ? <Pill tone="bad">{dueLabel} · {Math.abs(remaining).toLocaleString('en-GB')} over</Pill>
+          : remaining <= SERVICE_MILEAGE_WARN_WINDOW ? <Pill tone="warn">{dueLabel} · {remaining.toLocaleString('en-GB')} left</Pill>
+          : dueLabel}
       </dd>
     </div>
   );
@@ -46,6 +64,7 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
 
   const latestCheck = asset.checks[0];
   const outOfService = isOutOfService(latestCheck);
+  const currentMileage = latestCheck?.mileage ?? null;
 
   return (
     <Shell user={user} module="assets" nav={NAV.assets} current="/assets" alerts={alerts.length}>
@@ -108,6 +127,7 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
             <Due label="PUWER inspection" due={asset.puwerDue} windowDays={alertWindowDays('PUWER inspection', asset.category)} />
             <Due label="LOLER thorough examination" due={asset.lolerDue} windowDays={alertWindowDays('LOLER exam', asset.category)} />
             <Due label="Service" due={asset.serviceDue} windowDays={alertWindowDays('Service', asset.category)} />
+            <DueMileage label="Service (mileage)" dueAt={asset.serviceDueMileage} currentMileage={currentMileage} />
             <Due label="Measurement calibration" due={asset.calibrationDue} windowDays={alertWindowDays('Measurement calibration', asset.category)} />
             <Due label="Emergency light monthly test" due={asset.emergencyLightTestDue} windowDays={alertWindowDays('Emergency light test', asset.category)} />
             <Due label="Emergency light annual duration test" due={asset.emergencyLightDurationDue} windowDays={alertWindowDays('Emergency light duration test', asset.category)} />
@@ -152,6 +172,16 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
               <label className="label" htmlFor="nextDueOn">Next due</label>
               <input id="nextDueOn" name="nextDueOn" type="date" className="input" />
               <p className="hint">Fills the due date on this record.</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="mileageAt">Mileage at</label>
+              <input id="mileageAt" name="mileageAt" type="number" min="0" className="input" placeholder="109000"
+                     defaultValue={currentMileage ?? ''} />
+            </div>
+            <div>
+              <label className="label" htmlFor="dueInMiles">Next due in (miles)</label>
+              <input id="dueInMiles" name="dueInMiles" type="number" min="0" className="input" placeholder="15000" />
+              <p className="hint">A Service — adds to mileage at, so this rolls the due mileage forward too.</p>
             </div>
             <div>
               <label className="label" htmlFor="certificate">Certificate number</label>
@@ -236,6 +266,12 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
                 <span className="font-semibold">{i.kind}</span>
                 <Pill tone={i.result === 'Pass' ? 'good' : i.result === 'Fail' ? 'bad' : 'warn'}>{i.result}</Pill>
                 <span className="text-ink-muted">{i.provider}</span>
+                {i.mileageAt != null && (
+                  <span className="text-ink-faint text-xs">
+                    {i.mileageAt.toLocaleString('en-GB')} miles
+                    {i.nextDueMileage != null && ` · next due ${i.nextDueMileage.toLocaleString('en-GB')}`}
+                  </span>
+                )}
                 {i.notes && <span className="text-ink-muted italic w-full">{i.notes}</span>}
               </li>
             ))}
