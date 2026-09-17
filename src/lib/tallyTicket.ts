@@ -30,6 +30,16 @@ const ESC = '\x1B';
 export const PRINTER_BOLD_ON = `${ESC}E${ESC}G`;
 export const PRINTER_BOLD_OFF = `${ESC}H${ESC}F`;
 
+// Found by testing a real print: the first 3 lines of a raw job never reach
+// the paper at all — the printer (or whatever sits between the file and it)
+// snaps to its own idea of "top of form" before anything actually starts,
+// so what was meant to be the 4th line (the bar mark row) printed as the
+// very first visible line, and the header above it never showed up. This is
+// a one-off, once-per-job thing, not per-ticket — no form-feed is sent
+// between tickets on continuous stock, so only the very start of the whole
+// file needs padding to absorb it, not the start of every block.
+export const PRINTER_TOP_OF_FORM_OFFSET = '\r\n'.repeat(3);
+
 const ddmmyyyy = (d: Date | null) => {
   if (!d) return '';
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { notFound } from 'next/navigation';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { buildTallyLines, PRINTER_BOLD_OFF, PRINTER_BOLD_ON } from '@/lib/tallyTicket';
+import { buildTallyLines, PRINTER_BOLD_OFF, PRINTER_BOLD_ON, PRINTER_TOP_OF_FORM_OFFSET } from '@/lib/tallyTicket';
 
 /**
  * A raw .txt download of the tally — the most reliable option for an impact
@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   });
   if (!order) notFound();
 
-  const text = PRINTER_BOLD_ON + buildTallyLines(order).join('\r\n') + PRINTER_BOLD_OFF + '\r\n';
+  const text = PRINTER_BOLD_ON + PRINTER_TOP_OF_FORM_OFFSET + buildTallyLines(order).join('\r\n') + PRINTER_BOLD_OFF + '\r\n';
 
   return new NextResponse(text, {
     headers: {
