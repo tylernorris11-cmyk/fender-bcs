@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { ChevronRight, Plus } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -13,6 +14,10 @@ export default async function StockPage({ searchParams }: { searchParams: { cate
   const user = await requirePermission('stock.view');
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
+  // Coils are BCS's day-to-day stock — the Stock tile leads straight there
+  // rather than the general product list, same reasoning as trimming it
+  // off their Stock menu.
+  if (company === 'BS_SUPPLIES') redirect('/stock/coils/stock');
   const caresApplies = company === 'FENDER';
   const depot = searchParams.depot;
   const showInactive = searchParams.inactive === '1';
