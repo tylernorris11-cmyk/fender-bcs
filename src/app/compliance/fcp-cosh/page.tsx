@@ -10,22 +10,22 @@ import { SubmitButton } from '@/components/SubmitButton';
 import { uploadComplianceDocument } from '../actions';
 import { ComplianceDocumentRow } from '../ComplianceDocumentRow';
 
+const CATEGORIES = ['FCP_DATA', 'COSHH'] as const;
 const CATEGORY_LABEL: Record<string, string> = {
-  PROCEDURE: 'Procedure',
-  CARES_GUIDANCE: 'CARES guidance',
-  SCOPE_OF_APPROVAL: 'Scope of approval',
-  OTHER: 'Other',
+  FCP_DATA: 'FCP data sheet',
+  COSHH: 'COSHH sheet',
 };
 
-export default async function ComplianceDocumentsPage() {
+/** A place to keep FCP product data sheets and COSHH (hazardous substance) safety data sheets — reuses the same document storage as CARES documents, just its own section and categories. No AI extraction here (that's only for mill certs) — a plain upload/download/rename filing cabinet. */
+export default async function FcpCoshPage() {
   const user = await requirePermission('compliance.view');
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
 
   if (company !== 'FENDER') {
     return (
-      <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/documents" alerts={alerts.length}>
-        <PageHeader title="CARES documents" />
+      <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/fcp-cosh" alerts={alerts.length}>
+        <PageHeader title="FCP Data & Cosh sheets" />
         <div className="banner-warn">
           Compliance is a Fender Steel thing — BCS Products is not CARES-approved and none of this applies to it.
         </div>
@@ -34,32 +34,32 @@ export default async function ComplianceDocumentsPage() {
   }
 
   const documents = await db.complianceDocument.findMany({
-    where: { company, archived: false, category: { in: ['PROCEDURE', 'CARES_GUIDANCE', 'SCOPE_OF_APPROVAL', 'OTHER'] } },
+    where: { company, archived: false, category: { in: [...CATEGORIES] } },
     include: { uploadedBy: true },
     orderBy: [{ category: 'asc' }, { uploadedAt: 'desc' }],
   });
   const canEdit = can(user, 'compliance.edit');
 
   return (
-    <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/documents" alerts={alerts.length}>
+    <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/fcp-cosh" alerts={alerts.length}>
       <PageHeader
-        title="CARES documents"
-        blurb="Reference material — CARES's own guidance, our written procedures, scope of approval. Not certificates — those are under Upload certificate and Suppliers."
+        title="FCP Data & Cosh sheets"
+        blurb="Product technical data sheets and COSHH safety data sheets for hazardous substances."
       />
 
       {canEdit && (
         <section className="card card-pad mb-6">
-          <h2 className="text-lg font-bold mb-4">Upload a document</h2>
+          <h2 className="text-lg font-bold mb-4">Upload a sheet</h2>
           <form action={uploadComplianceDocument} className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[200px]">
               <label className="label" htmlFor="title">Title</label>
-              <input id="title" name="title" required className="input" placeholder="CARES SRC21 — cast/product traceability procedure" />
+              <input id="title" name="title" required className="input" placeholder="e.g. Cemrok — technical data sheet" />
             </div>
             <div>
-              <label className="label" htmlFor="category">Category</label>
-              <select id="category" name="category" defaultValue="OTHER" className="input">
-                {Object.entries(CATEGORY_LABEL).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+              <label className="label" htmlFor="category">Type</label>
+              <select id="category" name="category" defaultValue="FCP_DATA" className="input">
+                {CATEGORIES.map((value) => (
+                  <option key={value} value={value}>{CATEGORY_LABEL[value]}</option>
                 ))}
               </select>
             </div>
@@ -73,7 +73,7 @@ export default async function ComplianceDocumentsPage() {
       )}
 
       <section className="card card-pad">
-        {documents.length === 0 ? <Empty title="No CARES documents uploaded yet." /> : (
+        {documents.length === 0 ? <Empty title="No data or COSHH sheets uploaded yet." /> : (
           <ul className="divide-y divide-hairline">
             {documents.map((d) => (
               <ComplianceDocumentRow

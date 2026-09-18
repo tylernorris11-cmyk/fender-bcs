@@ -319,6 +319,7 @@ export async function uploadComplianceDocument(formData: FormData) {
   });
   await logActivity('ComplianceDocument', doc.id, 'Uploaded', title, user.id);
   revalidatePath('/compliance/documents');
+  revalidatePath('/compliance/fcp-cosh');
 }
 
 export async function archiveComplianceDocument(formData: FormData) {
@@ -331,4 +332,21 @@ export async function archiveComplianceDocument(formData: FormData) {
   await db.complianceDocument.update({ where: { id }, data: { archived: true } });
   await logActivity('ComplianceDocument', id, 'Archived', doc.title, user.id);
   revalidatePath('/compliance/documents');
+  revalidatePath('/compliance/fcp-cosh');
+}
+
+export async function renameComplianceDocument(formData: FormData) {
+  const user = await assertPermission('compliance.edit');
+  assertCaresApplies(user);
+  const id = String(formData.get('id') ?? '');
+  const title = String(formData.get('title') ?? '').trim();
+  if (!title) throw new Error('Give the document a title.');
+
+  const doc = await db.complianceDocument.findUniqueOrThrow({ where: { id } });
+  assertCompanyAccess(user, doc.company);
+
+  await db.complianceDocument.update({ where: { id }, data: { title } });
+  await logActivity('ComplianceDocument', id, 'Renamed', `${doc.title} → ${title}`, user.id);
+  revalidatePath('/compliance/documents');
+  revalidatePath('/compliance/fcp-cosh');
 }

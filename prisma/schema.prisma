@@ -1098,6 +1098,8 @@ enum ComplianceDocumentCategory {
   CARES_GUIDANCE
   SCOPE_OF_APPROVAL
   OTHER
+  FCP_DATA // FCP product technical data sheets
+  COSHH // hazardous-substance safety data sheets
 }
 
 model ComplianceDocument {

@@ -194,6 +194,7 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'Upload certificate', href: '/compliance/test-certs' },
     { label: 'Cast numbers', href: '/compliance/cast-numbers' },
     { label: 'CARES documents', href: '/compliance/documents' },
+    { label: 'FCP Data & Cosh sheets', href: '/compliance/fcp-cosh' },
     { label: 'Trace a batch', href: '/compliance/trace' },
     { label: 'Suppliers', href: '/compliance/suppliers' },
     { label: 'Non-conformance', href: '/compliance/ncr' },
