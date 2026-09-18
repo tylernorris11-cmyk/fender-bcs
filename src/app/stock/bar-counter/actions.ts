@@ -6,7 +6,7 @@ import { Prisma, type BarCountMode } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
-import { detectBarCircles, detectBarCirclesWatershed, type DetectedCircle } from '@/lib/barDetection';
+import { detectBarCircles, detectBarCirclesWatershed, type DetectedCircle, type NormalizedRect } from '@/lib/barDetection';
 import { estimateBarCount } from '@/lib/barCountAI';
 
 const ALLOWED_PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -53,12 +53,33 @@ export async function runBarDetection(formData: FormData): Promise<BarDetectResu
   const calibratedRadiusRaw = formData.get('calibratedRadius');
   const calibratedRadius = calibratedRadiusRaw ? Number(calibratedRadiusRaw) : undefined;
 
+  // Optional "Define Count Area" crop, drawn by the worker to exclude
+  // background clutter (other stacks, dirt, sky) from detection — see
+  // the countthings.com guide this was modelled on. Malformed input just
+  // falls back to running on the whole photo, same as if none was drawn.
+  const areaRaw = formData.get('area');
+  let area: NormalizedRect | undefined;
+  if (areaRaw) {
+    try {
+      const parsed = JSON.parse(String(areaRaw));
+      if (
+        typeof parsed?.x0 === 'number' && typeof parsed?.y0 === 'number'
+        && typeof parsed?.x1 === 'number' && typeof parsed?.y1 === 'number'
+      ) {
+        area = {
+          x0: Math.min(parsed.x0, parsed.x1), x1: Math.max(parsed.x0, parsed.x1),
+          y0: Math.min(parsed.y0, parsed.y1), y1: Math.max(parsed.y0, parsed.y1),
+        };
+      }
+    } catch { /* ignore malformed area — falls back to the whole photo */ }
+  }
+
   let detectedCount: number | null = null;
   let circles: DetectedCircle[] = [];
   let photoWidth = 0;
   let photoHeight = 0;
   if (mode === 'CIRCLE_DETECTOR' || mode === 'BOTH') {
-    const result = await detectBarCircles(buffer, file.type, calibratedRadius);
+    const result = await detectBarCircles(buffer, file.type, calibratedRadius, area);
     if (result.error) return { ok: false, error: result.error };
     circles = result.circles;
     detectedCount = result.circles.length;
@@ -66,7 +87,7 @@ export async function runBarDetection(formData: FormData): Promise<BarDetectResu
     photoHeight = result.height;
   } else if (mode === 'WATERSHED') {
     if (!calibratedRadius) return { ok: false, error: 'Drag across one bar end to show its size before running watershed detection.' };
-    const result = await detectBarCirclesWatershed(buffer, file.type, calibratedRadius);
+    const result = await detectBarCirclesWatershed(buffer, file.type, calibratedRadius, area);
     if (result.error) return { ok: false, error: result.error };
     circles = result.circles;
     detectedCount = result.circles.length;

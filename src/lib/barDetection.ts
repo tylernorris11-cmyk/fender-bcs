@@ -4,6 +4,8 @@ import { PNG } from 'pngjs';
 
 export type DetectedCircle = { x: number; y: number; r: number }; // all 0–1, normalized by width (r too, so it never distorts into an ellipse)
 
+export type NormalizedRect = { x0: number; y0: number; x1: number; y1: number }; // 0–1 fractions of the full photo
+
 // Fallback only, used when the worker's own bar-size calibration (see
 // below) isn't available for some reason. Tuned against one real yard photo
 // with a genuine, verified ground-truth count (112, via a dedicated
@@ -86,10 +88,58 @@ function decodeToRgba(bytes: Buffer, mimeType: string): { data: Uint8Array; widt
   throw new Error(`Unsupported image type for detection: ${mimeType}. Upload a JPEG or PNG.`);
 }
 
+// Crops the decoded RGBA buffer down to just the worker-drawn area before
+// detection runs, so background clutter outside the bundle (other stacks,
+// dirt, sky) never gets a chance to seed a false circle. Same "Define Count
+// Area" idea used by dedicated bar-counting apps (countthings.com's guide)
+// to keep background noise out of frame — optional, and detection runs on
+// the whole photo exactly as before when no area is given.
+function cropToArea(
+  data: Uint8Array, width: number, height: number, area: NormalizedRect,
+): { data: Uint8Array; width: number; height: number } {
+  const x0 = Math.max(0, Math.min(width - 1, Math.round(area.x0 * width)));
+  const y0 = Math.max(0, Math.min(height - 1, Math.round(area.y0 * height)));
+  const x1 = Math.max(x0 + 1, Math.min(width, Math.round(area.x1 * width)));
+  const y1 = Math.max(y0 + 1, Math.min(height, Math.round(area.y1 * height)));
+  const cropW = x1 - x0;
+  const cropH = y1 - y0;
+  const out = new Uint8Array(cropW * cropH * 4);
+  for (let row = 0; row < cropH; row++) {
+    const srcStart = ((y0 + row) * width + x0) * 4;
+    out.set(data.subarray(srcStart, srcStart + cropW * 4), row * cropW * 4);
+  }
+  return { data: out, width: cropW, height: cropH };
+}
+
+// Detection runs on the crop (when there is one) and returns coordinates
+// normalized to the crop's own width/height — remap those back into
+// full-photo-normalized units so the client overlay, which always draws
+// against the full original photo, doesn't need to know a crop happened.
+function toFullPhotoCircle(
+  cropX: number, cropY: number, cropR: number,
+  area: NormalizedRect | undefined, areaWidthFraction: number, areaHeightFraction: number,
+): DetectedCircle {
+  if (!area) return { x: cropX, y: cropY, r: cropR };
+  return {
+    x: area.x0 + cropX * areaWidthFraction,
+    y: area.y0 + cropY * areaHeightFraction,
+    r: cropR * areaWidthFraction,
+  };
+}
+
 async function runDetection(
-  bytes: Buffer, mimeType: string, calibratedRadiusFraction?: number,
+  bytes: Buffer, mimeType: string, calibratedRadiusFraction?: number, area?: NormalizedRect,
 ): Promise<{ circles: DetectedCircle[]; width: number; height: number }> {
-  const { data, width, height } = decodeToRgba(bytes, mimeType);
+  const decoded = decodeToRgba(bytes, mimeType);
+  const areaWidthFraction = area ? area.x1 - area.x0 : 1;
+  const areaHeightFraction = area ? area.y1 - area.y0 : 1;
+  const { data, width, height } = area ? cropToArea(decoded.data, decoded.width, decoded.height, area) : decoded;
+  // calibratedRadiusFraction was drawn against the full, uncropped photo —
+  // re-express it as a fraction of the (smaller) crop's own width so it
+  // still means the same physical bar size once cropping shrinks the frame.
+  const scaledCalibratedRadiusFraction = calibratedRadiusFraction != null
+    ? calibratedRadiusFraction / areaWidthFraction
+    : calibratedRadiusFraction;
   const cv = await getCv();
 
   const mat = new cv.Mat(height, width, cv.CV_8UC4);
@@ -113,8 +163,8 @@ async function runDetection(
     cv.medianBlur(gray, blurred, BLUR_KERNEL);
 
     const minDim = Math.min(workW, workH);
-    if (calibratedRadiusFraction && calibratedRadiusFraction > 0) {
-      const calibR = calibratedRadiusFraction * workW;
+    if (scaledCalibratedRadiusFraction && scaledCalibratedRadiusFraction > 0) {
+      const calibR = scaledCalibratedRadiusFraction * workW;
       const minR = Math.max(1, Math.round(calibR * CALIB_MIN_RADIUS_MULT));
       const maxR = Math.max(minR + 1, Math.round(calibR * CALIB_MAX_RADIUS_MULT));
       cv.HoughCircles(
@@ -138,9 +188,9 @@ async function runDetection(
       const x = detected.data32F[i * 3];
       const y = detected.data32F[i * 3 + 1];
       const r = detected.data32F[i * 3 + 2];
-      circles.push({ x: x / workW, y: y / workH, r: r / workW });
+      circles.push(toFullPhotoCircle(x / workW, y / workH, r / workW, area, areaWidthFraction, areaHeightFraction));
     }
-    return { circles, width, height };
+    return { circles, width: decoded.width, height: decoded.height };
   } finally {
     mat.delete(); resized?.delete(); gray.delete(); blurred.delete(); detected.delete();
   }
@@ -149,15 +199,16 @@ async function runDetection(
 /** calibratedRadiusFraction, when given, is the radius the worker indicated
  * by dragging across one bar end, as a fraction of the photo's own width —
  * same normalization as a DetectedCircle's own x/y/r. Falls back to the
- * fixed-fraction defaults above if omitted. */
+ * fixed-fraction defaults above if omitted. area, when given, restricts
+ * detection to that worker-drawn rectangle of the photo — see cropToArea. */
 export async function detectBarCircles(
-  bytes: Buffer, mimeType: string, calibratedRadiusFraction?: number,
+  bytes: Buffer, mimeType: string, calibratedRadiusFraction?: number, area?: NormalizedRect,
 ): Promise<{ circles: DetectedCircle[]; width: number; height: number; error?: string }> {
   try {
     const timeout = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Detection took too long on this photo — try Both/AI estimate, or crop closer to the bundle end and retake it.')), DETECTION_TIMEOUT_MS);
     });
-    return await Promise.race([runDetection(bytes, mimeType, calibratedRadiusFraction), timeout]);
+    return await Promise.race([runDetection(bytes, mimeType, calibratedRadiusFraction, area), timeout]);
   } catch (err) {
     return { circles: [], width: 0, height: 0, error: err instanceof Error ? err.message : 'Unknown error detecting circles.' };
   }
@@ -199,13 +250,19 @@ const WATERSHED_ADAPTIVE_BLOCK_MULT = 6; // adaptive-threshold neighbourhood siz
 const WATERSHED_ADAPTIVE_C = -2; // adaptiveThreshold's constant offset — slightly negative so the local mean itself doesn't get classified as foreground (a real gap between bars stays background even under a fairly flat local gradient)
 
 async function runWatershedDetection(
-  bytes: Buffer, mimeType: string, calibratedRadiusFraction: number,
+  bytes: Buffer, mimeType: string, calibratedRadiusFraction: number, area?: NormalizedRect,
 ): Promise<{ circles: DetectedCircle[]; width: number; height: number }> {
   if (!(calibratedRadiusFraction > 0)) {
     throw new Error('Drag across one bar end to show its size before running watershed detection.');
   }
 
-  const { data, width, height } = decodeToRgba(bytes, mimeType);
+  const decoded = decodeToRgba(bytes, mimeType);
+  const areaWidthFraction = area ? area.x1 - area.x0 : 1;
+  const areaHeightFraction = area ? area.y1 - area.y0 : 1;
+  const { data, width, height } = area ? cropToArea(decoded.data, decoded.width, decoded.height, area) : decoded;
+  // See the matching comment in runDetection — re-express the calibrated
+  // radius relative to the (smaller) crop's own width.
+  const scaledCalibratedRadiusFraction = calibratedRadiusFraction / areaWidthFraction;
   const cv = await getCv();
 
   const mat = new cv.Mat(height, width, cv.CV_8UC4);
@@ -243,7 +300,7 @@ async function runWatershedDetection(
     // the comment above these constants). Thresholding against each pixel's
     // local neighbourhood instead keeps the split meaningful across the
     // photo's own lighting gradient.
-    const calibRpxForThreshold = calibratedRadiusFraction * workW;
+    const calibRpxForThreshold = scaledCalibratedRadiusFraction * workW;
     let adaptiveBlockSize = Math.round(calibRpxForThreshold * WATERSHED_ADAPTIVE_BLOCK_MULT);
     if (adaptiveBlockSize % 2 === 0) adaptiveBlockSize += 1; // adaptiveThreshold requires an odd block size
     if (adaptiveBlockSize < 11) adaptiveBlockSize = 11;
@@ -260,7 +317,7 @@ async function runWatershedDetection(
     // textbook approach) keeps the seed threshold tied to a known
     // real-world bar size instead of whatever the biggest touching cluster
     // in this particular photo happens to look like.
-    const calibR = calibratedRadiusFraction * workW;
+    const calibR = scaledCalibratedRadiusFraction * workW;
     cv.threshold(dist, sureFg, calibR * WATERSHED_SEED_RADIUS_FRACTION, 255, cv.THRESH_BINARY);
     sureFg.convertTo(sureFg8, cv.CV_8U);
     cv.subtract(sureBg, sureFg8, unknown);
@@ -296,9 +353,9 @@ async function runWatershedDetection(
     for (const { sx, sy, n } of sums.values()) {
       if (n < minArea) continue;
       const r = Math.sqrt(n / Math.PI); // area-equivalent radius — watershed regions aren't perfect circles, so this is the closest single number to report
-      circles.push({ x: sx / n / workW, y: sy / n / workH, r: r / workW });
+      circles.push(toFullPhotoCircle(sx / n / workW, sy / n / workH, r / workW, area, areaWidthFraction, areaHeightFraction));
     }
-    return { circles, width, height };
+    return { circles, width: decoded.width, height: decoded.height };
   } finally {
     mat.delete(); resized?.delete(); gray.delete(); blurred.delete(); binary.delete();
     kernel.delete(); opened.delete(); sureBg.delete(); dist.delete(); sureFg.delete(); sureFg8.delete();
@@ -313,15 +370,16 @@ async function runWatershedDetection(
  * threshold and noise filter are both expressed relative to it, and there's
  * no fixed-fraction fallback that would mean anything across differently
  * framed photos (the same problem that motivated calibration in the first
- * place). */
+ * place). area, when given, restricts detection to that worker-drawn
+ * rectangle of the photo — see cropToArea. */
 export async function detectBarCirclesWatershed(
-  bytes: Buffer, mimeType: string, calibratedRadiusFraction: number,
+  bytes: Buffer, mimeType: string, calibratedRadiusFraction: number, area?: NormalizedRect,
 ): Promise<{ circles: DetectedCircle[]; width: number; height: number; error?: string }> {
   try {
     const timeout = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Detection took too long on this photo — try Both/AI estimate, or crop closer to the bundle end and retake it.')), DETECTION_TIMEOUT_MS);
     });
-    return await Promise.race([runWatershedDetection(bytes, mimeType, calibratedRadiusFraction), timeout]);
+    return await Promise.race([runWatershedDetection(bytes, mimeType, calibratedRadiusFraction, area), timeout]);
   } catch (err) {
     return { circles: [], width: 0, height: 0, error: err instanceof Error ? err.message : 'Unknown error detecting circles.' };
   }

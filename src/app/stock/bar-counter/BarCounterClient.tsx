@@ -28,6 +28,31 @@ function medianRadius(circles: Circle[]): number {
 }
 
 type Point = { x: number; y: number };
+type Rect = { x0: number; y0: number; x1: number; y1: number };
+
+function normalizeRect(a: Point, b: Point): Rect {
+  return { x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y) };
+}
+
+/** Dims everything outside `rect`, so the worker can see at a glance what's
+ * being excluded from detection — mirrors the "Define Count Area" step from
+ * the countthings.com bar-counting guide, which crops out background
+ * clutter (other stacks, dirt, sky) before counting runs. */
+function AreaMask({ rect }: { rect: Rect }) {
+  const bandStyle = 'absolute bg-black/50 pointer-events-none';
+  return (
+    <>
+      <div className={bandStyle} style={{ left: 0, top: 0, width: '100%', height: `${rect.y0 * 100}%` }} />
+      <div className={bandStyle} style={{ left: 0, top: `${rect.y1 * 100}%`, width: '100%', height: `${(1 - rect.y1) * 100}%` }} />
+      <div className={bandStyle} style={{ left: 0, top: `${rect.y0 * 100}%`, width: `${rect.x0 * 100}%`, height: `${(rect.y1 - rect.y0) * 100}%` }} />
+      <div className={bandStyle} style={{ left: `${rect.x1 * 100}%`, top: `${rect.y0 * 100}%`, width: `${(1 - rect.x1) * 100}%`, height: `${(rect.y1 - rect.y0) * 100}%` }} />
+      <div
+        className="absolute border-2 border-teal-400 pointer-events-none"
+        style={{ left: `${rect.x0 * 100}%`, top: `${rect.y0 * 100}%`, width: `${(rect.x1 - rect.x0) * 100}%`, height: `${(rect.y1 - rect.y0) * 100}%` }}
+      />
+    </>
+  );
+}
 
 export function BarCounterClient({ orders }: { orders: Order[] }) {
   const [file, setFile] = useState<File | null>(null);
@@ -44,6 +69,15 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
   const [calibStart, setCalibStart] = useState<Point | null>(null);
   const [calibEnd, setCalibEnd] = useState<Point | null>(null);
   const [calibratedRadius, setCalibratedRadius] = useState<number | null>(null);
+
+  // Optional "Define Count Area" crop, drawn the same way as bar size but
+  // toggled to a separate tool — excludes background clutter (other stacks,
+  // dirt, sky) from detection, which is exactly what caused the worst
+  // overcount seen so far (a cluttered yard photo, 131 detected vs 112 true).
+  const [dragTool, setDragTool] = useState<'size' | 'area'>('size');
+  const [areaStart, setAreaStart] = useState<Point | null>(null);
+  const [areaEnd, setAreaEnd] = useState<Point | null>(null);
+  const areaRect = areaStart && areaEnd ? normalizeRect(areaStart, areaEnd) : null;
 
   const [result, setResult] = useState<Extract<BarDetectResult, { ok: true }> | null>(null);
   const [circles, setCircles] = useState<Circle[]>([]);
@@ -66,6 +100,9 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
     setCalibStart(null);
     setCalibEnd(null);
     setCalibratedRadius(null);
+    setAreaStart(null);
+    setAreaEnd(null);
+    setDragTool('size');
   }
 
   function pointFromEvent(e: React.PointerEvent<HTMLDivElement>): Point {
@@ -79,15 +116,31 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
   function onCalibDown(e: React.PointerEvent<HTMLDivElement>) {
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = pointFromEvent(e);
+    if (dragTool === 'area') {
+      setAreaStart(p);
+      setAreaEnd(p);
+      return;
+    }
     setCalibStart(p);
     setCalibEnd(p);
     setCalibratedRadius(null);
   }
   function onCalibMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (dragTool === 'area') {
+      if (!areaStart) return;
+      setAreaEnd(pointFromEvent(e));
+      return;
+    }
     if (!calibStart) return;
     setCalibEnd(pointFromEvent(e));
   }
   function onCalibUp() {
+    if (dragTool === 'area') {
+      if (!areaStart || !areaEnd) return;
+      const rect = normalizeRect(areaStart, areaEnd);
+      if (rect.x1 - rect.x0 < 0.02 || rect.y1 - rect.y0 < 0.02) { setAreaStart(null); setAreaEnd(null); } // ignore an accidental tap with no real drag
+      return;
+    }
     if (!calibStart || !calibEnd) return;
     const dx = calibEnd.x - calibStart.x;
     const dy = calibEnd.y - calibStart.y;
@@ -106,6 +159,7 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
         formData.set('photo', resized);
         formData.set('mode', mode);
         if (calibratedRadius) formData.set('calibratedRadius', String(calibratedRadius));
+        if (areaRect) formData.set('area', JSON.stringify(areaRect));
         const res = await runBarDetection(formData);
         if (!res.ok) { setDetectError(res.error); return; }
         setResult(res);
@@ -191,16 +245,42 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
 
       {!result && previewSrc && (
         <div className="mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <button
+              type="button"
+              className={dragTool === 'size' ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+              onClick={() => setDragTool('size')}
+            >
+              Bar size
+            </button>
+            <button
+              type="button"
+              className={dragTool === 'area' ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+              onClick={() => setDragTool('area')}
+            >
+              Count area (optional)
+            </button>
+            {areaRect && (
+              <button type="button" className="btn-secondary btn-sm" onClick={() => { setAreaStart(null); setAreaEnd(null); }}>
+                Clear area
+              </button>
+            )}
+          </div>
           <p className="text-sm text-ink-muted mb-2">
-            {calibratedRadius
-              ? 'Bar size set — drag again to redo it, or run a mode above.'
-              : 'Drag across one bar end below to show how big it looks, so the circle detector knows what size to look for.'}
+            {dragTool === 'area'
+              ? (areaRect
+                ? 'Area set — drag again to redo it. Only what’s inside the box gets counted, so background clutter (other stacks, dirt) can’t be mistaken for bars.'
+                : 'Drag a box around just the bundle end, to keep background clutter out of the count. Optional — skip it and the whole photo gets used.')
+              : (calibratedRadius
+                ? 'Bar size set — drag again to redo it, or run a mode above.'
+                : 'Drag across one bar end below to show how big it looks, so the circle detector knows what size to look for.')}
           </p>
           <div
             className="relative inline-block max-w-md w-full select-none touch-none"
             onPointerDown={onCalibDown} onPointerMove={onCalibMove} onPointerUp={onCalibUp} onPointerCancel={onCalibUp}
           >
             <img src={previewSrc} alt="" className="block w-full h-auto rounded-lg border border-hairline" draggable={false} />
+            {areaRect && <AreaMask rect={areaRect} />}
             {calibStart && calibEnd && (
               <>
                 <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden>
@@ -231,6 +311,7 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
             <>
               <div className="relative inline-block max-w-2xl w-full select-none" onClick={handleTapAdd}>
                 <img src={previewSrc} alt="" className="block w-full h-auto rounded-lg border border-hairline" draggable={false} />
+                {areaRect && <AreaMask rect={areaRect} />}
                 {circles.map((c) => (
                   <button
                     key={c.id}
@@ -267,7 +348,7 @@ export function BarCounterClient({ orders }: { orders: Order[] }) {
           )}
 
           <form
-            action={(formData) => startSave(async () => { await confirmBarCount(formData); setFile(null); setPreviewSrc(''); setResult(null); setCircles([]); setManualCount(''); setOrderId(''); setNotes(''); setCalibStart(null); setCalibEnd(null); setCalibratedRadius(null); if (fileInputRef.current) fileInputRef.current.value = ''; if (uploadInputRef.current) uploadInputRef.current.value = ''; })}
+            action={(formData) => startSave(async () => { await confirmBarCount(formData); setFile(null); setPreviewSrc(''); setResult(null); setCircles([]); setManualCount(''); setOrderId(''); setNotes(''); setCalibStart(null); setCalibEnd(null); setCalibratedRadius(null); setAreaStart(null); setAreaEnd(null); setDragTool('size'); if (fileInputRef.current) fileInputRef.current.value = ''; if (uploadInputRef.current) uploadInputRef.current.value = ''; })}
             className="flex flex-wrap items-end gap-3 pt-2 border-t border-hairline"
           >
             <input type="hidden" name="mode" value={result.mode} />
