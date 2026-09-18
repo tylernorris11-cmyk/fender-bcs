@@ -202,10 +202,14 @@ export const NAV: Record<string, NavItem[]> = {
   stock: [
     { label: 'Coil Stock', href: '/stock/coils/stock', company: 'BS_SUPPLIES' },
     { label: 'Add Coils', href: '/stock/coils', company: 'BS_SUPPLIES' },
-    { label: 'All stock', href: '/stock' },
-    { label: 'Goods in', href: '/stock/goods-in', perm: 'stock.goodsIn' },
-    { label: 'Movements', href: '/stock/movements' },
-    { label: 'Bar counter', href: '/stock/bar-counter', perm: 'barCounter.view' },
+    // BCS's day-to-day stock is coils — these still work for BCS (goods-in
+    // and movements are already BCS-aware) but stay off their own menu so
+    // it doesn't compete with the two things they actually use; still
+    // reachable from the Stock page itself for whoever needs them.
+    { label: 'All stock', href: '/stock', company: 'FENDER' },
+    { label: 'Goods in', href: '/stock/goods-in', perm: 'stock.goodsIn', company: 'FENDER' },
+    { label: 'Movements', href: '/stock/movements', company: 'FENDER' },
+    { label: 'Bar counter', href: '/stock/bar-counter', perm: 'barCounter.view', company: 'FENDER' },
   ],
   assets: [
     { label: 'Both', href: '/assets' },
