@@ -11,7 +11,7 @@ import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill } from '@/components/ui';
 import { addAssetChecklistItem, addAssetNote, logInspection, removeAssetChecklistItem, retireAsset } from '../actions';
 
-const KINDS = ['MOT', 'Safety check', 'PUWER', 'LOLER', 'Service', 'Calibration', 'Emergency light test', 'Emergency light duration test'];
+const KINDS = ['MOT', 'Safety check', 'PUWER', 'LOLER', 'Service', 'Calibration', 'Emergency light test', 'Emergency light duration test', 'Chains test'];
 
 function Due({ label, due, windowDays }: { label: string; due: Date | null; windowDays: number }) {
   if (!due) return null;
@@ -131,6 +131,7 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
             <Due label="Measurement calibration" due={asset.calibrationDue} windowDays={alertWindowDays('Measurement calibration', asset.category)} />
             <Due label="Emergency light monthly test" due={asset.emergencyLightTestDue} windowDays={alertWindowDays('Emergency light test', asset.category)} />
             <Due label="Emergency light annual duration test" due={asset.emergencyLightDurationDue} windowDays={alertWindowDays('Emergency light duration test', asset.category)} />
+            <Due label="Chains test" due={asset.chainsTestDue} windowDays={alertWindowDays('Chains test', asset.category)} />
           </dl>
           {asset.calibrationDue && daysUntil(asset.calibrationDue)! < 0 && (
             <p className="banner-bad mt-4">

@@ -173,6 +173,7 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
       ['PUWER inspection', a.puwerDue], ['LOLER exam', a.lolerDue], ['Service', a.serviceDue],
       ['Measurement calibration', a.calibrationDue],
       ['Emergency light test', a.emergencyLightTestDue], ['Emergency light duration test', a.emergencyLightDurationDue],
+      ['Chains test', a.chainsTestDue],
     ];
     for (const [label, due] of checks) {
       if (!due) continue;

@@ -1,6 +1,6 @@
 export type StatutoryCheck =
   | 'MOT' | 'Road tax' | 'Safety inspection' | 'PUWER inspection' | 'LOLER exam' | 'Service' | 'Measurement calibration'
-  | 'Emergency light test' | 'Emergency light duration test';
+  | 'Emergency light test' | 'Emergency light duration test' | 'Chains test';
 
 type LatestCheckLike = { result: 'PASS' | 'FAIL'; items: { critical: boolean; ok: boolean; resolved: boolean }[] } | null | undefined;
 
@@ -17,6 +17,9 @@ export function isOutOfService(latestCheck: LatestCheckLike): boolean {
   return latestCheck.items.some((i) => i.critical && !i.ok && !i.resolved);
 }
 
+/** How close to a mileage-interval service due point to start flagging it — same idea as alertWindowDays, just in miles instead of days. */
+export const SERVICE_MILEAGE_WARN_WINDOW = 1000;
+
 /**
  * How many days ahead of a statutory date to start flagging it as due. An
  * HGV failing its annual test is off the road far longer than a pickup
@@ -24,9 +27,6 @@ export function isOutOfService(latestCheck: LatestCheckLike): boolean {
  * inspection is booked at short notice, so a week's warning is enough.
  * Everything else keeps the original three-week heads-up.
  */
-/** How close to a mileage-interval service due point to start flagging it — same idea as alertWindowDays, just in miles instead of days. */
-export const SERVICE_MILEAGE_WARN_WINDOW = 1000;
-
 export function alertWindowDays(check: StatutoryCheck, category: string): number {
   if (check === 'Safety inspection') return 7;
   // Only 30 days between tests to begin with, so a 21-day heads-up would

@@ -761,6 +761,7 @@ model Asset {
   calibrationDue            DateTime? // control of measuring devices — CARES requirement
   emergencyLightTestDue     DateTime? // EN 50172 monthly functional test
   emergencyLightDurationDue DateTime? // EN 50172 annual 3-hour full duration test
+  chainsTestDue             DateTime? // thorough examination of the unloading chains — lorries that carry them
 
   inspections    Inspection[]
   notes          AssetNote[]

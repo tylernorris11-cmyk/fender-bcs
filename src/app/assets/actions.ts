@@ -127,6 +127,7 @@ export async function logInspection(formData: FormData) {
       MOT: 'motDue', PUWER: 'puwerDue', LOLER: 'lolerDue',
       Service: 'serviceDue', Calibration: 'calibrationDue', 'Safety check': 'weeklyCheckDue',
       'Emergency light test': 'emergencyLightTestDue', 'Emergency light duration test': 'emergencyLightDurationDue',
+      'Chains test': 'chainsTestDue',
     }[kind];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (field) await db.asset.update({ where: { id: assetId }, data: { [field]: nextDueOn } as any });
