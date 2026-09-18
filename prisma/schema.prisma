@@ -86,6 +86,7 @@ model User {
   trainingAssignedBy          UserTrainingAssignment[] @relation("trainingAssignedBy")
   holidayAllowanceDays        Int                      @default(28) // working days a year — editable in Set Up
   hiddenModules               String[]                 @default([]) // module keys hidden for this person regardless of role — never applies to MASTER_ADMIN
+  extraPermissions            String[]                 @default([]) // permission keys granted on top of their role, for a one-off narrow need (e.g. FCP/COSHH upload for one Office person) — the role matrix stays the source of truth for everything else
   holidaysRequested           HolidayRequest[]         @relation("holidayRequestedBy")
   holidaysDecided             HolidayRequest[]         @relation("holidayDecidedBy")
   holidayAdjustmentsReceived  HolidayAdjustment[]      @relation("holidayAdjustmentFor")

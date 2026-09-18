@@ -4,7 +4,8 @@ import { put } from '@vercel/blob';
 import { revalidatePath } from 'next/cache';
 import type { CertificateSize, Company, ComplianceDocumentCategory } from '@prisma/client';
 import { db } from '@/lib/db';
-import { assertPermission, logActivity } from '@/lib/auth';
+import { assertPermission, getCurrentUser, logActivity } from '@/lib/auth';
+import { can } from '@/lib/rbac';
 import { assertCaresApplies, assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { nextNcrRef } from '@/lib/orders';
 import { CERT_SIZE_LABEL, CERT_SIZE_ORDER, extractCastNumbers } from '@/lib/certExtraction';
@@ -294,14 +295,28 @@ export async function rejectCastNumber(formData: FormData) {
 
 const ALLOWED_COMPLIANCE_DOC_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
 
+const FCP_COSH_CATEGORIES: ComplianceDocumentCategory[] = ['FCP_DATA', 'COSHH'];
+
+/** compliance.edit covers every document here; compliance.fcpCosh is the
+ * narrower grant (see rbac.ts) that only covers FCP Data & Cosh sheets —
+ * someone with just that grant can't touch CARES documents, certificates
+ * etc. through these same actions. */
+async function assertComplianceDocAccess(category: ComplianceDocumentCategory) {
+  const user = await getCurrentUser();
+  if (!user) throw new Error('Your session has expired. Sign in again.');
+  if (can(user, 'compliance.edit')) return user;
+  if (can(user, 'compliance.fcpCosh') && FCP_COSH_CATEGORIES.includes(category)) return user;
+  throw new Error('You do not have permission to do that.');
+}
+
 export async function uploadComplianceDocument(formData: FormData) {
-  const user = await assertPermission('compliance.edit');
+  const category = String(formData.get('category') ?? 'OTHER') as ComplianceDocumentCategory;
+  const user = await assertComplianceDocAccess(category);
   assertCaresApplies(user);
   const company = getActiveCompany(user);
 
   const title = String(formData.get('title') ?? '').trim();
   if (!title) throw new Error('Give the document a title.');
-  const category = String(formData.get('category') ?? 'OTHER') as ComplianceDocumentCategory;
 
   const file = formData.get('file');
   if (!(file instanceof File) || file.size === 0) throw new Error('Choose a file to upload.');
@@ -323,10 +338,10 @@ export async function uploadComplianceDocument(formData: FormData) {
 }
 
 export async function archiveComplianceDocument(formData: FormData) {
-  const user = await assertPermission('compliance.edit');
-  assertCaresApplies(user);
   const id = String(formData.get('id') ?? '');
   const doc = await db.complianceDocument.findUniqueOrThrow({ where: { id } });
+  const user = await assertComplianceDocAccess(doc.category);
+  assertCaresApplies(user);
   assertCompanyAccess(user, doc.company);
 
   await db.complianceDocument.update({ where: { id }, data: { archived: true } });
@@ -336,13 +351,13 @@ export async function archiveComplianceDocument(formData: FormData) {
 }
 
 export async function renameComplianceDocument(formData: FormData) {
-  const user = await assertPermission('compliance.edit');
-  assertCaresApplies(user);
   const id = String(formData.get('id') ?? '');
   const title = String(formData.get('title') ?? '').trim();
   if (!title) throw new Error('Give the document a title.');
 
   const doc = await db.complianceDocument.findUniqueOrThrow({ where: { id } });
+  const user = await assertComplianceDocAccess(doc.category);
+  assertCaresApplies(user);
   assertCompanyAccess(user, doc.company);
 
   await db.complianceDocument.update({ where: { id }, data: { title } });

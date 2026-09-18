@@ -36,6 +36,7 @@ export type Permission =
   | 'compliance.view'
   | 'compliance.edit' // certificates, suppliers, returns
   | 'compliance.ncr' // raise and close non-conformances
+  | 'compliance.fcpCosh' // upload/rename/archive on FCP Data & Cosh sheets only — a narrower slice of compliance.edit, grantable to one person via extraPermissions without handing them the rest of Compliance
   // Assets
   | 'assets.view'
   | 'assets.edit'
@@ -76,7 +77,7 @@ const ALL: Permission[] = [
   'customers.view', 'customers.edit', 'customers.credit',
   'stock.view', 'stock.goodsIn', 'stock.pick', 'stock.adjust', 'barCounter.view',
   'production.view', 'production.progress', 'production.qc', 'production.assign',
-  'compliance.view', 'compliance.edit', 'compliance.ncr',
+  'compliance.view', 'compliance.edit', 'compliance.ncr', 'compliance.fcpCosh',
   'assets.view', 'assets.edit',
   'purchaseOrders.view', 'purchaseOrders.create', 'purchaseOrders.edit',
   'checks.view', 'checks.create',
@@ -196,7 +197,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
 
 export type SessionUser = {
   id: string; name: string; email: string; role: Role; jobTitle: string; initials: string; colour: string;
-  companies: Company[]; hiddenModules: string[];
+  companies: Company[]; hiddenModules: string[]; extraPermissions: string[];
 };
 
 /**
@@ -206,10 +207,10 @@ export type SessionUser = {
  * module is gone from the page itself, not just the menu. Never applies to
  * a Master Administrator; there would be no way back in for the last one.
  */
-export function can(user: Pick<SessionUser, 'role' | 'hiddenModules'> | null | undefined, perm: Permission): boolean {
+export function can(user: Pick<SessionUser, 'role' | 'hiddenModules' | 'extraPermissions'> | null | undefined, perm: Permission): boolean {
   if (!user) return false;
   if (user.role !== 'MASTER_ADMIN' && user.hiddenModules?.includes(perm.split('.')[0])) return false;
-  return PERMISSIONS[user.role]?.includes(perm) ?? false;
+  return (PERMISSIONS[user.role]?.includes(perm) ?? false) || (user.extraPermissions?.includes(perm) ?? false);
 }
 
 export function canAny(user: SessionUser | null | undefined, ...perms: Permission[]): boolean {
@@ -231,6 +232,15 @@ export const MODULES = [
   { key: 'checks', label: 'Checks', href: '/checks', perm: 'checks.view' as Permission, blurb: 'Morning checks on machines, lorries and pickups before use.' },
   { key: 'fuel', label: 'Fuel', href: '/fuel', perm: 'fuel.view' as Permission, blurb: 'Log fuel taken from the yard tank against each vehicle.' },
   { key: 'hs', label: 'Health & Safety', href: '/hs', perm: 'hs.view' as Permission, blurb: 'HSE documents, RAMS and mandatory training.' },
+] as const;
+
+/** Narrow one-off permissions a Master Administrator/Administrator can grant
+ * to a specific person in Set Up, on top of whatever their role already
+ * gives them — for when someone needs just one extra capability rather than
+ * a whole different role. Grows as more narrow permissions like this get
+ * added; nothing here should duplicate something a role already covers. */
+export const GRANTABLE_EXTRA_PERMISSIONS = [
+  { key: 'compliance.fcpCosh' as Permission, label: 'Upload FCP Data & Cosh sheets' },
 ] as const;
 
 /** Every module a Master Administrator can hide for someone in Set Up — everything except Set Up itself. */

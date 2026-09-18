@@ -128,7 +128,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     where: { id: userId },
     select: {
       id: true, name: true, email: true, role: true, jobTitle: true, initials: true, colour: true, active: true,
-      companies: true, hiddenModules: true,
+      companies: true, hiddenModules: true, extraPermissions: true,
     },
   });
   if (!user || !user.active) return null;

@@ -8,7 +8,7 @@ import { assertPermission, hashPassword, logActivity, notifyMasterAdmins, passwo
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { initialsOf } from '@/lib/format';
 import { sendEmail } from '@/lib/email';
-import { ROLE_LABELS, TOGGLEABLE_MODULES } from '@/lib/rbac';
+import { GRANTABLE_EXTRA_PERMISSIONS, ROLE_LABELS, TOGGLEABLE_MODULES } from '@/lib/rbac';
 
 /** MASTER_ADMIN and ADMIN both carry the full permission set (ALL) — company scope is the only difference. */
 const isHighPrivilege = (role: Role) => role === 'MASTER_ADMIN' || role === 'ADMIN';
@@ -203,6 +203,32 @@ export async function updateAllHiddenModules(formData: FormData) {
 
   for (const { target, hiddenModules } of changes) {
     await logActivity('User', target.id, 'Visibility changed', hiddenModules.length ? `Hidden: ${hiddenModules.join(', ')}` : 'Everything visible', admin.id);
+  }
+  revalidatePath('/setup/users');
+}
+
+/** Same shape as updateAllHiddenModules, for the narrow extra permissions in
+ * GRANTABLE_EXTRA_PERMISSIONS — grants a specific person one capability
+ * their role doesn't already carry, without changing their role. */
+export async function updateExtraPermissions(formData: FormData) {
+  const admin = await assertPermission('setup.users');
+  const userIds = formData.getAll('userIds').map(String);
+  const targets = await db.user.findMany({ where: { id: { in: userIds } } });
+
+  const changes = targets.map((target) => {
+    assertCanManage(admin, target);
+    const extraPermissions = GRANTABLE_EXTRA_PERMISSIONS
+      .map((p) => p.key)
+      .filter((key) => formData.getAll(`extra_${target.id}`).map(String).includes(key));
+    return { target, extraPermissions };
+  });
+
+  await db.$transaction(changes.map(({ target, extraPermissions }) =>
+    db.user.update({ where: { id: target.id }, data: { extraPermissions } }),
+  ));
+
+  for (const { target, extraPermissions } of changes) {
+    await logActivity('User', target.id, 'Extra access changed', extraPermissions.length ? extraPermissions.join(', ') : 'None', admin.id);
   }
   revalidatePath('/setup/users');
 }

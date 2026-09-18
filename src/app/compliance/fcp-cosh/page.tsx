@@ -38,7 +38,7 @@ export default async function FcpCoshPage() {
     include: { uploadedBy: true },
     orderBy: [{ category: 'asc' }, { uploadedAt: 'desc' }],
   });
-  const canEdit = can(user, 'compliance.edit');
+  const canEdit = can(user, 'compliance.edit') || can(user, 'compliance.fcpCosh');
 
   return (
     <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance/fcp-cosh" alerts={alerts.length}>

@@ -2,13 +2,13 @@ import type { Role } from '@prisma/client';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
-import { PERMISSIONS, ROLE_BLURBS, ROLE_LABELS, TOGGLEABLE_MODULES } from '@/lib/rbac';
+import { GRANTABLE_EXTRA_PERMISSIONS, PERMISSIONS, ROLE_BLURBS, ROLE_LABELS, TOGGLEABLE_MODULES } from '@/lib/rbac';
 import { shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { COMPANY_LABEL } from '@/lib/company';
 import { Avatar, PageHeader, Pill, SortTh, Table } from '@/components/ui';
 import {
-  createUser, resetPassword, toggleUserActive, updateAllHiddenModules, updateHolidayAllowance, updateUserCompanies, updateUserRole,
+  createUser, resetPassword, toggleUserActive, updateAllHiddenModules, updateExtraPermissions, updateHolidayAllowance, updateUserCompanies, updateUserRole,
 } from '../actions';
 
 const COMPANIES = ['FENDER', 'BS_SUPPLIES'] as const;
@@ -163,6 +163,48 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
               ))}
               {users.filter((u) => u.role !== 'MASTER_ADMIN').length === 0 && (
                 <tr><td colSpan={TOGGLEABLE_MODULES.length + 1} className="td text-ink-muted">Nobody else to set this for yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {users.filter((u) => u.role !== 'MASTER_ADMIN').length > 0 && (
+          <button className="btn-primary mt-4">Save all</button>
+        )}
+        </form>
+      </section>
+
+      <section className="card card-pad mb-6">
+        <h2 className="text-lg font-bold mb-1">Extra access</h2>
+        <p className="text-sm text-ink-muted mb-4">
+          One-off extras on top of a person&apos;s role — for when someone needs just one narrow thing, not a whole different role.
+        </p>
+        <form action={updateExtraPermissions}>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px] text-sm">
+            <thead>
+              <tr>
+                <th className="th text-left">Person</th>
+                {GRANTABLE_EXTRA_PERMISSIONS.map((p) => <th key={p.key} className="th text-center whitespace-nowrap px-2">{p.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {users.filter((u) => u.role !== 'MASTER_ADMIN').map((u) => (
+                <tr key={u.id} className="row">
+                  <td className="td font-semibold whitespace-nowrap">
+                    {u.name}
+                    <input type="hidden" name="userIds" value={u.id} />
+                  </td>
+                  {GRANTABLE_EXTRA_PERMISSIONS.map((p) => (
+                    <td key={p.key} className="td text-center">
+                      <input type="checkbox" name={`extra_${u.id}`} value={p.key}
+                             defaultChecked={u.extraPermissions.includes(p.key)}
+                             className="h-4 w-4 accent-brand" aria-label={`${u.name}: ${p.label}`} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {users.filter((u) => u.role !== 'MASTER_ADMIN').length === 0 && (
+                <tr><td colSpan={GRANTABLE_EXTRA_PERMISSIONS.length + 1} className="td text-ink-muted">Nobody else to set this for yet.</td></tr>
               )}
             </tbody>
           </table>
