@@ -45,6 +45,11 @@ export function parseMinutes(hhmm: string): number | null {
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
 
+/** 00:00 to 00:00 with no break — how a day off is shown on the form. It's a day with nothing worked, not a shift, so it's never saved. */
+export function isZeroDay(start: string, end: string, breakValue: string | number): boolean {
+  return start === '00:00' && end === '00:00' && Number(breakValue || 0) === 0;
+}
+
 /** Worked minutes for a day, or an error message a person can act on. */
 export function workedMinutes(start: string, end: string, breakMinutes: number): { minutes: number } | { error: string } {
   const s = parseMinutes(start);

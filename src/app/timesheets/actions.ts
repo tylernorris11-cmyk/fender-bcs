@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { addDays, isoDay, parseDayInput } from '@/lib/holidays';
-import { dayLabel, formatHours, mondayOf, todayInLondon, weekDays, workedMinutes } from '@/lib/timesheets';
+import { dayLabel, formatHours, isZeroDay, mondayOf, todayInLondon, weekDays, workedMinutes } from '@/lib/timesheets';
 
 export type SaveWeekResult = { ok: true; message: string } | { ok: false; error: string };
 
@@ -34,6 +34,13 @@ export async function saveTimesheetWeek(formData: FormData): Promise<SaveWeekRes
 
     if (!startTime && !endTime && !breakRaw) {
       toClear.push(date);
+      continue;
+    }
+    // A day off (00:00 to 00:00). Nothing to record unless they've said why —
+    // "Holiday" or "Sick" on a zero day is kept as a zero-hour entry.
+    if (isZeroDay(startTime, endTime, breakRaw)) {
+      if (note) toSave.push({ date, startTime: '00:00', endTime: '00:00', breakMinutes: 0, workedMinutes: 0, note });
+      else toClear.push(date);
       continue;
     }
     if (date > today) return { ok: false, error: `${dayLabel(date)} hasn't happened yet — leave it blank until you've worked it.` };

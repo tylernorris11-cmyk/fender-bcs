@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
-import { formatHours, workedMinutes } from '@/lib/timesheets';
+import { formatHours, isZeroDay, workedMinutes } from '@/lib/timesheets';
 import { saveTimesheetWeek } from './actions';
 
 export type TimesheetDay = {
@@ -30,7 +30,12 @@ function IntentButton({ intent, className, pendingLabel, children }: { intent: '
 export function TimesheetWeekForm({
   week, days, canSubmit, submittedLabel,
 }: { week: string; days: TimesheetDay[]; canSubmit: boolean; submittedLabel: string | null }) {
-  const [rows, setRows] = useState(days.map((d) => ({ start: d.startTime, end: d.endTime, brk: d.breakMinutes })));
+  // A day nothing's been entered for starts as zeros (00:00 to 00:00, no
+  // break) rather than blank, so the sheet reads "not in" until someone
+  // changes it — the server treats an untouched zero day as no entry at all.
+  const [rows, setRows] = useState(days.map((d) => (
+    d.startTime || d.future ? { start: d.startTime, end: d.endTime, brk: d.breakMinutes } : { start: '00:00', end: '00:00', brk: '0' }
+  )));
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
 
@@ -41,6 +46,7 @@ export function TimesheetWeekForm({
 
   const minutesFor = (r: (typeof rows)[number]) => {
     if (!r.start || !r.end) return null;
+    if (isZeroDay(r.start, r.end, r.brk)) return 0;
     const res = workedMinutes(r.start, r.end, r.brk === '' ? 0 : Number(r.brk));
     return 'minutes' in res ? res.minutes : null;
   };

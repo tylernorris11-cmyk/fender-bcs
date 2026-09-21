@@ -109,7 +109,7 @@ export default async function TimesheetTeamPage({ searchParams }: { searchParams
                             <>
                               <span className="block font-semibold tabular-nums">{formatHours(e.workedMinutes)}</span>
                               <span className="block text-[11px] text-ink-faint whitespace-nowrap">
-                                {e.startTime}–{e.endTime}{e.breakMinutes > 0 && ` · ${e.breakMinutes}m brk`}
+                                {e.workedMinutes === 0 ? e.note : <>{e.startTime}–{e.endTime}{e.breakMinutes > 0 && ` · ${e.breakMinutes}m brk`}</>}
                               </span>
                             </>
                           ) : <span className="text-ink-faint">—</span>}
