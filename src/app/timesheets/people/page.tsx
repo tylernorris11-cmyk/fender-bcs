@@ -25,10 +25,10 @@ export default async function TimesheetPeoplePage() {
   const onCount = users.filter((u) => u.onTimesheets).length;
 
   return (
-    <Shell user={user} module="timesheets" nav={NAV.timesheets} current="/timesheets/people" alerts={alerts.length}>
+    <Shell user={user} module="setup" nav={NAV.setup} current="/timesheets/people" alerts={alerts.length}>
       <PageHeader
-        title="Who fills one in"
-        blurb="Tick everyone who fills in a timesheet. Leave anyone who clocks in unticked — they won't see Timesheets at all."
+        title="Who fills timesheets"
+        blurb="Tick everyone who fills in a timesheet. Anyone unticked — including you, if you leave yourself off — doesn't see Timesheets at all."
       />
 
       <section className="card card-pad">

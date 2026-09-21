@@ -3,12 +3,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
-import { can } from '@/lib/rbac';
 import { shortDate } from '@/lib/format';
 import { addDays, isoDay, isWeekend, parseDayInput } from '@/lib/holidays';
 import { dayLabel, dueWeekMonday, mondayOf, todayInLondon, weekDays, weekRangeLabel } from '@/lib/timesheets';
 import { NAV, Shell } from '@/components/Shell';
-import { Empty, PageHeader, Pill } from '@/components/ui';
+import { PageHeader, Pill } from '@/components/ui';
 import { TimesheetWeekForm, type TimesheetDay } from './TimesheetWeekForm';
 
 export default async function TimesheetPage({ searchParams }: { searchParams: { week?: string } }) {
@@ -21,18 +20,6 @@ export default async function TimesheetPage({ searchParams }: { searchParams: { 
   const prev = isoDay(addDays(monday, -7));
   const next = isoDay(addDays(monday, 7));
   const dueMonday = dueWeekMonday(today);
-
-  if (!user.onTimesheets) {
-    return (
-      <Shell user={user} module="timesheets" nav={NAV.timesheets} current="/timesheets" alerts={alerts.length}>
-        <PageHeader title="My timesheet" />
-        <Empty
-          title="You're not on timesheets, so there's nothing for you to fill in."
-          action={can(user, 'timesheets.viewAll') ? <Link href="/timesheets/team" className="btn-primary">See everyone&apos;s timesheets</Link> : undefined}
-        />
-      </Shell>
-    );
-  }
 
   const [entries, submitted] = await Promise.all([
     db.timesheetEntry.findMany({ where: { userId: user.id, date: { gte: monday, lte: addDays(monday, 6) } } }),

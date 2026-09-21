@@ -41,11 +41,11 @@ export default async function TimesheetTeamPage({ searchParams }: { searchParams
   const outstanding = weekOver ? people.filter((p) => !submittedAt.has(p.id)) : [];
 
   return (
-    <Shell user={user} module="timesheets" nav={NAV.timesheets} current="/timesheets/team" alerts={alerts.length}>
+    <Shell user={user} module="setup" nav={NAV.setup} current="/timesheets/team" alerts={alerts.length}>
       <PageHeader
         title="Team timesheets"
         blurb={`Hours for everyone on timesheets at ${COMPANY_LABEL[company]}. Anyone who clocks in isn't listed.`}
-        actions={can(user, 'setup.users') ? <Link href="/timesheets/people" className="btn-secondary">Who fills one in</Link> : undefined}
+        actions={can(user, 'setup.users') ? <Link href="/timesheets/people" className="btn-secondary">Who fills timesheets</Link> : undefined}
       />
 
       <div className="flex flex-wrap items-center gap-3 mb-4">

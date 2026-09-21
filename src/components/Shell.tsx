@@ -192,8 +192,6 @@ export const NAV: Record<string, NavItem[]> = {
   ],
   timesheets: [
     { label: 'My timesheet', href: '/timesheets' },
-    { label: 'Team', href: '/timesheets/team', perm: 'timesheets.viewAll' },
-    { label: 'Who fills one in', href: '/timesheets/people', perm: 'setup.users' },
   ],
   customers: [{ label: 'All customers', href: '/customers' }],
   compliance: [
@@ -244,6 +242,8 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'Pricing', href: '/setup/pricing', perm: 'setup.pricing' },
     { label: 'Users & roles', href: '/setup/users', perm: 'setup.users' },
     { label: 'Access requests', href: '/setup/access-requests', perm: 'setup.users' },
+    { label: 'Team timesheets', href: '/timesheets/team', perm: 'timesheets.viewAll' },
+    { label: 'Who fills timesheets', href: '/timesheets/people', perm: 'setup.users' },
     { label: 'Drivers', href: '/setup/drivers', perm: 'setup.lists' },
     { label: 'Towns & cities', href: '/setup/towns', perm: 'setup.lists' },
     { label: 'Locations', href: '/setup/locations', perm: 'setup.lists' },

@@ -7,11 +7,11 @@ import { TimesheetReminderModal } from './TimesheetReminderModal';
 /**
  * Timesheets are due every Wednesday for the week before. From Tuesday
  * (a day's warning) until they've handed that week in, anyone on timesheets
- * gets a pop-up on whatever page they open. It only appears for people put on timesheets —
- * anyone who clocks in never sees it.
+ * gets a pop-up on whatever page they open. It only appears for people ticked on timesheets —
+ * anyone who isn't never sees it.
  */
 export async function TimesheetReminder({ user }: { user: SessionUser }) {
-  if (!user.onTimesheets || !can(user, 'timesheets.view')) return null;
+  if (!can(user, 'timesheets.view')) return null;
 
   const today = todayInLondon();
   const week = dueWeekMonday(today);

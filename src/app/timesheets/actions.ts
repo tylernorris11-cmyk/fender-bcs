@@ -14,7 +14,6 @@ export type SaveWeekResult = { ok: true; message: string } | { ok: false; error:
  * the form can show them next to the day they're about. */
 export async function saveTimesheetWeek(formData: FormData): Promise<SaveWeekResult> {
   const user = await assertPermission('timesheets.view');
-  if (!user.onTimesheets) return { ok: false, error: 'You are not set up to fill in a timesheet.' };
 
   const requested = parseDayInput(String(formData.get('week') ?? ''));
   if (!requested) return { ok: false, error: 'That week could not be read — reload the page and try again.' };

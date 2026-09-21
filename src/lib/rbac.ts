@@ -53,9 +53,10 @@ export type Permission =
   // Planning
   | 'planning.view'
   | 'planning.edit'
-  // Timesheets — 'timesheets.view' isn't in any role's list: it's true for
-  // anyone put on timesheets (User.onTimesheets, chosen in Timesheets > Who
-  // fills one in) or who can see everyone's, and worked out in can() below.
+  // Timesheets — 'timesheets.view' isn't in any role's list: it's true only
+  // for people ticked on timesheets (User.onTimesheets, chosen in Set Up >
+  // Who fills timesheets), whatever their role, and worked out in can()
+  // below. 'viewAll' is separate: the admin-side Team page under Set Up.
   | 'timesheets.view'
   | 'timesheets.viewAll' // see everyone's timesheets and who hasn't handed theirs in
   // Holidays — request/view is universal; deciding is a Master Admin-only
@@ -215,7 +216,7 @@ export type SessionUser = {
 export function can(user: Pick<SessionUser, 'role' | 'hiddenModules' | 'extraPermissions' | 'onTimesheets'> | null | undefined, perm: Permission): boolean {
   if (!user) return false;
   if (user.role !== 'MASTER_ADMIN' && user.hiddenModules?.includes(perm.split('.')[0])) return false;
-  if (perm === 'timesheets.view') return !!user.onTimesheets || can(user, 'timesheets.viewAll');
+  if (perm === 'timesheets.view') return !!user.onTimesheets;
   return (PERMISSIONS[user.role]?.includes(perm) ?? false) || (user.extraPermissions?.includes(perm) ?? false);
 }
 
