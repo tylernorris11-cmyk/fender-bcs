@@ -18,16 +18,24 @@ export function weekDays(monday: Date): Date[] {
 }
 
 /**
- * Timesheets are due the Wednesday after the week they cover, and people
- * are prompted from the Tuesday before. This is the week the reminder is
- * about right now: the previous week as of the most recent Tuesday. It
- * rolls over each Tuesday, so a week nobody filled in is nagged about from
- * that Tuesday until the next one.
+ * Timesheets are due the Wednesday after the week they cover, and people can
+ * fill them in — and are prompted to — from the Monday. This is the week the
+ * reminder is about right now: the previous week as of the most recent
+ * Monday. It rolls over each Monday, so a week nobody handed in is nagged
+ * about from that Monday until the next one.
  */
 export function dueWeekMonday(today: Date): Date {
-  const daysSinceTuesday = (today.getUTCDay() + 5) % 7; // Tue = 0 ... Mon = 6
-  const mostRecentTuesday = addDays(today, -daysSinceTuesday);
-  return addDays(mostRecentTuesday, -8);
+  const daysSinceMonday = (today.getUTCDay() + 6) % 7; // Mon = 0 ... Sun = 6
+  const mostRecentMonday = addDays(today, -daysSinceMonday);
+  return addDays(mostRecentMonday, -7);
+}
+
+export type ReminderStage = 'ready' | 'tomorrow' | 'today' | 'overdue';
+
+/** Monday: ready to fill in (due Wednesday). Tuesday: due tomorrow. Wednesday: due today. Thursday on: overdue. */
+export function reminderStage(today: Date): ReminderStage {
+  const day = today.getUTCDay();
+  return day === 1 ? 'ready' : day === 2 ? 'tomorrow' : day === 3 ? 'today' : 'overdue';
 }
 
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;

@@ -1,12 +1,12 @@
 import { db } from '@/lib/db';
 import { can, type SessionUser } from '@/lib/rbac';
 import { isoDay } from '@/lib/holidays';
-import { dueWeekMonday, todayInLondon, weekRangeLabel } from '@/lib/timesheets';
+import { dueWeekMonday, reminderStage, todayInLondon, weekRangeLabel } from '@/lib/timesheets';
 import { TimesheetReminderModal } from './TimesheetReminderModal';
 
 /**
- * Timesheets are due every Wednesday for the week before. From Tuesday
- * (a day's warning) until they've handed that week in, anyone on timesheets
+ * Timesheets are due every Wednesday for the week before. From Monday
+ * (two days' notice) until they've handed that week in, anyone on timesheets
  * gets a pop-up on whatever page they open. It only appears for people ticked on timesheets —
  * anyone who isn't never sees it.
  */
@@ -25,7 +25,7 @@ export async function TimesheetReminder({ user }: { user: SessionUser }) {
     <TimesheetReminderModal
       weekLabel={weekRangeLabel(week)}
       href={`/timesheets?week=${isoDay(week)}`}
-      when={today.getUTCDay() === 2 ? 'tomorrow' : today.getUTCDay() === 3 ? 'today' : 'overdue'}
+      when={reminderStage(today)}
       dismissKey={`timesheet-reminder:${user.id}:${isoDay(week)}:${isoDay(today)}`}
     />
   );

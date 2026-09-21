@@ -4,11 +4,19 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Clock } from 'lucide-react';
+import type { ReminderStage } from '@/lib/timesheets';
+
+const TITLE: Record<ReminderStage, string> = {
+  ready: "Time to do last week's timesheet",
+  tomorrow: 'Your timesheet is due tomorrow',
+  today: 'Your timesheet is due today',
+  overdue: 'Your timesheet is overdue',
+};
 
 /** "Later" hides it for the rest of the day (per person, per week) — it comes back tomorrow if the week still hasn't been handed in. */
 export function TimesheetReminderModal({
   weekLabel, href, when, dismissKey,
-}: { weekLabel: string; href: string; when: 'tomorrow' | 'today' | 'overdue'; dismissKey: string }) {
+}: { weekLabel: string; href: string; when: ReminderStage; dismissKey: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const primary = useRef<HTMLAnchorElement>(null);
@@ -42,7 +50,7 @@ export function TimesheetReminderModal({
           <Clock size={28} aria-hidden />
         </span>
         <h2 id="timesheet-reminder-title" className="text-xl font-bold">
-          {when === 'tomorrow' ? 'Your timesheet is due tomorrow' : when === 'today' ? 'Your timesheet is due today' : 'Your timesheet is overdue'}
+          {TITLE[when]}
         </h2>
         <p className="text-ink-muted mt-2">
           Last week&apos;s hours ({weekLabel}) need filling in and handing in. It only takes a minute — start, finish and breaks for each day you were in.

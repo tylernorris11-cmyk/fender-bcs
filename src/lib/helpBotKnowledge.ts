@@ -28,7 +28,7 @@ Keep answers short and practical — a sentence or two plus which page/button to
 
 **Holidays** (/holidays) — request time off, and (for those with permission) approve requests and see who else is away. A new request emails every Master Administrator.
 
-**Timesheets** (/timesheets) — for people who fill in hours rather than clock in (a Master Administrator or Administrator ticks who fills one in under Set Up → Who fills timesheets; anyone not ticked doesn't see Timesheets at all, whatever their role). Each day you were in: start, finish and break minutes. Last week's is due every Wednesday — you get a pop-up from the Tuesday before ("due tomorrow"), again on Wednesday ("due today"), and daily after that until you've pressed "Hand in this week" (available once the week has finished). Administrators see everyone's hours under Set Up → Team timesheets, including who hasn't handed theirs in.
+**Timesheets** (/timesheets) — for people who fill in hours rather than clock in (a Master Administrator or Administrator ticks who fills one in under Set Up → Who fills timesheets; anyone not ticked doesn't see Timesheets at all, whatever their role). Each day you were in: start, finish and break minutes. Last week's is due every Wednesday — you can do last week's from the Monday and get a pop-up then, again on Tuesday ("due tomorrow") and Wednesday ("due today"), and daily after that until you've pressed "Hand in this week" (available once the week has finished). Administrators see everyone's hours under Set Up → Team timesheets, including who hasn't handed theirs in.
 
 **Customers** (/customers) — customer profiles, contacts, order history and credit limits.
 

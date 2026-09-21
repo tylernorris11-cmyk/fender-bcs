@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { shortDate } from '@/lib/format';
 import { addDays, isoDay, isWeekend, parseDayInput } from '@/lib/holidays';
-import { dayLabel, dueWeekMonday, mondayOf, todayInLondon, weekDays, weekRangeLabel } from '@/lib/timesheets';
+import { dayLabel, dueWeekMonday, mondayOf, reminderStage, todayInLondon, weekDays, weekRangeLabel } from '@/lib/timesheets';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill } from '@/components/ui';
 import { TimesheetWeekForm, type TimesheetDay } from './TimesheetWeekForm';
@@ -59,7 +59,7 @@ export default async function TimesheetPage({ searchParams }: { searchParams: { 
         {submitted
           ? <Pill tone="good">Handed in {shortDate(submitted.submittedAt)}</Pill>
           : weekOver
-            ? <Pill tone={isDueWeek ? 'warn' : 'neutral'}>{isDueWeek ? 'Due now — not handed in' : 'Not handed in'}</Pill>
+            ? <Pill tone={isDueWeek ? 'warn' : 'neutral'}>{isDueWeek ? (reminderStage(today) === 'overdue' ? 'Overdue — not handed in' : 'Due Wednesday — not handed in') : 'Not handed in'}</Pill>
             : <Pill tone="neutral">Week in progress</Pill>}
       </div>
 
