@@ -6,6 +6,7 @@ import { can, type SessionUser } from './rbac';
 import { getActiveCompany } from './company';
 import { alertWindowDays, isOutOfService, SERVICE_MILEAGE_WARN_WINDOW, type StatutoryCheck } from './assets';
 import { findFuelDiscrepancies } from './fuel';
+import { todayInLondon } from './timesheets';
 
 export type Alert = {
   id: string;
@@ -33,7 +34,7 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const [certs, openNcrs, quarantined, suppliers, assets, overCredit, pending, missingCert, checkedTodayIds, pendingAccessRequests, pendingHolidays, fuelGaps] = await Promise.all([
+  const [certs, openNcrs, quarantined, suppliers, assets, overCredit, pending, missingCert, checkedTodayIds, pendingAccessRequests, pendingHolidays, offToday, fuelGaps] = await Promise.all([
     db.certificate.findMany({ where: { company, expiresOn: { lte: in90 } }, orderBy: { expiresOn: 'asc' } }),
     db.ncr.findMany({ where: { company, status: 'OPEN' }, orderBy: { raisedAt: 'asc' } }),
     db.batch.findMany({ where: { company, status: 'Quarantined' }, include: { product: true, supplier: true } }),
@@ -50,6 +51,19 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
     // Holiday requests are decided by Master Administrators only (see holidays/actions.ts) — everyone else never sees this one.
     user.role === 'MASTER_ADMIN'
       ? db.holidayRequest.findMany({ where: { status: 'PENDING' }, include: { user: { select: { name: true } } }, orderBy: { requestedAt: 'asc' } })
+      : [],
+    // Who's off today — for administrators only. A company-scoped Administrator
+    // sees people in their own company; a Master Administrator sees everyone.
+    user.role === 'MASTER_ADMIN' || user.role === 'ADMIN'
+      ? db.holidayRequest.findMany({
+          where: {
+            status: 'APPROVED',
+            startDate: { lte: todayInLondon() },
+            endDate: { gte: todayInLondon() },
+            user: { active: true, ...(user.role === 'MASTER_ADMIN' ? {} : { companies: { hasSome: user.companies } }) },
+          },
+          include: { user: { select: { name: true } } },
+        })
       : [],
     findFuelDiscrepancies(), // one shared yard tank — not company-filtered, same as assets/checks below
   ]);
@@ -73,6 +87,20 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
       title: `${pendingHolidays.length} holiday ${pendingHolidays.length === 1 ? 'request is' : 'requests are'} waiting for a decision`,
       detail: `From ${names.slice(0, 4).join(', ')}${names.length > 4 ? ` and ${names.length - 4} more` : ''}.`,
       href: '/holidays',
+      perm: 'holidays.view',
+    });
+  }
+
+  if (offToday.length > 0) {
+    const names = offToday
+      .map((r) => `${r.user.name}${r.half ? ` (${r.half})` : ''}`)
+      .sort((a, b) => a.localeCompare(b));
+    out.push({
+      id: 'off-today',
+      severity: 'info',
+      title: `${offToday.length} ${offToday.length === 1 ? 'person is' : 'people are'} off today`,
+      detail: names.join(', '),
+      href: '/planning?view=day',
       perm: 'holidays.view',
     });
   }
