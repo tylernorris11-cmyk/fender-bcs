@@ -236,7 +236,7 @@ export const MODULES = [
   { key: 'production', label: 'Production', href: '/production', perm: 'production.view' as Permission, blurb: 'Cutting, bending and dimensional checks to BS 8666.' },
   { key: 'planning', label: 'Deliveries', href: '/planning', perm: 'planning.view' as Permission, blurb: 'View and manage deliveries, collections and site schedules.' },
   { key: 'holidays', label: 'Holidays', href: '/holidays', perm: 'holidays.view' as Permission, blurb: 'Request time off, approve requests and see who else is away.' },
-  { key: 'timesheets', label: 'Timesheets', href: '/timesheets', perm: 'timesheets.view' as Permission, blurb: 'Fill in the hours you worked — start, finish and breaks — every Wednesday for the week before.' },
+  { key: 'timesheets', label: 'Timesheets', href: '/timesheets', perm: 'timesheets.view' as Permission, blurb: 'Fill in the hours you worked — start, finish and breaks — every Monday for the week before.' },
   { key: 'customers', label: 'Customers', href: '/customers', perm: 'customers.view' as Permission, blurb: 'Manage customer profiles, contacts and history.' },
   { key: 'compliance', label: 'Compliance', href: '/compliance', perm: 'compliance.view' as Permission, blurb: 'CARES approval, certificates and full steel traceability.', company: 'FENDER' as Company },
   { key: 'stock', label: 'Stock', href: '/stock', perm: 'stock.view' as Permission, blurb: 'Track inventory levels, materials and movements.' },
