@@ -111,7 +111,11 @@ export async function updateUserRole(formData: FormData) {
   if (role === 'MASTER_ADMIN' && admin.role !== 'MASTER_ADMIN') {
     throw new Error('Only a Master Administrator can grant that role.');
   }
-  assertCompaniesForRole(role, target.companies);
+  // A Master Administrator always has every company, so promoting someone
+  // grants both in the same step — checking their current single company
+  // first would make promoting a company-scoped Administrator impossible.
+  const companies = role === 'MASTER_ADMIN' ? ALL_COMPANIES : target.companies;
+  assertCompaniesForRole(role, companies);
 
   // Never let the last Master Administrator demote themselves out of the system.
   if (target.role === 'MASTER_ADMIN' && role !== 'MASTER_ADMIN') {
@@ -119,7 +123,7 @@ export async function updateUserRole(formData: FormData) {
     if (masters <= 1) throw new Error('This is the last Master Administrator. Give someone else that role first.');
   }
 
-  await db.user.update({ where: { id: userId }, data: { role } });
+  await db.user.update({ where: { id: userId }, data: { role, companies } });
   await logActivity('User', userId, 'Role changed', role, admin.id);
   if (isHighPrivilege(role) && target.role !== role) {
     const article = role === 'ADMIN' ? 'an' : 'a';
