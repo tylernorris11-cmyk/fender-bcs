@@ -95,11 +95,17 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
                 )}
               </td>
               <td className="td">
-                <form action={updateHolidayAllowance} className="flex gap-2 items-center">
-                  <input type="hidden" name="userId" value={u.id} />
-                  <input name="holidayAllowanceDays" type="number" min="0" step="1" defaultValue={u.holidayAllowanceDays}
-                         className="input w-16 py-1.5" aria-label={`Holiday days a year for ${u.name}`} />
-                  <button className="btn-secondary btn-sm">Save</button>
+                <form action={updateHolidayAllowance} className="flex flex-col gap-1.5">
+                  <span className="flex gap-2 items-center">
+                    <input type="hidden" name="userId" value={u.id} />
+                    <input name="holidayAllowanceDays" type="number" min="0" step="1" defaultValue={u.holidayAllowanceDays}
+                           className="input w-16 py-1.5" aria-label={`Holiday days a year for ${u.name}`} />
+                    <button className="btn-secondary btn-sm">Save</button>
+                  </span>
+                  <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+                    <input type="checkbox" name="bankHolidaysComeOff" defaultChecked={u.bankHolidaysComeOff} className="h-3.5 w-3.5 accent-brand" />
+                    Bank holidays come off
+                  </label>
                 </form>
               </td>
               <td className="td">

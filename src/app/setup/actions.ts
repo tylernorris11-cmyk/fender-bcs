@@ -178,8 +178,10 @@ export async function updateHolidayAllowance(formData: FormData) {
   const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
   assertCanManage(admin, target);
 
-  await db.user.update({ where: { id: userId }, data: { holidayAllowanceDays: days } });
-  await logActivity('User', userId, 'Holiday allowance changed', `${days} days a year`, admin.id);
+  const bankHolidaysComeOff = formData.get('bankHolidaysComeOff') === 'on';
+
+  await db.user.update({ where: { id: userId }, data: { holidayAllowanceDays: days, bankHolidaysComeOff } });
+  await logActivity('User', userId, 'Holiday allowance changed', `${days} days a year${bankHolidaysComeOff ? '' : ', bank holidays not taken off'}`, admin.id);
   revalidatePath('/setup/users');
   revalidatePath('/holidays');
 }

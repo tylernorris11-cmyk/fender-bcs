@@ -36,8 +36,8 @@ export async function requestHoliday(formData: FormData) {
   // understand that (see the modal in RequestHolidayForm) before this ever
   // gets called; unpaidDays is locked in here, at request time, against
   // today's balance, not re-worked out later at approval.
-  const { remaining } = await holidayBalance(user.id, startDate);
-  const unpaidDays = Math.max(0, workingDays - Math.max(0, remaining));
+  const { leftToBook } = await holidayBalance(user.id, startDate);
+  const unpaidDays = Math.max(0, workingDays - Math.max(0, leftToBook));
 
   const request = await db.holidayRequest.create({
     data: {

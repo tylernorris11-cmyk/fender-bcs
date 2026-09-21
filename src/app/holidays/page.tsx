@@ -56,7 +56,6 @@ export default async function HolidaysPage() {
       : Promise.resolve([]),
   ]);
 
-  const used = myBalance.usedPaid;
   const unpaidUsed = myRequests
     .filter((r) => r.status === 'APPROVED' && r.startDate >= yearStart && r.startDate <= yearEnd)
     .reduce((s, r) => s + r.unpaidDays, 0);
@@ -90,9 +89,11 @@ export default async function HolidaysPage() {
 
       <StatRow>
         <Stat value={myBalance.allowance} label="Days a year (incl. bank holidays)" />
-        <Stat value={used} label="Used this year" tone="good" />
+        <Stat value={myBalance.takenPaid} label="Taken so far" tone="good" />
+        <Stat value={myBalance.bookedAhead} label="Booked, not yet taken" />
+        {myBalance.bankHolidaysPassed > 0 && <Stat value={myBalance.bankHolidaysPassed} label="Bank holidays taken off" />}
         <Stat value={awaiting} label="Awaiting a decision" tone={awaiting ? 'warn' : 'default'} />
-        <Stat value={remaining} label="Remaining" tone={remaining < 0 ? 'bad' : 'default'} />
+        <Stat value={remaining} label="Remaining today" tone={remaining < 0 ? 'bad' : 'default'} />
         <Stat value={myBalance.accrued.toFixed(1)} label="Accrued so far" />
         <Stat
           value={myBalance.accrualBalance.toFixed(1)}
@@ -102,8 +103,9 @@ export default async function HolidaysPage() {
         {unpaidUsed > 0 && <Stat value={unpaidUsed} label="Unpaid this year" tone="warn" />}
       </StatRow>
       <p className="text-xs text-ink-faint -mt-4 mb-6">
-        Bank holidays are free for everyone automatically — nobody needs to book them, and they&apos;re already counted
-        in your days a year rather than on top of it. Accrued so far is your share of the year&apos;s bookable days
+        Your days a year include bank holidays. Days come off as they pass: each day of approved holiday when it arrives, and
+        each bank holiday on the day (from when this was switched on). Remaining today is what&apos;s left right now; holiday booked for later shows as
+        booked, not yet taken, and a new request is checked against what&apos;s left after that. Accrued so far is your share of the year&apos;s bookable days
         (allowance minus bank holidays) earned at 1/12th a month, credited from the 1st. Accrual balance is that minus
         what you&apos;ve actually taken — it can go negative if a request gets approved ahead of what&apos;s been earned yet.
       </p>
@@ -124,7 +126,7 @@ export default async function HolidaysPage() {
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
         <section className="card card-pad">
           <h2 className="text-lg font-bold mb-4">Request holiday</h2>
-          <RequestHolidayForm remainingDays={remaining} />
+          <RequestHolidayForm remainingDays={myBalance.leftToBook} />
         </section>
 
         <section className="card card-pad">

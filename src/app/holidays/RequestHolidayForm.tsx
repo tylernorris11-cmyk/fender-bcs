@@ -8,8 +8,8 @@ import { requestHoliday } from './actions';
 
 type Conflict = { name: string; colour: string; status: 'PENDING' | 'APPROVED'; startDate: string; endDate: string };
 
-/** remainingDays: the requester's own paid days left in the current
- * holiday year (see lib/holidayBalance.ts) — used only to warn them here
+/** remainingDays: the requester's own paid days left to book in the holiday
+ * year (after what's already booked ahead) (see lib/holidayBalance.ts) — used only to warn them here
  * before they submit; the real number that gets stored is worked out
  * server-side the same way, not trusted from this component. */
 export function RequestHolidayForm({ remainingDays }: { remainingDays: number }) {
@@ -106,7 +106,7 @@ export function RequestHolidayForm({ remainingDays }: { remainingDays: number })
             <strong className="text-ink">{length}</strong> — weekends and bank holidays don&apos;t count against your allowance.
             {unpaidDays > 0 && (
               <span className="block text-signal font-medium mt-1">
-                You have {Math.max(0, remainingDays)} paid day{Math.max(0, remainingDays) === 1 ? '' : 's'} left —
+                You have {Math.max(0, remainingDays)} paid day{Math.max(0, remainingDays) === 1 ? '' : 's'} left to book —
                 {' '}{unpaidDays} of these would be unpaid holiday.
               </span>
             )}
@@ -154,7 +154,7 @@ export function RequestHolidayForm({ remainingDays }: { remainingDays: number })
               Part of this will be unpaid
             </h2>
             <p className="text-sm text-ink-muted mb-4">
-              You have {Math.max(0, remainingDays)} paid day{Math.max(0, remainingDays) === 1 ? '' : 's'} left this holiday year.
+              You have {Math.max(0, remainingDays)} paid day{Math.max(0, remainingDays) === 1 ? '' : 's'} left to book this holiday year.
               This request is for {length?.toLowerCase()}, so{' '}
               <strong className="text-ink">{pendingUnpaidDays} of {workingDays} would be unpaid holiday</strong>.
             </p>
