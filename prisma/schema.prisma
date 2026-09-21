@@ -100,6 +100,7 @@ model User {
   fuelEntriesLogged           FuelEntry[]
   coilsAllocated              Coil[]                   @relation("coilAllocatedBy")
   coilsReceived               Coil[]                   @relation("coilReceivedBy")
+  outreachEmailsApproved      OutreachEmail[]          @relation("outreachApprovedBy")
 }
 
 // ------------------------------------------------------------- customers
@@ -1337,4 +1338,86 @@ model TimesheetWeek {
 
   @@unique([userId, weekStart])
   @@index([weekStart])
+}
+
+// ------------------------------------------------------------- outreach
+// Cold-outreach agent: finds prospective customers via Companies House,
+// drafts an introductory email, and — once a person approves it — sends and
+// tracks it. Built and tested for BCS Products / BS Supplies first (see
+// docs/OUTREACH_SETUP.md); nothing here is company-scoped by design, so the
+// same module works for Fender Steel once that's wanted too.
+
+enum LeadStatus {
+  NEW // found via Companies House, contact details not looked up yet
+  CONTACT_FOUND // a website/email was found — ready to draft
+  NO_CONTACT_FOUND // looked, found nothing usable — sits until someone adds one by hand
+  DRAFTED // an OutreachEmail exists and is waiting for approval
+  APPROVED // approved, waiting for the daily send job
+  SENT
+  REPLIED
+  BOUNCED
+  OPTED_OUT // this company (or any contact of theirs) asked not to be emailed — permanent
+  REJECTED // a person rejected the draft rather than approving it — stays out of future drafting runs
+}
+
+model Lead {
+  id                String     @id @default(cuid())
+  companyName       String
+  companyNumber     String     @unique // Companies House number — the dedupe key across discovery runs
+  companyType       String     @default("") // ltd | plc | llp — PECR: only these types are ever emailed, never a sole trader/partnership
+  sicCodes          String[]   @default([])
+  website           String     @default("")
+  contactEmail      String     @default("")
+  contactName       String     @default("")
+  registeredAddress String     @default("")
+  postcode          String     @default("")
+  status            LeadStatus @default(NEW)
+  source            String     @default("companies_house")
+  notes             String     @default("")
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  emails OutreachEmail[]
+
+  @@index([status])
+}
+
+model OutreachEmail {
+  id     String @id @default(cuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id])
+
+  senderLabel String // "BCS Products / BS Supplies" — which business this went out as
+  fromEmail   String // e.g. sales@sales.fenderbcs.com
+  subject     String
+  bodyText    String
+
+  status String @default("DRAFT") // DRAFT | APPROVED | REJECTED | SENT | FAILED
+
+  draftedAt    DateTime  @default(now())
+  approvedById String?
+  approvedBy   User?     @relation("outreachApprovedBy", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+  rejectedAt   DateTime?
+
+  sentAt     DateTime?
+  postmarkId String    @default("")
+  failReason String    @default("")
+
+  // The one-click unsubscribe link embeds this, never a plain company id —
+  // guessable ids would let anyone unsubscribe anyone else.
+  unsubscribeToken String @unique @default(cuid())
+
+  repliedAt DateTime?
+  replyText String    @default("")
+
+  @@index([status])
+}
+
+model OutreachSuppression {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  companyName String   @default("")
+  reason      String   @default("") // opted_out | bounced | manual
+  createdAt   DateTime @default(now())
 }

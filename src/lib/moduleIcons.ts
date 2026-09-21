@@ -1,6 +1,6 @@
 import {
   CalendarDays, CalendarHeart, CircleDot, ClipboardCheck, ClipboardList, Clock, Factory, Fuel, HardHat, Layers,
-  Settings, ShieldCheck, ShoppingCart, Truck, Users, type LucideIcon,
+  Mail, Settings, ShieldCheck, ShoppingCart, Truck, Users, type LucideIcon,
 } from 'lucide-react';
 import type { Company } from '@prisma/client';
 
@@ -9,7 +9,7 @@ import type { Company } from '@prisma/client';
 export const MODULE_ICONS: Record<string, LucideIcon> = {
   orders: ClipboardList, purchaseOrders: ShoppingCart, production: Factory, planning: CalendarDays, customers: Users,
   compliance: ShieldCheck, stock: Layers, barCounter: CircleDot, assets: Truck, checks: ClipboardCheck, fuel: Fuel, holidays: CalendarHeart, timesheets: Clock,
-  hs: HardHat, setup: Settings,
+  hs: HardHat, setup: Settings, outreach: Mail,
 };
 
 /** Same accent per module as the home screen tiles, so the colour is the
@@ -17,7 +17,7 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
 export const MODULE_COLORS: Record<string, string> = {
   orders: 'text-brand-700', purchaseOrders: 'text-cyan-700', production: 'text-violet-700', planning: 'text-sky-700',
   customers: 'text-emerald-700', compliance: 'text-signal', stock: 'text-amber-700', barCounter: 'text-fuchsia-700', assets: 'text-indigo-700',
-  checks: 'text-lime-700', fuel: 'text-orange-700', holidays: 'text-rose-700', timesheets: 'text-yellow-700', hs: 'text-teal-700', setup: 'text-ink-muted',
+  checks: 'text-lime-700', fuel: 'text-orange-700', holidays: 'text-rose-700', timesheets: 'text-yellow-700', hs: 'text-teal-700', setup: 'text-ink-muted', outreach: 'text-pink-700',
 };
 
 /** Modules with real use and testing behind them — everywhere else still

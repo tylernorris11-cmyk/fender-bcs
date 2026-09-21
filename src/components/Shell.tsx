@@ -19,7 +19,7 @@ export type NavItem = { label: string; href: string; perm?: Permission; company?
 
 const MODULE_TITLE: Record<string, string> = {
   orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Deliveries', holidays: 'Holidays', timesheets: 'Timesheets',
-  customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', fuel: 'Fuel', hs: 'Health & Safety', setup: 'Set Up',
+  customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', fuel: 'Fuel', hs: 'Health & Safety', setup: 'Set Up', outreach: 'Sales Outreach',
 };
 
 export function Shell({
@@ -194,6 +194,11 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'My timesheet', href: '/timesheets' },
   ],
   customers: [{ label: 'All customers', href: '/customers' }],
+  outreach: [
+    { label: 'Review queue', href: '/outreach' },
+    { label: 'All leads', href: '/outreach/leads' },
+    { label: 'Sent', href: '/outreach?status=SENT' },
+  ],
   compliance: [
     { label: 'Overview', href: '/compliance' },
     { label: 'Upload certificate', href: '/compliance/test-certs' },

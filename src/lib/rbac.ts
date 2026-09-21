@@ -73,6 +73,9 @@ export type Permission =
   | 'setup.lists'
   | 'setup.backups'
   | 'setup.bugs' // read the "report a bug" inbox
+  // Sales outreach — BCS Products / BS Supplies cold-email agent
+  | 'outreach.view'
+  | 'outreach.manage' // approve/reject drafts, trigger sends
   // Commercially sensitive
   | 'finance.costs' // purchase costs and margin — CEO only
   | 'finance.debtors';
@@ -92,6 +95,7 @@ const ALL: Permission[] = [
   'holidays.view', 'timesheets.viewAll',
   'hs.view', 'hs.edit', 'hs.manageTraining',
   'setup.view', 'setup.pricing', 'setup.users', 'setup.lists', 'setup.backups', 'setup.bugs',
+  'outreach.view', 'outreach.manage',
   'finance.costs', 'finance.debtors',
 ];
 
@@ -136,6 +140,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
     'compliance.view',
     'hs.view',
     'finance.debtors',
+    'outreach.view', 'outreach.manage',
   ],
 
   // General office admin — same ground as Sales (orders, accounts, no
@@ -240,6 +245,7 @@ export const MODULES = [
   { key: 'checks', label: 'Checks', href: '/checks', perm: 'checks.view' as Permission, blurb: 'Morning checks on machines, lorries and pickups before use.' },
   { key: 'fuel', label: 'Fuel', href: '/fuel', perm: 'fuel.view' as Permission, blurb: 'Log fuel taken from the yard tank against each vehicle.' },
   { key: 'hs', label: 'Health & Safety', href: '/hs', perm: 'hs.view' as Permission, blurb: 'HSE documents, RAMS and mandatory training.' },
+  { key: 'outreach', label: 'Sales Outreach', href: '/outreach', perm: 'outreach.view' as Permission, blurb: 'Find new trade customers and review outreach emails before they send.', company: 'BS_SUPPLIES' as Company },
 ] as const;
 
 /** Narrow one-off permissions a Master Administrator/Administrator can grant
