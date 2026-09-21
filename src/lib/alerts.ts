@@ -33,7 +33,7 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const [certs, openNcrs, quarantined, suppliers, assets, overCredit, pending, missingCert, checkedTodayIds, pendingAccessRequests, fuelGaps] = await Promise.all([
+  const [certs, openNcrs, quarantined, suppliers, assets, overCredit, pending, missingCert, checkedTodayIds, pendingAccessRequests, pendingHolidays, fuelGaps] = await Promise.all([
     db.certificate.findMany({ where: { company, expiresOn: { lte: in90 } }, orderBy: { expiresOn: 'asc' } }),
     db.ncr.findMany({ where: { company, status: 'OPEN' }, orderBy: { raisedAt: 'asc' } }),
     db.batch.findMany({ where: { company, status: 'Quarantined' }, include: { product: true, supplier: true } }),
@@ -47,6 +47,10 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
     db.batch.count({ where: { company, millCertUrl: '', status: { not: 'Rejected' } } }),
     db.assetCheck.findMany({ where: { performedAt: { gte: startOfToday } }, select: { assetId: true } }),
     user.role === 'MASTER_ADMIN' ? db.accessRequest.count({ where: { status: 'PENDING' } }) : 0,
+    // Holiday requests are decided by Master Administrators only (see holidays/actions.ts) — everyone else never sees this one.
+    user.role === 'MASTER_ADMIN'
+      ? db.holidayRequest.findMany({ where: { status: 'PENDING' }, include: { user: { select: { name: true } } }, orderBy: { requestedAt: 'asc' } })
+      : [],
     findFuelDiscrepancies(), // one shared yard tank — not company-filtered, same as assets/checks below
   ]);
 
@@ -58,6 +62,18 @@ export async function getAlerts(user: SessionUser): Promise<Alert[]> {
       detail: 'From the login page — review who is asking and what they need.',
       href: '/setup/access-requests',
       perm: 'setup.users',
+    });
+  }
+
+  if (pendingHolidays.length > 0) {
+    const names = [...new Set(pendingHolidays.map((r) => r.user.name))];
+    out.push({
+      id: 'holiday-requests-pending',
+      severity: 'info',
+      title: `${pendingHolidays.length} holiday ${pendingHolidays.length === 1 ? 'request is' : 'requests are'} waiting for a decision`,
+      detail: `From ${names.slice(0, 4).join(', ')}${names.length > 4 ? ` and ${names.length - 4} more` : ''}.`,
+      href: '/holidays',
+      perm: 'holidays.view',
     });
   }
 
