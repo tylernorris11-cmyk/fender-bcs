@@ -1,5 +1,5 @@
 import {
-  CalendarDays, CalendarHeart, CircleDot, ClipboardCheck, ClipboardList, Clock, Factory, Fuel, HardHat, Layers,
+  Bell, CalendarDays, CalendarHeart, CircleDot, ClipboardCheck, ClipboardList, Clock, Factory, Fuel, HardHat, Layers,
   Mail, Settings, ShieldCheck, ShoppingCart, Truck, Users, type LucideIcon,
 } from 'lucide-react';
 import type { Company } from '@prisma/client';
@@ -9,7 +9,7 @@ import type { Company } from '@prisma/client';
 export const MODULE_ICONS: Record<string, LucideIcon> = {
   orders: ClipboardList, purchaseOrders: ShoppingCart, production: Factory, planning: CalendarDays, customers: Users,
   compliance: ShieldCheck, stock: Layers, barCounter: CircleDot, assets: Truck, checks: ClipboardCheck, fuel: Fuel, holidays: CalendarHeart, timesheets: Clock,
-  hs: HardHat, setup: Settings, outreach: Mail,
+  hs: HardHat, setup: Settings, outreach: Mail, alerts: Bell,
 };
 
 /** Same accent per module as the home screen tiles, so the colour is the
@@ -24,7 +24,7 @@ export const MODULE_COLORS: Record<string, string> = {
  * gets an in-progress flag (the corner ribbon on the home tiles, the
  * hazard banner in Shell, the WIP tag in the module switcher). One
  * function so all three can't drift out of sync with each other. */
-const STABLE_MODULE_KEYS = new Set(['assets', 'checks', 'fuel', 'holidays', 'timesheets']);
+const STABLE_MODULE_KEYS = new Set(['assets', 'checks', 'fuel', 'holidays', 'timesheets', 'alerts']);
 
 /** Stable only on the BCS Products side — its production process (cutting
  * fence post to length from coil) is much simpler than Fender's

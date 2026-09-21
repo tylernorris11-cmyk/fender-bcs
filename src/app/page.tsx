@@ -10,6 +10,7 @@ import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
 import { isStableModule, MODULE_ICONS } from '@/lib/moduleIcons';
 import { Avatar } from '@/components/ui';
 import { GlobalSearch } from '@/components/GlobalSearch';
+import { NotificationBell } from '@/components/NotificationBell';
 
 // Each tile gets its own accent so people learn the colour before the label.
 const TONES = {
@@ -86,14 +87,7 @@ export default async function Launcher() {
                 ))}
               </div>
             )}
-            <Link href="/alerts" className="relative rounded-xl bg-white/10 hover:bg-white/15 p-2.5" aria-label={`Alerts, ${alerts.length} needing attention`}>
-              <Bell size={18} />
-              {alerts.length > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-signal text-[10px] font-bold grid place-items-center">
-                  {alerts.length}
-                </span>
-              )}
-            </Link>
+            <NotificationBell count={alerts.length} />
             {can(user, 'setup.view') && (
               <Link href="/setup/pricing" className="btn bg-white/10 hover:bg-white/15 text-white text-sm">
                 <Settings size={16} /> Set Up

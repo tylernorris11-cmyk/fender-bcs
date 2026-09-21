@@ -12,8 +12,8 @@ export default async function AlertsPage() {
   const warn = alerts.filter((a) => a.severity !== 'bad');
 
   return (
-    <Shell user={user} module="compliance" nav={NAV.compliance} current="/compliance" alerts={alerts.length}>
-      <PageHeader title="Needs attention" blurb="Everything the system thinks is worth a look, worst first." />
+    <Shell user={user} module="alerts" nav={NAV.alerts} current="/alerts" alerts={alerts.length}>
+      <PageHeader title="Needs attention" blurb="Everything the system thinks is worth a look — certificates, checks, orders, and requests waiting on you. Worst first." />
 
       {alerts.length === 0 && (
         <div className="banner-ok">

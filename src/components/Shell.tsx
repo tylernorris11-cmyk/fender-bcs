@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
-import { Bell, Bug, Home, LogOut } from 'lucide-react';
+import { Bug, Home, LogOut } from 'lucide-react';
 import type { Company } from '@prisma/client';
 import { can, MODULES, ROLE_LABELS, type Permission, type SessionUser } from '@/lib/rbac';
 import { COMPANY_LABEL, getActiveCompany } from '@/lib/company';
@@ -11,6 +11,7 @@ import { ModuleSwitcher } from './ModuleSwitcher';
 import { GlobalSearch } from './GlobalSearch';
 import { InProgressBanner } from './InProgressBanner';
 import { TimesheetReminder } from './TimesheetReminder';
+import { NotificationBell } from './NotificationBell';
 
 // `company`, when set, only shows this nav item while that company's view is
 // active — for things like BCS Products' cost centres that don't exist on
@@ -19,7 +20,7 @@ export type NavItem = { label: string; href: string; perm?: Permission; company?
 
 const MODULE_TITLE: Record<string, string> = {
   orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Deliveries', holidays: 'Holidays', timesheets: 'Timesheets',
-  customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', fuel: 'Fuel', hs: 'Health & Safety', setup: 'Set Up', outreach: 'Sales Outreach',
+  customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', fuel: 'Fuel', hs: 'Health & Safety', setup: 'Set Up', outreach: 'Sales Outreach', alerts: 'Notifications',
 };
 
 export function Shell({
@@ -133,14 +134,7 @@ export function Shell({
                 ))}
               </div>
             )}
-            <Link href="/alerts" className="relative rounded-xl bg-white/10 hover:bg-white/15 p-2.5" aria-label={`Alerts, ${alerts} needing attention`}>
-              <Bell size={18} />
-              {alerts > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-signal text-[10px] font-bold grid place-items-center">
-                  {alerts}
-                </span>
-              )}
-            </Link>
+            <NotificationBell count={alerts} />
             <Link href="/account" className="flex items-center gap-2.5 rounded-xl bg-white/10 hover:bg-white/15 pl-1.5 pr-3.5 py-1.5">
               <Avatar name={user.name} colour={user.colour} size={30} />
               <span className="hidden sm:block leading-tight text-left">
@@ -193,6 +187,7 @@ export const NAV: Record<string, NavItem[]> = {
   timesheets: [
     { label: 'My timesheet', href: '/timesheets' },
   ],
+  alerts: [{ label: 'Needs attention', href: '/alerts' }],
   customers: [{ label: 'All customers', href: '/customers' }],
   outreach: [
     { label: 'Review queue', href: '/outreach' },
