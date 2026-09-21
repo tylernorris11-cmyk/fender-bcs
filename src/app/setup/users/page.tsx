@@ -8,8 +8,9 @@ import { NAV, Shell } from '@/components/Shell';
 import { COMPANY_LABEL } from '@/lib/company';
 import { Avatar, PageHeader, Pill, SortTh, Table } from '@/components/ui';
 import {
-  createUser, resetPassword, toggleUserActive, updateAllHiddenModules, updateExtraPermissions, updateHolidayAllowance, updateUserCompanies, updateUserRole,
+  resetPassword, toggleUserActive, updateAllHiddenModules, updateExtraPermissions, updateHolidayAllowance, updateUserCompanies, updateUserRole,
 } from '../actions';
+import { AddUserForm } from './AddUserForm';
 
 const COMPANIES = ['FENDER', 'BS_SUPPLIES'] as const;
 
@@ -218,32 +219,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card card-pad">
           <h2 className="text-lg font-bold mb-4">Add someone</h2>
-          <form action={createUser} className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="label" htmlFor="name">Full name</label>
-              <input id="name" name="name" required className="input" />
-            </div>
-            <div>
-              <label className="label" htmlFor="email">Email</label>
-              <input id="email" name="email" type="email" required className="input" placeholder="name@fendersteel.co.uk" />
-            </div>
-            <div>
-              <label className="label" htmlFor="jobTitle">Job title</label>
-              <input id="jobTitle" name="jobTitle" className="input" placeholder="Yard manager" />
-            </div>
-            <div>
-              <label className="label" htmlFor="role">Role</label>
-              <select id="role" name="role" defaultValue="YARD" className="input">
-                {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label" htmlFor="password">Starting password</label>
-              <input id="password" name="password" type="text" required className="input" />
-              <p className="hint">At least ten characters with a number. They will be asked to change it.</p>
-            </div>
-            <div><button className="btn-primary">Create account</button></div>
-          </form>
+          <AddUserForm roles={ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }))} />
         </section>
 
         <section className="card card-pad">

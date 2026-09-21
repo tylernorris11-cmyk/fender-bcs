@@ -56,19 +56,25 @@ function assertCompaniesForRole(role: Role, companies: Company[]) {
   }
 }
 
-export async function createUser(formData: FormData) {
+export type CreateUserResult = { ok: true; message: string } | { ok: false; error: string };
+
+/** Returns problems (weak password, email already used…) instead of throwing —
+ * a thrown error reaches people in production as nothing but a reference
+ * code, which is no use to someone just trying to add an account. */
+export async function createUser(formData: FormData): Promise<CreateUserResult> {
   const admin = await assertPermission('setup.users');
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   const name = String(formData.get('name') ?? '').trim();
   const password = String(formData.get('password') ?? '');
   const role = String(formData.get('role')) as Role;
 
-  if (!email || !name) throw new Error('Name and email are both needed.');
+  if (!email || !name) return { ok: false, error: 'Name and email are both needed.' };
+  if (!(role in ROLE_LABELS)) return { ok: false, error: 'Choose a role for them.' };
   const problem = passwordProblem(password);
-  if (problem) throw new Error(problem);
-  if (await db.user.findUnique({ where: { email } })) throw new Error('There is already an account on that email.');
+  if (problem) return { ok: false, error: `Starting password: ${problem}` };
+  if (await db.user.findUnique({ where: { email } })) return { ok: false, error: 'There is already an account on that email.' };
   if (role === 'MASTER_ADMIN' && admin.role !== 'MASTER_ADMIN') {
-    throw new Error('Only a Master Administrator can grant that role.');
+    return { ok: false, error: 'Only a Master Administrator can grant that role.' };
   }
 
   const companies = role === 'MASTER_ADMIN' ? ALL_COMPANIES : [getActiveCompany(admin)];
@@ -92,6 +98,7 @@ export async function createUser(formData: FormData) {
     });
   }
   revalidatePath('/setup/users');
+  return { ok: true, message: `Account created for ${name}. They'll be asked to change the password when they first sign in.` };
 }
 
 export async function updateUserRole(formData: FormData) {
