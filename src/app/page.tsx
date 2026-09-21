@@ -25,6 +25,7 @@ const TONES = {
   checks: { icon: 'bg-lime-100 text-lime-700', bar: 'bg-lime-500', arrow: 'border-lime-500 text-lime-600' },
   fuel: { icon: 'bg-orange-100 text-orange-700', bar: 'bg-orange-500', arrow: 'border-orange-500 text-orange-600' },
   holidays: { icon: 'bg-rose-100 text-rose-700', bar: 'bg-rose-500', arrow: 'border-rose-500 text-rose-600' },
+  timesheets: { icon: 'bg-yellow-100 text-yellow-700', bar: 'bg-yellow-500', arrow: 'border-yellow-500 text-yellow-600' },
   hs: { icon: 'bg-teal-100 text-teal-700', bar: 'bg-teal-500', arrow: 'border-teal-500 text-teal-600' },
 } as const;
 

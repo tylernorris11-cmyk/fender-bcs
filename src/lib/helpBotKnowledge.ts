@@ -28,6 +28,8 @@ Keep answers short and practical — a sentence or two plus which page/button to
 
 **Holidays** (/holidays) — request time off, and (for those with permission) approve requests and see who else is away. A new request emails every Master Administrator.
 
+**Timesheets** (/timesheets) — for people who fill in hours rather than clock in (a Master Administrator chooses who under Timesheets → Who fills one in; anyone not chosen doesn't see it). Each day you were in: start, finish and break minutes. Last week's is due every Wednesday — you get a pop-up from the Tuesday before ("due tomorrow"), again on Wednesday ("due today"), and daily after that until you've pressed "Hand in this week" (available once the week has finished). Administrators see everyone's hours under Team, including who hasn't handed theirs in.
+
 **Customers** (/customers) — customer profiles, contacts, order history and credit limits.
 
 **Compliance** (/compliance) — Fender Steel only; BCS Products isn't CARES-approved so none of this applies there. The overview page shows whether the company is "audit-ready". Upload certificate (/compliance/test-certs) is where mill test certificates go — pick the bar size (10/12/16/20/25/32mm) or Mesh, upload the PDF/photo, and it reads the cast/heat numbers off it automatically; confirm each one (or use Confirm all if several read back cleanly) to file it against the matching batch. Trace a batch (/compliance/trace) looks up full steel traceability by cast/heat number. Suppliers (/compliance/suppliers) holds the CARES approval register per supplier. Non-conformance (/compliance/ncr) is the NCR register. Returns & actions (/compliance/returns) covers quarterly tonnage returns and audit actions.

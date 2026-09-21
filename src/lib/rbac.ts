@@ -53,6 +53,11 @@ export type Permission =
   // Planning
   | 'planning.view'
   | 'planning.edit'
+  // Timesheets — 'timesheets.view' isn't in any role's list: it's true for
+  // anyone put on timesheets (User.onTimesheets, chosen in Timesheets > Who
+  // fills one in) or who can see everyone's, and worked out in can() below.
+  | 'timesheets.view'
+  | 'timesheets.viewAll' // see everyone's timesheets and who hasn't handed theirs in
   // Holidays — request/view is universal; deciding is a Master Admin-only
   // role check, not a grantable permission (see holidays/actions.ts)
   | 'holidays.view'
@@ -83,7 +88,7 @@ const ALL: Permission[] = [
   'checks.view', 'checks.create',
   'fuel.view', 'fuel.create',
   'planning.view', 'planning.edit',
-  'holidays.view',
+  'holidays.view', 'timesheets.viewAll',
   'hs.view', 'hs.edit', 'hs.manageTraining',
   'setup.view', 'setup.pricing', 'setup.users', 'setup.lists', 'setup.backups', 'setup.bugs',
   'finance.costs', 'finance.debtors',
@@ -197,7 +202,7 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
 
 export type SessionUser = {
   id: string; name: string; email: string; role: Role; jobTitle: string; initials: string; colour: string;
-  companies: Company[]; hiddenModules: string[]; extraPermissions: string[];
+  companies: Company[]; hiddenModules: string[]; extraPermissions: string[]; onTimesheets: boolean;
 };
 
 /**
@@ -207,9 +212,10 @@ export type SessionUser = {
  * module is gone from the page itself, not just the menu. Never applies to
  * a Master Administrator; there would be no way back in for the last one.
  */
-export function can(user: Pick<SessionUser, 'role' | 'hiddenModules' | 'extraPermissions'> | null | undefined, perm: Permission): boolean {
+export function can(user: Pick<SessionUser, 'role' | 'hiddenModules' | 'extraPermissions' | 'onTimesheets'> | null | undefined, perm: Permission): boolean {
   if (!user) return false;
   if (user.role !== 'MASTER_ADMIN' && user.hiddenModules?.includes(perm.split('.')[0])) return false;
+  if (perm === 'timesheets.view') return !!user.onTimesheets || can(user, 'timesheets.viewAll');
   return (PERMISSIONS[user.role]?.includes(perm) ?? false) || (user.extraPermissions?.includes(perm) ?? false);
 }
 
@@ -224,6 +230,7 @@ export const MODULES = [
   { key: 'production', label: 'Production', href: '/production', perm: 'production.view' as Permission, blurb: 'Cutting, bending and dimensional checks to BS 8666.' },
   { key: 'planning', label: 'Deliveries', href: '/planning', perm: 'planning.view' as Permission, blurb: 'View and manage deliveries, collections and site schedules.' },
   { key: 'holidays', label: 'Holidays', href: '/holidays', perm: 'holidays.view' as Permission, blurb: 'Request time off, approve requests and see who else is away.' },
+  { key: 'timesheets', label: 'Timesheets', href: '/timesheets', perm: 'timesheets.view' as Permission, blurb: 'Fill in the hours you worked — start, finish and breaks — every Wednesday for the week before.' },
   { key: 'customers', label: 'Customers', href: '/customers', perm: 'customers.view' as Permission, blurb: 'Manage customer profiles, contacts and history.' },
   { key: 'compliance', label: 'Compliance', href: '/compliance', perm: 'compliance.view' as Permission, blurb: 'CARES approval, certificates and full steel traceability.', company: 'FENDER' as Company },
   { key: 'stock', label: 'Stock', href: '/stock', perm: 'stock.view' as Permission, blurb: 'Track inventory levels, materials and movements.' },

@@ -10,6 +10,7 @@ import { Avatar } from './ui';
 import { ModuleSwitcher } from './ModuleSwitcher';
 import { GlobalSearch } from './GlobalSearch';
 import { InProgressBanner } from './InProgressBanner';
+import { TimesheetReminder } from './TimesheetReminder';
 
 // `company`, when set, only shows this nav item while that company's view is
 // active — for things like BCS Products' cost centres that don't exist on
@@ -17,7 +18,7 @@ import { InProgressBanner } from './InProgressBanner';
 export type NavItem = { label: string; href: string; perm?: Permission; company?: Company };
 
 const MODULE_TITLE: Record<string, string> = {
-  orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Deliveries', holidays: 'Holidays',
+  orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Deliveries', holidays: 'Holidays', timesheets: 'Timesheets',
   customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', fuel: 'Fuel', hs: 'Health & Safety', setup: 'Set Up',
 };
 
@@ -154,6 +155,7 @@ export function Shell({
 
         <main className="p-4 sm:p-7 max-w-[1200px]">{children}</main>
       </div>
+      <TimesheetReminder user={user} />
     </div>
   );
 }
@@ -187,6 +189,11 @@ export const NAV: Record<string, NavItem[]> = {
   ],
   holidays: [
     { label: 'Requests', href: '/holidays' },
+  ],
+  timesheets: [
+    { label: 'My timesheet', href: '/timesheets' },
+    { label: 'Team', href: '/timesheets/team', perm: 'timesheets.viewAll' },
+    { label: 'Who fills one in', href: '/timesheets/people', perm: 'setup.users' },
   ],
   customers: [{ label: 'All customers', href: '/customers' }],
   compliance: [
