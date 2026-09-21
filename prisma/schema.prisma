@@ -1401,7 +1401,7 @@ model OutreachEmail {
   rejectedAt   DateTime?
 
   sentAt     DateTime?
-  postmarkId String    @default("")
+  postmarkId String    @default("") // unused: sending moved to a Microsoft 365 mailbox, and Graph sendMail returns no id. Column kept so no migration is needed.
   failReason String    @default("")
 
   // The one-click unsubscribe link embeds this, never a plain company id —

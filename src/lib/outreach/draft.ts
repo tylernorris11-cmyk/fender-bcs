@@ -5,7 +5,7 @@ import { OUTREACH_SENDER } from './config';
  * Drafts one introductory email for a lead — same house style as
  * lib/barCountAI.ts and lib/certExtraction.ts: a plain fetch against the
  * Anthropic Messages API, no SDK. The compliance footer (sender identity,
- * address, unsubscribe link) is appended separately in postmark.ts, never
+ * address, unsubscribe link) is appended separately in mail.ts, never
  * left to the model, so it's never missing or reworded.
  */
 export async function draftOutreachEmail({

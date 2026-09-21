@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { addSuppression } from '@/lib/outreach/postmark';
+import { addSuppression } from '@/lib/outreach/mail';
 
 /**
  * The link (and the one-click List-Unsubscribe header) in every outreach

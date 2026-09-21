@@ -1,7 +1,7 @@
 import 'server-only';
 import { db } from '@/lib/db';
 import { OUTREACH_DAILY_SEND_CAP } from './config';
-import { isSuppressed, sendOutreachEmail } from './postmark';
+import { isSuppressed, sendOutreachEmail } from './mail';
 
 export type SendResult = { attempted: number; sent: number; failed: number; errors: string[] };
 
@@ -50,7 +50,7 @@ export async function runSendBatch(): Promise<SendResult> {
       result.sent += 1;
       await db.outreachEmail.update({
         where: { id: email.id },
-        data: { status: 'SENT', sentAt: new Date(), postmarkId: outcome.postmarkId ?? '' },
+        data: { status: 'SENT', sentAt: new Date() },
       });
       await db.lead.update({ where: { id: email.leadId }, data: { status: 'SENT' } });
     } else {

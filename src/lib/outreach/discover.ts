@@ -6,7 +6,7 @@ import {
 import { isPecrEligible, searchCompaniesBySic } from './companiesHouse';
 import { findContactEmail, guessWebsite } from './contactFinder';
 import { draftOutreachEmail } from './draft';
-import { isSuppressed } from './postmark';
+import { isSuppressed } from './mail';
 
 export type DiscoveryResult = {
   found: number;

@@ -4,30 +4,25 @@ import 'server-only';
  * Everything about *who this is going out as* lives here, in one place, so
  * switching the module from testing on BCS Products / BS Supplies over to
  * Fender Steel later is a config change, not a rewrite. See
- * docs/OUTREACH_SETUP.md for the full setup (DNS, Postmark, Companies House).
+ * docs/OUTREACH_SETUP.md for the full setup (the Microsoft 365 mailbox, DNS, Companies House).
  */
 export const OUTREACH_SENDER = {
   // Shown as the display name on every email and in the footer — the two
   // trading names together, since prospects may know the business by either.
+  // (The display name people see in their inbox is the mailbox's own, set in
+  // Microsoft 365 — keep the two the same.)
   label: 'BCS Products / BS Supplies',
-  fromEmail: process.env.OUTREACH_FROM_EMAIL || 'sales@sales.fenderbcs.com',
-  replyTo: process.env.OUTREACH_REPLY_TO_EMAIL || process.env.OUTREACH_FROM_EMAIL || 'sales@sales.fenderbcs.com',
-  // Required on every commercial email under PECR/UK GDPR — fill in before
-  // the first real send. Left blank, the footer says so loudly rather than
-  // silently sending an email that's missing it.
+  // The dedicated Microsoft 365 mailbox everything is sent from, and where
+  // replies land. See docs/OUTREACH_SETUP.md — a separate domain from the
+  // company's main ones, on purpose.
+  fromEmail: process.env.OUTREACH_MAILBOX || '',
+  // Required on every commercial email under PECR/UK GDPR. Sends are refused
+  // while either is blank (see mail.ts), so they can't go out without them.
   registeredAddress: process.env.OUTREACH_REGISTERED_ADDRESS || '',
   companyNumber: process.env.OUTREACH_COMPANY_NUMBER || '',
 } as const;
 
-/**
- * Postmark message stream the emails go out on. 'broadcast' is Postmark's
- * stream for commercial email with unsubscribe handling; 'outbound' is the
- * transactional stream. See docs/OUTREACH_SETUP.md — read the warning at the
- * top about Postmark's own rules on unsolicited email before going live.
- */
-export const OUTREACH_MESSAGE_STREAM = process.env.POSTMARK_MESSAGE_STREAM || 'broadcast';
-
-/** Who gets forwarded every reply, straight away. */
+/** Who gets a heads-up email for every reply (they're also in the mailbox itself). */
 export const OUTREACH_FORWARD_TO = process.env.OUTREACH_FORWARD_TO_EMAIL || 'tyler@fendersteel.co.uk';
 
 /**
@@ -69,8 +64,10 @@ export const OUTREACH_REQUIRE_APPROVAL = process.env.OUTREACH_REQUIRE_APPROVAL !
 const REQUIRED_ENV: [string, string][] = [
   ['COMPANIES_HOUSE_API_KEY', 'finding companies'],
   ['ANTHROPIC_API_KEY', 'drafting the emails'],
-  ['POSTMARK_SERVER_TOKEN', 'sending'],
-  ['POSTMARK_WEBHOOK_SECRET', 'receiving replies and bounces'],
+  ['OUTREACH_M365_TENANT_ID', 'signing in to Microsoft 365'],
+  ['OUTREACH_M365_CLIENT_ID', 'signing in to Microsoft 365'],
+  ['OUTREACH_M365_CLIENT_SECRET', 'signing in to Microsoft 365'],
+  ['OUTREACH_MAILBOX', 'the mailbox emails are sent from and replies arrive in'],
   ['OUTREACH_REGISTERED_ADDRESS', "the legally required address in every email's footer"],
   ['OUTREACH_COMPANY_NUMBER', "the legally required company number in every email's footer"],
   ['CRON_SECRET', 'the daily jobs'],
