@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { DeliveryColour, HolidayStatus } from '@prisma/client';
-import { ChevronLeft, ChevronRight, MapPin, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
@@ -265,7 +265,6 @@ export default async function PlanningPage({
           const dayEntries = entries.filter((e) => sameDay(e.date, day));
           const isToday = sameDay(day, new Date());
           const outOfMonth = view === 'month' && day.getMonth() !== anchor.getMonth();
-          const towns = [...new Set(dayEntries.filter((e) => e.town).map((e) => e.town))];
 
           // day is local-midnight — convert via its own y/m/d (not the
           // instant) so this always reconstructs the same calendar date
@@ -305,12 +304,6 @@ export default async function PlanningPage({
                   </>
                 )}
 
-                {towns.length > 0 && (
-                  <p className="flex items-center gap-1 text-xs text-brand-700 font-medium bg-brand-50 rounded-md px-2 py-1 mt-2">
-                    <MapPin size={11} aria-hidden /> {towns.join(', ')}
-                  </p>
-                )}
-
                 {bankHoliday && (
                   <p className="text-[10px] text-signal font-medium leading-tight mt-2">{bankHoliday}</p>
                 )}
@@ -343,13 +336,23 @@ export default async function PlanningPage({
                             <Avatar name={e.driverBadge.name} colour={e.driverBadge.colour} size={18} />
                           </span>
                         )}
-                        {e.group === 'Deliveries'
-                          ? e.driver && <span className="text-xs font-semibold text-forest">{e.driver} </span>
-                          : e.time && <span className="text-xs font-semibold text-forest">{e.time} </span>}
-                        <span className={`text-xs font-medium ${e.delivered ? 'line-through text-ink-faint' : ''}`}>{e.title}</span>
-                        {e.delivered && <span className="ml-1.5 text-[10px] font-bold text-ink-faint uppercase tracking-wide">Delivered</span>}
-                        {e.detail && <span className="block text-[11px] text-ink-muted mt-0.5">{e.detail}</span>}
-                        {e.weightKg != null && <span className="block text-[11px] text-ink-muted mt-0.5">{tonnes(e.weightKg)}</span>}
+                        {e.group === 'Deliveries' ? (
+                          <>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`flex-1 min-w-0 truncate text-xs font-medium ${e.delivered ? 'line-through text-ink-faint' : ''}`}>{e.title}</span>
+                              {e.delivered && <span className="shrink-0 text-[10px] font-bold text-ink-faint uppercase tracking-wide">Delivered</span>}
+                            </div>
+                            {e.detail && <span className="block text-[11px] text-ink-muted mt-0.5">{e.detail}</span>}
+                            {e.weightKg != null && <span className="block text-[11px] text-ink-muted mt-0.5">{tonnes(e.weightKg)}</span>}
+                          </>
+                        ) : (
+                          <>
+                            {e.time && <span className="text-xs font-semibold text-forest">{e.time} </span>}
+                            <span className={`text-xs font-medium ${e.delivered ? 'line-through text-ink-faint' : ''}`}>{e.title}</span>
+                            {e.delivered && <span className="ml-1.5 text-[10px] font-bold text-ink-faint uppercase tracking-wide">Delivered</span>}
+                            {e.detail && <span className="block text-[11px] text-ink-muted mt-0.5">{e.detail}</span>}
+                          </>
+                        )}
                       </div>
                     );
                     // A stand-alone delivery's "Mark delivered" lives on its own page now
