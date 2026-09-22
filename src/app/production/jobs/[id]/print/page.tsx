@@ -44,6 +44,7 @@ export default async function ProductionJobPrint({ params }: { params: { id: str
         <div className="text-right">
           <h1 className="text-xl font-bold">Production sheet</h1>
           <p className="font-semibold">Job {job.jobNumber}</p>
+          {!isFender && job.customerName && <p className="font-semibold">{job.customerName}</p>}
           <p>{isFender ? PROCESS_LABEL[job.process] : 'Fence post cutting'}{job.order ? ` · Order ${job.order.number}` : ''}</p>
           <p>
             {shortDate(job.startedAt)} {clock(job.startedAt)}

@@ -94,6 +94,7 @@ export async function startProductionJob(formData: FormData) {
 
   const jobNumber = String(formData.get('jobNumber') ?? '').trim();
   if (!jobNumber) throw new Error('Enter a job number.');
+  const customerName = String(formData.get('customerName') ?? '').trim();
 
   let process: ProductionProcess = 'CUTTING';
   if (company === 'FENDER') {
@@ -124,10 +125,10 @@ export async function startProductionJob(formData: FormData) {
   const matchedOrder = await db.order.findFirst({ where: { company, number: jobNumber } });
 
   const job = await db.productionJob.create({
-    data: { company, jobNumber, process, orderId: matchedOrder?.id ?? null, userId: user.id },
+    data: { company, jobNumber, customerName, process, orderId: matchedOrder?.id ?? null, userId: user.id },
   });
 
-  await logActivity('ProductionJob', job.id, 'Started job', `${jobNumber} · ${process}`, user.id);
+  await logActivity('ProductionJob', job.id, 'Started job', `${jobNumber}${customerName ? ` — ${customerName}` : ''} · ${process}`, user.id);
   revalidatePath('/production');
 }
 

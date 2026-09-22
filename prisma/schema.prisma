@@ -589,6 +589,7 @@ model ProductionJob {
   id                 String            @id @default(cuid())
   company            Company           @default(FENDER)
   jobNumber          String
+  customerName       String            @default("") // typed alongside the job number, independent of orderId below — most BCS jobs are never tied to a matched Order at all
   process            ProductionProcess
   orderId            String? // best-effort match against Order.number — never required, never blocks starting
   userId             String

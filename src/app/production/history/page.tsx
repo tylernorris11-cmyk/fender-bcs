@@ -38,7 +38,7 @@ export default async function ProductionHistoryPage({
     where: {
       company,
       finishedAt: finishedAtFilter,
-      ...(q ? { jobNumber: { contains: q, mode: 'insensitive' } } : {}),
+      ...(q ? { OR: [{ jobNumber: { contains: q, mode: 'insensitive' } }, { customerName: { contains: q, mode: 'insensitive' } }] } : {}),
     },
     include: { user: true, rows: true },
     orderBy,
@@ -60,8 +60,8 @@ export default async function ProductionHistoryPage({
 
       <form className="mb-5 flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[200px]">
-          <label className="label text-xs" htmlFor="q">Job number</label>
-          <input id="q" name="q" defaultValue={q} className="input" placeholder="Search job number…" />
+          <label className="label text-xs" htmlFor="q">Job number or customer</label>
+          <input id="q" name="q" defaultValue={q} className="input" placeholder="Search job number or customer…" />
         </div>
         <div>
           <label className="label text-xs" htmlFor="from">Finished from</label>
@@ -96,7 +96,10 @@ export default async function ProductionHistoryPage({
               const weight = j.rows.reduce((s, r) => s + Number(r.tallyWeightKg), 0);
               return (
                 <tr key={j.id} className="row">
-                  <td className="td font-semibold">{j.jobNumber}</td>
+                  <td className="td font-semibold">
+                    {j.jobNumber}
+                    {!isFender && j.customerName && <span className="block text-xs font-normal text-ink-muted">{j.customerName}</span>}
+                  </td>
                   <td className="td">{isFender ? PROCESS_LABEL[j.process] : `${j.rows.length} row${j.rows.length === 1 ? '' : 's'}`}</td>
                   <td className="td">{tonnes(weight)}</td>
                   <td className="td text-ink-muted whitespace-nowrap">{shortDate(j.startedAt)}</td>

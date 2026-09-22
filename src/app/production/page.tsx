@@ -103,7 +103,10 @@ function InProgressJobs({ jobs, isFender }: { jobs: any[]; isFender: boolean }) 
             : j.startedAt);
           return (
             <tr key={j.id} className="row">
-              <td className="td font-semibold">{j.jobNumber}</td>
+              <td className="td font-semibold">
+                {j.jobNumber}
+                {!isFender && j.customerName && <span className="block text-xs font-normal text-ink-muted">{j.customerName}</span>}
+              </td>
               <td className="td">{isFender ? PROCESS_LABEL[j.process] : `${j.rows.length} row${j.rows.length === 1 ? '' : 's'}`}</td>
               <td className="td">{tonnes(weight)}</td>
               <td className="td text-ink-muted whitespace-nowrap">{shortDate(lastActivity)} {clock(lastActivity)}</td>
@@ -138,7 +141,10 @@ function RecentJobs({ jobs, isFender }: { jobs: any[]; isFender: boolean }) {
           const weight = j.rows.reduce((s: number, r: any) => s + Number(r.tallyWeightKg), 0);
           return (
             <tr key={j.id} className="row">
-              <td className="td font-semibold">{j.jobNumber}</td>
+              <td className="td font-semibold">
+                {j.jobNumber}
+                {!isFender && j.customerName && <span className="block text-xs font-normal text-ink-muted">{j.customerName}</span>}
+              </td>
               <td className="td">{isFender ? PROCESS_LABEL[j.process] : `${j.rows.length} row${j.rows.length === 1 ? '' : 's'}`}</td>
               <td className="td">{tonnes(weight)}</td>
               <td className="td text-ink-muted whitespace-nowrap">{shortDate(j.finishedAt)}</td>
@@ -177,7 +183,10 @@ function OpenBcsJobs({ jobs }: { jobs: any[] }) {
             : j.startedAt);
           return (
             <tr key={j.id} className="row">
-              <td className="td font-semibold">{j.jobNumber}</td>
+              <td className="td font-semibold">
+                {j.jobNumber}
+                {j.customerName && <span className="block text-xs font-normal text-ink-muted">{j.customerName}</span>}
+              </td>
               <td className="td">{j.rows.length} row{j.rows.length === 1 ? '' : 's'}</td>
               <td className="td">{tonnes(weight)}</td>
               <td className="td text-ink-muted whitespace-nowrap">{shortDate(lastActivity)} {clock(lastActivity)}</td>
@@ -330,6 +339,10 @@ async function BcsView({ orders, sort, user, company }: { orders: any[]; sort?: 
             <div>
               <label className="label" htmlFor="jobNumber">Job number</label>
               <input id="jobNumber" name="jobNumber" required className="input w-40" />
+            </div>
+            <div>
+              <label className="label" htmlFor="customerName">Customer</label>
+              <input id="customerName" name="customerName" className="input w-48" placeholder="Optional" />
             </div>
             <button className="btn-primary">Start job</button>
           </form>

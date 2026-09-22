@@ -41,7 +41,7 @@ export async function CurrentJobView({ job, viewerId }: { job: any; viewerId: st
         blurb={
           isFenderJob
             ? `${PROCESS_LABEL[job.process]}${job.order ? ` · linked to order ${job.order.number}` : ''}`
-            : `Fence post cutting${job.order ? ` · linked to order ${job.order.number}` : ''}${startedByOther ? ` · started by ${job.user?.name ?? 'someone else'} — anyone can add to it` : ''}`
+            : `${job.customerName ? `${job.customerName} · ` : ''}Fence post cutting${job.order ? ` · linked to order ${job.order.number}` : ''}${startedByOther ? ` · started by ${job.user?.name ?? 'someone else'} — anyone can add to it` : ''}`
         }
         actions={(
           <>
