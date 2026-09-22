@@ -40,6 +40,7 @@ const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const mondayOf = (d: Date) => addDays(startOfDay(d), -((d.getDay() + 6) % 7));
 const sameDay = (a: Date, b: Date) => startOfDay(a).getTime() === startOfDay(b).getTime();
+const isWeekendLocal = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
 
 const GROUP_TONE = {
   Deliveries: 'border-brand bg-brand-50',
@@ -49,10 +50,11 @@ const GROUP_TONE = {
 
 export default async function PlanningPage({
   searchParams,
-}: { searchParams: { view?: View; date?: string; depot?: string } }) {
+}: { searchParams: { view?: View; date?: string; depot?: string; hideWeekends?: string } }) {
   const user = await requirePermission('planning.view');
   const alerts = await getAlerts(user);
   const depot = searchParams.depot;
+  const hideWeekends = searchParams.hideWeekends === '1';
 
   const view: View = searchParams.view ?? 'month';
   const anchor = searchParams.date ? new Date(searchParams.date) : new Date();
@@ -204,15 +206,26 @@ export default async function PlanningPage({
     ? anchor.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
     : view === 'day' ? shortDate(anchor) : `Week of ${shortDate(from)}`;
 
-  const withDepot = (params: URLSearchParams) => {
-    if (depot) params.set('depot', depot);
+  // Carries the depot and weekend filters onto every other link on the page,
+  // so paging forward, switching view or drilling into a day never silently
+  // drops what the worker just chose. The depot-filter links build their own
+  // depot value directly (it's the whole point of clicking one), so they
+  // carry just the weekend filter on its own via carryHideWeekends —
+  // running them through withFilters too would stamp the OLD depot back
+  // over whichever one was just clicked.
+  const carryHideWeekends = (params: URLSearchParams, forceValue: boolean = hideWeekends) => {
+    if (forceValue) params.set('hideWeekends', '1');
     return params;
+  };
+  const withFilters = (params: URLSearchParams) => {
+    if (depot) params.set('depot', depot);
+    return carryHideWeekends(params);
   };
   const shift = (n: number) => {
     const d = view === 'month'
       ? new Date(anchor.getFullYear(), anchor.getMonth() + n, 1)
       : addDays(anchor, n * (view === 'day' ? 1 : 7));
-    return `/planning?${withDepot(new URLSearchParams({ view, date: d.toISOString().slice(0, 10) }))}`;
+    return `/planning?${withFilters(new URLSearchParams({ view, date: d.toISOString().slice(0, 10) }))}`;
   };
 
   const dayList = Array.from({ length: days }, (_, i) => addDays(from, i));
@@ -225,7 +238,7 @@ export default async function PlanningPage({
       <div className="flex flex-wrap items-center gap-3 mb-3">
         <div className="flex gap-2">
           {(['day', 'week', 'month'] as View[]).map((v) => (
-            <Link key={v} href={`/planning?${withDepot(new URLSearchParams({ view: v }))}`}
+            <Link key={v} href={`/planning?${withFilters(new URLSearchParams({ view: v }))}`}
               className={`rounded-pill px-5 py-2 text-sm font-medium border capitalize transition-colors ${
                 view === v ? 'bg-brand text-white border-brand' : 'bg-white border-hairline hover:bg-canvas'
               }`}>
@@ -237,31 +250,39 @@ export default async function PlanningPage({
           <Link href={shift(-1)} className="btn-secondary p-2.5" aria-label="Previous"><ChevronLeft size={18} /></Link>
           <h2 className="text-lg font-bold min-w-[180px] text-center">{heading}</h2>
           <Link href={shift(1)} className="btn-secondary p-2.5" aria-label="Next"><ChevronRight size={18} /></Link>
-          <Link href={`/planning?${withDepot(new URLSearchParams({ view }))}`} className="text-brand-700 font-semibold text-sm hover:underline">Today</Link>
+          <Link href={`/planning?${withFilters(new URLSearchParams({ view }))}`} className="text-brand-700 font-semibold text-sm hover:underline">Today</Link>
           {can(user, 'planning.edit') && (
             <Link href={`/planning/new?date=${isoDay(utcDay(anchor.getFullYear(), anchor.getMonth(), anchor.getDate()))}`} className="btn-primary">
               <Plus size={16} /> Add a delivery
             </Link>
           )}
+          <Link
+            href={`/planning?${carryHideWeekends(new URLSearchParams({ view, ...(depot ? { depot } : {}) }), !hideWeekends)}`}
+            className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${hideWeekends ? 'bg-forest text-white border-forest' : 'bg-white border-hairline hover:bg-canvas'}`}
+          >
+            {hideWeekends ? 'Weekends hidden' : 'Hide weekends'}
+          </Link>
           <FullscreenToggle targetId="delivery-board" />
         </div>
       </div>
 
       <nav className="flex flex-wrap gap-2 mb-6" aria-label="Filter by depot">
-        <Link href={`/planning?${new URLSearchParams({ view })}`}
+        <Link href={`/planning?${carryHideWeekends(new URLSearchParams({ view }))}`}
           className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${!depot ? 'bg-forest text-white border-forest' : 'bg-white border-hairline hover:bg-canvas'}`}>
           Both depots
         </Link>
         {locations.map((l) => (
-          <Link key={l.id} href={`/planning?${new URLSearchParams({ view, depot: l.name })}`}
+          <Link key={l.id} href={`/planning?${carryHideWeekends(new URLSearchParams({ view, depot: l.name }))}`}
             className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${depot === l.name ? 'bg-forest text-white border-forest' : 'bg-white border-hairline hover:bg-canvas'}`}>
             {l.name}
           </Link>
         ))}
       </nav>
 
-      <div className={`grid gap-3 ${view === 'day' ? '' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-7'}`}>
-        {dayList.map((day) => {
+      <div className={`grid gap-3 ${view === 'day' ? '' : `grid-cols-1 sm:grid-cols-2 ${hideWeekends ? 'lg:grid-cols-5' : 'lg:grid-cols-7'}`}`}>
+        {/* Only Week/Month drop weekend cells — Day view still shows a
+            Saturday or Sunday someone has navigated straight to. */}
+        {(hideWeekends && view !== 'day' ? dayList.filter((d) => !isWeekendLocal(d)) : dayList).map((day) => {
           const dayEntries = entries.filter((e) => sameDay(e.date, day));
           const isToday = sameDay(day, new Date());
           const outOfMonth = view === 'month' && day.getMonth() !== anchor.getMonth();
@@ -281,7 +302,7 @@ export default async function PlanningPage({
               <div className="sticky top-0 bg-white pb-2 z-10">
                 {view === 'month' ? (
                   <Link
-                    href={`/planning?${withDepot(new URLSearchParams({ view: 'day', date: isoDay(dayUtc) }))}`}
+                    href={`/planning?${withFilters(new URLSearchParams({ view: 'day', date: isoDay(dayUtc) }))}`}
                     className="block hover:opacity-70"
                   >
                     <div className="flex items-baseline justify-between">
