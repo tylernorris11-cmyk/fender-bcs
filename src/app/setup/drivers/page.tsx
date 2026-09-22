@@ -6,18 +6,23 @@ import { daysUntil, shortDate } from '@/lib/format';
 import { ensureDriverRecords } from '@/lib/drivers';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortTh, Table } from '@/components/ui';
-import { addDriver } from '../actions';
+import { SubmitButton } from '@/components/SubmitButton';
+import { addDriver, addUserAsDriver, removeDriver } from '../actions';
 
 export default async function DriversPage({ searchParams }: { searchParams: { sort?: string; dir?: string } }) {
   const user = await requirePermission('setup.lists');
   const alerts = await getAlerts(user);
   await ensureDriverRecords();
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
-  const [drivers, locations] = await Promise.all([
+  const [drivers, locations, eligibleUsers] = await Promise.all([
     db.driver.findMany({
       orderBy: searchParams.sort === 'depot' ? { depot: dir } : { name: searchParams.sort === 'name' ? dir : 'asc' },
     }),
     db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    // Anyone active who isn't already on the register — ensureDriverRecords
+    // above already covers everyone with the Driver role, so this is really
+    // for someone who occasionally runs a delivery without being one by role.
+    db.user.findMany({ where: { active: true, driver: null }, select: { id: true, name: true, jobTitle: true }, orderBy: { name: 'asc' } }),
   ]);
 
   return (
@@ -29,7 +34,7 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
           <SortTh label="Driver" field="name" basePath="/setup/drivers" searchParams={searchParams} />
           <th className="th">Phone</th><th className="th">Licence</th>
           <SortTh label="Depot" field="depot" basePath="/setup/drivers" searchParams={searchParams} />
-          <th className="th">CPC expiry</th>
+          <th className="th">CPC expiry</th><th className="th sr-only">Remove</th>
         </>}>
           {drivers.map((d) => {
             const days = d.cpcExpiry ? daysUntil(d.cpcExpiry)! : null;
@@ -52,29 +57,62 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
                     : days <= 60 ? <Pill tone="warn">{shortDate(d.cpcExpiry)} · {days}d</Pill>
                     : shortDate(d.cpcExpiry)}
                 </td>
+                <td className="td">
+                  <form action={removeDriver}>
+                    <input type="hidden" name="driverId" value={d.id} />
+                    <button type="submit" className="text-xs text-ink-faint hover:text-signal underline" title={d.userId ? 'Comes back automatically if they still have the Driver role' : undefined}>
+                      Remove
+                    </button>
+                  </form>
+                </td>
               </tr>
             );
           })}
-          {drivers.length === 0 && <tr><td colSpan={5} className="td text-ink-muted">No drivers on the list.</td></tr>}
+          {drivers.length === 0 && <tr><td colSpan={6} className="td text-ink-muted">No drivers on the list.</td></tr>}
         </Table>
       </section>
 
-      <section className="card card-pad max-w-2xl">
-        <h2 className="text-lg font-bold mb-4">Add a driver</h2>
-        <form action={addDriver} className="grid gap-4 sm:grid-cols-2">
-          <div><label className="label" htmlFor="name">Name</label><input id="name" name="name" required className="input" /></div>
-          <div><label className="label" htmlFor="phone">Phone</label><input id="phone" name="phone" className="input" /></div>
-          <div><label className="label" htmlFor="licence">Licence number</label><input id="licence" name="licence" className="input" /></div>
-          <div>
-            <label className="label" htmlFor="depot">Depot</label>
-            <select id="depot" name="depot" defaultValue={locations[0]?.name ?? 'Scunthorpe'} className="input">
-              {locations.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
-            </select>
-          </div>
-          <div><label className="label" htmlFor="cpcExpiry">CPC expiry</label><input id="cpcExpiry" name="cpcExpiry" type="date" className="input" /></div>
-          <div className="flex items-end"><button className="btn-primary">Add driver</button></div>
-        </form>
-      </section>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="card card-pad">
+          <h2 className="text-lg font-bold mb-1">Add a user as a driver</h2>
+          <p className="text-sm text-ink-muted mb-4">For someone already in the system who occasionally runs a delivery.</p>
+          {eligibleUsers.length === 0 ? (
+            <p className="text-sm text-ink-muted">Everyone active is already on the register.</p>
+          ) : (
+            <form action={addUserAsDriver} className="flex flex-wrap items-end gap-3">
+              <div className="flex-1 min-w-[200px]">
+                <label className="label" htmlFor="userId">Person</label>
+                <select id="userId" name="userId" required className="input">
+                  <option value="">Choose someone…</option>
+                  {eligibleUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}{u.jobTitle ? ` — ${u.jobTitle}` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <SubmitButton pendingLabel="Adding…">Add to Drivers</SubmitButton>
+            </form>
+          )}
+          <p className="hint mt-3">Their phone, licence and depot start blank — fill those in below once they&apos;re added.</p>
+        </section>
+
+        <section className="card card-pad">
+          <h2 className="text-lg font-bold mb-4">Add a driver</h2>
+          <p className="text-sm text-ink-muted mb-4">For someone with no account here — an agency or subcontracted driver.</p>
+          <form action={addDriver} className="grid gap-4 sm:grid-cols-2">
+            <div><label className="label" htmlFor="name">Name</label><input id="name" name="name" required className="input" /></div>
+            <div><label className="label" htmlFor="phone">Phone</label><input id="phone" name="phone" className="input" /></div>
+            <div><label className="label" htmlFor="licence">Licence number</label><input id="licence" name="licence" className="input" /></div>
+            <div>
+              <label className="label" htmlFor="depot">Depot</label>
+              <select id="depot" name="depot" defaultValue={locations[0]?.name ?? 'Scunthorpe'} className="input">
+                {locations.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
+              </select>
+            </div>
+            <div><label className="label" htmlFor="cpcExpiry">CPC expiry</label><input id="cpcExpiry" name="cpcExpiry" type="date" className="input" /></div>
+            <div className="flex items-end"><button className="btn-primary">Add driver</button></div>
+          </form>
+        </section>
+      </div>
     </Shell>
   );
 }

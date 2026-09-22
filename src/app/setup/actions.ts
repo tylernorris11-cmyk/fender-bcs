@@ -349,6 +349,34 @@ export async function addDriver(formData: FormData) {
   revalidatePath('/setup/drivers');
 }
 
+/** Puts an existing person on the Drivers register, the same way
+ * ensureDriverRecords does automatically for anyone given the Driver
+ * role — for someone who occasionally runs a delivery without actually
+ * being a driver by role. Phone/licence/depot start blank, same as an
+ * auto-created one, and show the same "not on file yet" prompt until
+ * someone fills them in. */
+export async function addUserAsDriver(formData: FormData) {
+  await assertPermission('setup.lists');
+  const userId = String(formData.get('userId') ?? '');
+  const user = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { id: true, name: true, active: true, driver: true } });
+  if (!user.active) throw new Error('That account is suspended.');
+  if (user.driver) throw new Error(`${user.name} is already on the Drivers register.`);
+
+  await db.driver.create({ data: { name: user.name, userId: user.id, depot: '' } });
+  revalidatePath('/setup/drivers');
+}
+
+/** Removes a driver from the register entirely — not a suspend, since a
+ * driver isn't a login. One tied to a User with the Driver role reappears
+ * next visit (ensureDriverRecords syncs that automatically); this is for
+ * a manually-added one, or a user-linked one no longer wanted on it. */
+export async function removeDriver(formData: FormData) {
+  await assertPermission('setup.lists');
+  const id = String(formData.get('driverId') ?? '');
+  await db.driver.delete({ where: { id } });
+  revalidatePath('/setup/drivers');
+}
+
 export async function addChecklistTemplate(formData: FormData) {
   const user = await assertPermission('setup.lists');
   const label = String(formData.get('label') ?? '').trim();
