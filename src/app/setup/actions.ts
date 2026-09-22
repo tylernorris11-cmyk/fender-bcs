@@ -4,9 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { db } from '@/lib/db';
 import type { Company, Role } from '@prisma/client';
-import { assertPermission, hashPassword, logActivity, notifyMasterAdmins, passwordProblem } from '@/lib/auth';
+import { assertPermission, hashPassword, logActivity, notifyMasterAdmins, passwordProblem, requireUser } from '@/lib/auth';
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
-import { initialsOf } from '@/lib/format';
+import { initialsOf, shortDate } from '@/lib/format';
 import { sendEmail } from '@/lib/email';
 import { GRANTABLE_EXTRA_PERMISSIONS, ROLE_LABELS, TOGGLEABLE_MODULES } from '@/lib/rbac';
 
@@ -340,9 +340,7 @@ export async function addDriver(formData: FormData) {
   await db.driver.create({
     data: {
       name: String(formData.get('name') ?? '').trim(),
-      phone: String(formData.get('phone') ?? ''),
       licence: String(formData.get('licence') ?? ''),
-      depot: String(formData.get('depot') ?? 'Scunthorpe'),
       cpcExpiry: formData.get('cpcExpiry') ? new Date(String(formData.get('cpcExpiry'))) : null,
     },
   });
@@ -352,7 +350,7 @@ export async function addDriver(formData: FormData) {
 /** Puts an existing person on the Drivers register, the same way
  * ensureDriverRecords does automatically for anyone given the Driver
  * role — for someone who occasionally runs a delivery without actually
- * being a driver by role. Phone/licence/depot start blank, same as an
+ * being a driver by role. Licence/CPC expiry start blank, same as an
  * auto-created one, and show the same "not on file yet" prompt until
  * someone fills them in. */
 export async function addUserAsDriver(formData: FormData) {
@@ -362,7 +360,7 @@ export async function addUserAsDriver(formData: FormData) {
   if (!user.active) throw new Error('That account is suspended.');
   if (user.driver) throw new Error(`${user.name} is already on the Drivers register.`);
 
-  await db.driver.create({ data: { name: user.name, userId: user.id, depot: '' } });
+  await db.driver.create({ data: { name: user.name, userId: user.id } });
   revalidatePath('/setup/drivers');
 }
 
@@ -374,6 +372,36 @@ export async function removeDriver(formData: FormData) {
   await assertPermission('setup.lists');
   const id = String(formData.get('driverId') ?? '');
   await db.driver.delete({ where: { id } });
+  revalidatePath('/setup/drivers');
+}
+
+function parseCpcExpiry(formData: FormData): Date {
+  const raw = String(formData.get('cpcExpiry') ?? '').trim();
+  const date = raw ? new Date(raw) : null;
+  if (!date || Number.isNaN(date.getTime())) throw new Error('Enter a valid date.');
+  return date;
+}
+
+/** An admin setting or changing any driver's CPC expiry from the register itself. */
+export async function updateDriverCpcExpiry(formData: FormData) {
+  const admin = await assertPermission('setup.lists');
+  const driverId = String(formData.get('driverId') ?? '');
+  const cpcExpiry = parseCpcExpiry(formData);
+  await db.driver.update({ where: { id: driverId }, data: { cpcExpiry } });
+  await logActivity('Driver', driverId, 'CPC expiry set', shortDate(cpcExpiry), admin.id);
+  revalidatePath('/setup/drivers');
+}
+
+/** A driver setting their own CPC expiry, from the pop-up prompt (see
+ * DriverCpcReminder) rather than the admin register — needs no setup.lists
+ * permission, just a driver record of their own to set it on. */
+export async function setOwnDriverCpcExpiry(formData: FormData) {
+  const user = await requireUser();
+  const driver = await db.driver.findUnique({ where: { userId: user.id } });
+  if (!driver) throw new Error('You are not on the Drivers register.');
+  const cpcExpiry = parseCpcExpiry(formData);
+  await db.driver.update({ where: { id: driver.id }, data: { cpcExpiry } });
+  await logActivity('Driver', driver.id, 'CPC expiry set', `${shortDate(cpcExpiry)} — set by themselves`, user.id);
   revalidatePath('/setup/drivers');
 }
 

@@ -7,18 +7,15 @@ import { ensureDriverRecords } from '@/lib/drivers';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortTh, Table } from '@/components/ui';
 import { SubmitButton } from '@/components/SubmitButton';
-import { addDriver, addUserAsDriver, removeDriver } from '../actions';
+import { addDriver, addUserAsDriver, removeDriver, updateDriverCpcExpiry } from '../actions';
 
 export default async function DriversPage({ searchParams }: { searchParams: { sort?: string; dir?: string } }) {
   const user = await requirePermission('setup.lists');
   const alerts = await getAlerts(user);
   await ensureDriverRecords();
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
-  const [drivers, locations, eligibleUsers] = await Promise.all([
-    db.driver.findMany({
-      orderBy: searchParams.sort === 'depot' ? { depot: dir } : { name: searchParams.sort === 'name' ? dir : 'asc' },
-    }),
-    db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+  const [drivers, eligibleUsers] = await Promise.all([
+    db.driver.findMany({ orderBy: { name: searchParams.sort === 'name' ? dir : 'asc' } }),
     // Anyone active who isn't already on the register — ensureDriverRecords
     // above already covers everyone with the Driver role, so this is really
     // for someone who occasionally runs a delivery without being one by role.
@@ -32,13 +29,12 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
       <section className="card card-pad mb-6">
         <Table head={<>
           <SortTh label="Driver" field="name" basePath="/setup/drivers" searchParams={searchParams} />
-          <th className="th">Phone</th><th className="th">Licence</th>
-          <SortTh label="Depot" field="depot" basePath="/setup/drivers" searchParams={searchParams} />
+          <th className="th">Licence</th>
           <th className="th">CPC expiry</th><th className="th sr-only">Remove</th>
         </>}>
           {drivers.map((d) => {
             const days = d.cpcExpiry ? daysUntil(d.cpcExpiry)! : null;
-            const incomplete = d.userId && (!d.phone || !d.licence || !d.depot);
+            const incomplete = d.userId && (!d.licence || !d.cpcExpiry);
             return (
               <tr key={d.id} className="row">
                 <td className="td font-semibold">
@@ -48,14 +44,23 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
                   </span>
                   {incomplete && <span className="block text-[11px] font-normal text-amber-600">Not on file yet</span>}
                 </td>
-                <td className="td text-ink-muted">{d.phone}</td>
                 <td className="td text-ink-muted">{d.licence}</td>
-                <td className="td text-ink-muted">{d.depot}</td>
                 <td className="td">
-                  {days === null ? '—'
-                    : days < 0 ? <Pill tone="bad">Expired {shortDate(d.cpcExpiry)}</Pill>
-                    : days <= 60 ? <Pill tone="warn">{shortDate(d.cpcExpiry)} · {days}d</Pill>
-                    : shortDate(d.cpcExpiry)}
+                  <form action={updateDriverCpcExpiry} className="flex items-center gap-2">
+                    <input type="hidden" name="driverId" value={d.id} />
+                    <input
+                      type="date" name="cpcExpiry" defaultValue={d.cpcExpiry ? d.cpcExpiry.toISOString().slice(0, 10) : ''}
+                      className="input py-1.5 w-40" aria-label={`CPC expiry for ${d.name}`}
+                    />
+                    <button type="submit" className="btn-secondary btn-sm">Save</button>
+                  </form>
+                  {days !== null && (
+                    <span className="block mt-1">
+                      {days < 0 ? <Pill tone="bad">Expired {shortDate(d.cpcExpiry)}</Pill>
+                        : days <= 60 ? <Pill tone="warn">{days} day{days === 1 ? '' : 's'} left</Pill>
+                        : null}
+                    </span>
+                  )}
                 </td>
                 <td className="td">
                   <form action={removeDriver}>
@@ -68,7 +73,7 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
               </tr>
             );
           })}
-          {drivers.length === 0 && <tr><td colSpan={6} className="td text-ink-muted">No drivers on the list.</td></tr>}
+          {drivers.length === 0 && <tr><td colSpan={4} className="td text-ink-muted">No drivers on the list.</td></tr>}
         </Table>
       </section>
 
@@ -92,7 +97,7 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
               <SubmitButton pendingLabel="Adding…">Add to Drivers</SubmitButton>
             </form>
           )}
-          <p className="hint mt-3">Their phone, licence and depot start blank — fill those in below once they&apos;re added.</p>
+          <p className="hint mt-3">Their licence and CPC expiry start blank — fill those in above once they&apos;re added, or they&apos;ll be prompted for their CPC expiry themselves next time they sign in.</p>
         </section>
 
         <section className="card card-pad">
@@ -100,14 +105,7 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
           <p className="text-sm text-ink-muted mb-4">For someone with no account here — an agency or subcontracted driver.</p>
           <form action={addDriver} className="grid gap-4 sm:grid-cols-2">
             <div><label className="label" htmlFor="name">Name</label><input id="name" name="name" required className="input" /></div>
-            <div><label className="label" htmlFor="phone">Phone</label><input id="phone" name="phone" className="input" /></div>
             <div><label className="label" htmlFor="licence">Licence number</label><input id="licence" name="licence" className="input" /></div>
-            <div>
-              <label className="label" htmlFor="depot">Depot</label>
-              <select id="depot" name="depot" defaultValue={locations[0]?.name ?? 'Scunthorpe'} className="input">
-                {locations.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
-              </select>
-            </div>
             <div><label className="label" htmlFor="cpcExpiry">CPC expiry</label><input id="cpcExpiry" name="cpcExpiry" type="date" className="input" /></div>
             <div className="flex items-end"><button className="btn-primary">Add driver</button></div>
           </form>

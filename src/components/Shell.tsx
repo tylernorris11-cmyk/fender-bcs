@@ -11,6 +11,7 @@ import { ModuleSwitcher } from './ModuleSwitcher';
 import { GlobalSearch } from './GlobalSearch';
 import { InProgressBanner } from './InProgressBanner';
 import { TimesheetReminder } from './TimesheetReminder';
+import { DriverCpcReminder } from './DriverCpcReminder';
 import { NotificationBell } from './NotificationBell';
 
 // `company`, when set, only shows this nav item while that company's view is
@@ -150,6 +151,7 @@ export function Shell({
         <main className="p-4 sm:p-7 max-w-[1200px]">{children}</main>
       </div>
       <TimesheetReminder user={user} />
+      <DriverCpcReminder user={user} />
     </div>
   );
 }
