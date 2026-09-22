@@ -89,7 +89,7 @@ export default async function Launcher() {
             )}
             <NotificationBell count={alerts.length} />
             {can(user, 'setup.view') && (
-              <Link href="/setup/pricing" className="btn bg-white/10 hover:bg-white/15 text-white text-sm">
+              <Link href="/setup" className="btn bg-white/10 hover:bg-white/15 text-white text-sm">
                 <Settings size={16} /> Set Up
               </Link>
             )}

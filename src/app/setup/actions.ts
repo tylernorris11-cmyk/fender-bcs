@@ -27,6 +27,7 @@ export async function setPrice(formData: FormData) {
   });
   await logActivity('Product', productId, 'Price set', `£${unitPrice.toFixed(2)}${minQty ? ` from ${minQty}` : ''}`, user.id);
   revalidatePath('/setup/pricing');
+  revalidatePath('/setup');
 }
 
 // --------------------------------------------------------------- users

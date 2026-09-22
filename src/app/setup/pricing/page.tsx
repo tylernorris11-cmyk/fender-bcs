@@ -26,7 +26,7 @@ export default async function PricingPage({ searchParams }: { searchParams: { q?
 
   return (
     <Shell user={user} module="setup" nav={NAV.setup} current="/setup/pricing" alerts={alerts.length}>
-      <PageHeader title="Set Up" blurb="Pricing, people and the lists the rest of the system runs on." />
+      <PageHeader title="Pricing" blurb="Selling prices for every product — one price, or quantity bands." />
 
       <p className="banner-ok mb-6">
         <Info size={18} className="shrink-0 mt-0.5" aria-hidden />

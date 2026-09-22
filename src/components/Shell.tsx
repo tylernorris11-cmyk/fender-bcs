@@ -39,7 +39,7 @@ export function Shell({
   const switcherItems = [
     ...MODULES.filter((m) => can(user, m.perm) && (!('company' in m) || m.company === active))
       .map((m) => ({ key: m.key, label: m.label, href: m.href, inProgress: !isStableModule(m.key, active) })),
-    ...(can(user, 'setup.view') ? [{ key: 'setup', label: 'Set Up', href: '/setup/pricing', inProgress: !isStableModule('setup', active) }] : []),
+    ...(can(user, 'setup.view') ? [{ key: 'setup', label: 'Set Up', href: '/setup', inProgress: !isStableModule('setup', active) }] : []),
   ];
 
   return (
@@ -238,19 +238,18 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'My training', href: '/hs/training' },
     { label: 'Manage training', href: '/hs/training/manage', perm: 'hs.manageTraining' },
   ],
+  // Trimmed to one link per area — Home is the full directory
+  // (src/app/setup/page.tsx), grouped by what each person actually has
+  // access to, with the less-common pages (Access requests, Who fills
+  // timesheets, Towns & cities, Locations, Cost centres, Order checklist,
+  // Bug reports) one click away from there rather than every page listed
+  // flat here.
   setup: [
+    { label: 'Home', href: '/setup' },
     { label: 'Pricing', href: '/setup/pricing', perm: 'setup.pricing' },
-    { label: 'Users & roles', href: '/setup/users', perm: 'setup.users' },
-    { label: 'Access requests', href: '/setup/access-requests', perm: 'setup.users' },
-    { label: 'Team timesheets', href: '/timesheets/team', perm: 'timesheets.viewAll' },
-    { label: 'Who fills timesheets', href: '/timesheets/people', perm: 'setup.users' },
-    { label: 'Drivers', href: '/setup/drivers', perm: 'setup.lists' },
-    { label: 'Towns & cities', href: '/setup/towns', perm: 'setup.lists' },
-    { label: 'Locations', href: '/setup/locations', perm: 'setup.lists' },
-    { label: 'Cost centres', href: '/setup/cost-centres', perm: 'setup.lists', company: 'BS_SUPPLIES' },
-    { label: 'Order checklist', href: '/setup/checklist', perm: 'setup.lists' },
-    { label: 'Backups', href: '/setup/backups', perm: 'setup.backups' },
-    { label: 'Bug reports', href: '/setup/bugs', perm: 'setup.bugs' },
+    { label: 'People', href: '/setup/users', perm: 'setup.users' },
+    { label: 'Lists', href: '/setup/drivers', perm: 'setup.lists' },
+    { label: 'System', href: '/setup/backups', perm: 'setup.backups' },
   ],
 };
 
