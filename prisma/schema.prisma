@@ -926,21 +926,32 @@ enum EventType {
   OTHER
 }
 
+enum DeliveryColour {
+  BLUE
+  RED
+  BLACK
+  GREEN
+}
+
 model PlanningEvent {
-  id         String    @id @default(cuid())
+  id         String         @id @default(cuid())
   title      String
-  type       EventType @default(OTHER)
+  type       EventType      @default(OTHER)
   startsAt   DateTime
-  allDay     Boolean   @default(false)
-  town       String    @default("")
-  detail     String    @default("")
+  allDay     Boolean        @default(false)
+  town       String         @default("")
+  detail     String         @default("")
   orderId    String?
   assetId    String?
-  assignedTo String    @default("")
-  done       Boolean   @default(false)
+  driverId   String? // stand-alone deliveries only — who's running it, shown as an initials badge on the board
+  weightKg   Decimal?       @db.Decimal(12, 3) // stand-alone deliveries only
+  colour     DeliveryColour @default(BLUE) // stand-alone deliveries only — a colour tag on the board, picked when it's added
+  assignedTo String         @default("")
+  done       Boolean        @default(false)
 
-  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  asset Asset? @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  order  Order?  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  asset  Asset?  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  driver Driver? @relation(fields: [driverId], references: [id])
 
   @@index([startsAt])
 }
@@ -997,7 +1008,8 @@ model Driver {
   active    Boolean   @default(true)
   userId    String?   @unique // set when this row was auto-created from a User with role DRIVER
 
-  user User? @relation(fields: [userId], references: [id])
+  user       User?           @relation(fields: [userId], references: [id])
+  deliveries PlanningEvent[]
 }
 
 model Setting {

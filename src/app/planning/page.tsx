@@ -1,17 +1,19 @@
 import Link from 'next/link';
-import type { HolidayStatus } from '@prisma/client';
-import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
+import type { DeliveryColour, HolidayStatus } from '@prisma/client';
+import { ChevronLeft, ChevronRight, MapPin, Plus } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { COMPANY_LABEL } from '@/lib/company';
-import { clock, shortDate } from '@/lib/format';
+import { clock, shortDate, tonnes } from '@/lib/format';
 import { bankHolidayName, eachDayInclusive, isoDay, utcDay } from '@/lib/holidays';
+import { DELIVERY_COLOUR_BOARD } from '@/lib/deliveryColours';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, PageHeader } from '@/components/ui';
 import { advanceStage } from '@/app/orders/actions';
 import { markEventDelivered } from './actions';
+import { FullscreenToggle } from './FullscreenToggle';
 
 type View = 'day' | 'week' | 'month';
 
@@ -22,6 +24,11 @@ type Entry = {
   delivered?: boolean;
   markDelivered?: { orderId: string } | { eventId: string };
   driver?: string;
+  // Only ever set on a stand-alone delivery (a PlanningEvent, not a real
+  // Order) — an order-derived delivery keeps the plain green board styling.
+  colour?: DeliveryColour;
+  weightKg?: number;
+  driverBadge?: { name: string; colour: string };
 };
 
 // Holiday/leave is a third data source, not folded into Entry[]: it isn't a
@@ -48,7 +55,7 @@ export default async function PlanningPage({
   const alerts = await getAlerts(user);
   const depot = searchParams.depot;
 
-  const view: View = searchParams.view ?? 'week';
+  const view: View = searchParams.view ?? 'month';
   const anchor = searchParams.date ? new Date(searchParams.date) : new Date();
 
   const from = view === 'month'
@@ -71,7 +78,10 @@ export default async function PlanningPage({
       },
       include: { customer: true },
     }),
-    db.planningEvent.findMany({ where: { startsAt: { gte: from, lt: to } }, include: { asset: true, order: true } }),
+    db.planningEvent.findMany({
+      where: { startsAt: { gte: from, lt: to } },
+      include: { asset: true, order: true, driver: { include: { user: { select: { colour: true } } } } },
+    }),
     db.asset.findMany({ where: { retired: false, OR: [{ company: null }, { company: { in: user.companies } }], ...(depot ? { depot } : {}) } }),
     db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     // Deliberately no company/depot filter — holidays.view is company-agnostic
@@ -140,6 +150,11 @@ export default async function PlanningPage({
       delivered: group === 'Deliveries' ? e.done : undefined,
       markDelivered: group === 'Deliveries' && visible && !e.done && can(user, 'orders.progress') ? { eventId: e.id } : undefined,
       driver: group === 'Deliveries' && visible ? (e.assignedTo || undefined) : undefined,
+      colour: group === 'Deliveries' && !e.orderId ? e.colour : undefined,
+      weightKg: group === 'Deliveries' && !e.orderId && e.weightKg != null ? Number(e.weightKg) : undefined,
+      driverBadge: group === 'Deliveries' && !e.orderId && e.driver
+        ? { name: e.driver.name, colour: e.driver.user?.colour ?? '#0D4A42' }
+        : undefined,
     });
   }
 
@@ -200,6 +215,7 @@ export default async function PlanningPage({
     <Shell user={user} module="planning" nav={NAV.planning} current={`/planning${view === 'week' ? '' : `?view=${view}`}`} alerts={alerts.length}>
       <PageHeader title="Deliveries" blurb="Deliveries, inspections and everything else with a date on it." />
 
+      <div id="delivery-board">
       <div className="flex flex-wrap items-center gap-3 mb-3">
         <div className="flex gap-2">
           {(['day', 'week', 'month'] as View[]).map((v) => (
@@ -216,6 +232,12 @@ export default async function PlanningPage({
           <h2 className="text-lg font-bold min-w-[180px] text-center">{heading}</h2>
           <Link href={shift(1)} className="btn-secondary p-2.5" aria-label="Next"><ChevronRight size={18} /></Link>
           <Link href={`/planning?${withDepot(new URLSearchParams({ view }))}`} className="text-brand-700 font-semibold text-sm hover:underline">Today</Link>
+          {can(user, 'planning.edit') && (
+            <Link href={`/planning/new?date=${isoDay(utcDay(anchor.getFullYear(), anchor.getMonth(), anchor.getDate()))}`} className="btn-primary">
+              <Plus size={16} /> Add a delivery
+            </Link>
+          )}
+          <FullscreenToggle targetId="delivery-board" />
         </div>
       </div>
 
@@ -252,13 +274,30 @@ export default async function PlanningPage({
             <div key={day.toISOString()}
                  className={`card p-3 min-h-[150px] ${isToday ? 'ring-2 ring-brand' : ''} ${outOfMonth ? 'opacity-50' : ''}`}>
               <div className="sticky top-0 bg-white pb-2 z-10">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-                    {day.toLocaleDateString('en-GB', { weekday: 'short' })}
-                  </span>
-                  {isToday && <span className="text-[10px] font-bold text-brand uppercase">Today</span>}
-                </div>
-                <p className="font-bold">{day.getDate()} {day.toLocaleDateString('en-GB', { month: 'short' })}</p>
+                {view === 'month' ? (
+                  <Link
+                    href={`/planning?${withDepot(new URLSearchParams({ view: 'day', date: isoDay(dayUtc) }))}`}
+                    className="block hover:opacity-70"
+                  >
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                        {day.toLocaleDateString('en-GB', { weekday: 'short' })}
+                      </span>
+                      {isToday && <span className="text-[10px] font-bold text-brand uppercase">Today</span>}
+                    </div>
+                    <p className="font-bold">{day.getDate()} {day.toLocaleDateString('en-GB', { month: 'short' })}</p>
+                  </Link>
+                ) : (
+                  <>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                        {day.toLocaleDateString('en-GB', { weekday: 'short' })}
+                      </span>
+                      {isToday && <span className="text-[10px] font-bold text-brand uppercase">Today</span>}
+                    </div>
+                    <p className="font-bold">{day.getDate()} {day.toLocaleDateString('en-GB', { month: 'short' })}</p>
+                  </>
+                )}
 
                 {towns.length > 0 && (
                   <p className="flex items-center gap-1 text-xs text-brand-700 font-medium bg-brand-50 rounded-md px-2 py-1 mt-2">
@@ -290,14 +329,21 @@ export default async function PlanningPage({
               ) : (
                 <ul className="space-y-2">
                   {dayEntries.map((e) => {
+                    const boardTone = e.delivered ? 'border-hairline bg-canvas' : e.colour ? DELIVERY_COLOUR_BOARD[e.colour] : GROUP_TONE[e.group];
                     const body = (
-                      <div className={`border-l-[3px] rounded-r-md px-2 py-1.5 ${e.delivered ? 'border-hairline bg-canvas' : GROUP_TONE[e.group]} ${e.delivered ? 'opacity-60' : ''}`}>
+                      <div className={`relative border-l-[3px] rounded-r-md px-2 py-1.5 ${boardTone} ${e.delivered ? 'opacity-60' : ''} ${e.driverBadge ? 'pl-3' : ''}`}>
+                        {e.driverBadge && (
+                          <span className="absolute -top-2 -left-2 z-10" title={e.driverBadge.name}>
+                            <Avatar name={e.driverBadge.name} colour={e.driverBadge.colour} size={18} />
+                          </span>
+                        )}
                         {e.group === 'Deliveries'
                           ? e.driver && <span className="text-xs font-semibold text-forest">{e.driver} </span>
                           : e.time && <span className="text-xs font-semibold text-forest">{e.time} </span>}
                         <span className={`text-xs font-medium ${e.delivered ? 'line-through text-ink-faint' : ''}`}>{e.title}</span>
                         {e.delivered && <span className="ml-1.5 text-[10px] font-bold text-ink-faint uppercase tracking-wide">Delivered</span>}
                         {e.detail && <span className="block text-[11px] text-ink-muted mt-0.5">{e.detail}</span>}
+                        {e.weightKg != null && <span className="block text-[11px] text-ink-muted mt-0.5">{tonnes(e.weightKg)}</span>}
                       </div>
                     );
                     return (
@@ -320,6 +366,7 @@ export default async function PlanningPage({
             </div>
           );
         })}
+      </div>
       </div>
     </Shell>
   );

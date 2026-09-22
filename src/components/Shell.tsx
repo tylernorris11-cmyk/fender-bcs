@@ -177,9 +177,9 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'Dimensional checks', href: '/production/checks', company: 'FENDER' },
   ],
   planning: [
-    { label: 'This week', href: '/planning' },
+    { label: 'Month', href: '/planning' },
+    { label: 'This week', href: '/planning?view=week' },
     { label: 'Today', href: '/planning?view=day' },
-    { label: 'Month', href: '/planning?view=month' },
   ],
   holidays: [
     { label: 'Requests', href: '/holidays' },
