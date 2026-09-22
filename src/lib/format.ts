@@ -30,6 +30,30 @@ export const longDate = (d?: Date | string | null) =>
 export const clock = (d?: Date | string | null) =>
   d ? new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: UK_TZ }) : '';
 
+/**
+ * The inverse of clock() — converts a UK wall-clock date+time (what someone
+ * typed into a <input type="date"> and <input type="time">) into the
+ * correct UTC instant to store. A bare "yyyy-mm-dd" on its own is safely
+ * UTC-midnight already, per the date-string spec, but as soon as a time is
+ * added it becomes a local-time string — on Vercel's UTC server that would
+ * take "14:00" to mean 14:00 UTC, an hour out during BST, rather than the
+ * 14:00 in London someone actually typed. Works out the UK's current
+ * offset from the date itself (BST vs GMT), rather than a hardcoded date
+ * range, so it stays right whichever side of the clock change it's on.
+ */
+export function ukTimeToUtc(dateStr: string, timeStr: string): Date {
+  const guess = new Date(`${dateStr}T${timeStr}:00Z`); // treat the wall-clock string as if it were already UTC
+  // Read that same instant back out in Europe/London — the gap between what
+  // was asked for and what comes back is exactly the UK's current offset.
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: UK_TZ, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(guess);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const asIfUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+  return new Date(guess.getTime() + (guess.getTime() - asIfUtc));
+}
+
 export const daysUntil = (d?: Date | string | null) => {
   if (!d) return null;
   const ms = new Date(d).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0);

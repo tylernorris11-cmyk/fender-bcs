@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import type { DeliveryColour } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
+import { ukTimeToUtc } from '@/lib/format';
 
 /** Marks a stand-alone delivery entry (one not tied to a real Order) as
  * delivered, so it greys out on the planning board. */
@@ -33,7 +34,9 @@ export async function createDelivery(formData: FormData) {
   const dateRaw = String(formData.get('date') ?? '');
   if (!dateRaw) throw new Error('Pick a date.');
   const timeRaw = String(formData.get('time') ?? '').trim();
-  const startsAt = new Date(timeRaw ? `${dateRaw}T${timeRaw}:00` : `${dateRaw}T00:00:00`);
+  // A bare "yyyy-mm-dd" is safely UTC-midnight on its own (see ukTimeToUtc's
+  // own comment for why a specific time needs converting explicitly instead).
+  const startsAt = timeRaw ? ukTimeToUtc(dateRaw, timeRaw) : new Date(dateRaw);
   if (Number.isNaN(startsAt.getTime())) throw new Error('That date could not be read.');
 
   const weightRaw = String(formData.get('weightTonnes') ?? '').trim();
@@ -64,4 +67,29 @@ export async function createDelivery(formData: FormData) {
   await logActivity('PlanningEvent', event.id, 'Delivery added', `${customerName} — ${town}`, user.id);
   revalidatePath('/planning');
   redirect(`/planning?view=day&date=${dateRaw}`);
+}
+
+/** Assigns, changes or clears the driver on a stand-alone delivery already
+ * on the board — for when nobody was available to run it at the time it
+ * was added. Only applies to a stand-alone delivery (see createDelivery);
+ * a real Order has no driver field to assign here. */
+export async function assignDeliveryDriver(formData: FormData) {
+  const user = await assertPermission('planning.edit');
+  const eventId = String(formData.get('eventId'));
+
+  const event = await db.planningEvent.findUniqueOrThrow({ where: { id: eventId } });
+  if (event.type !== 'DELIVERY' || event.orderId) throw new Error('Only a stand-alone delivery can have a driver assigned here.');
+
+  const driverId = String(formData.get('driverId') ?? '') || null;
+  let driverName = 'Not assigned';
+  if (driverId) {
+    const driver = await db.driver.findUniqueOrThrow({ where: { id: driverId } });
+    if (!driver.active) throw new Error('That driver is no longer active.');
+    driverName = driver.name;
+  }
+
+  await db.planningEvent.update({ where: { id: eventId }, data: { driverId } });
+  await logActivity('PlanningEvent', eventId, 'Driver assigned', `${event.title} — ${driverName}`, user.id);
+  revalidatePath('/planning');
+  revalidatePath(`/planning/deliveries/${eventId}`);
 }

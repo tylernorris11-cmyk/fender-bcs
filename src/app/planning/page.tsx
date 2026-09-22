@@ -12,7 +12,6 @@ import { DELIVERY_COLOUR_BOARD } from '@/lib/deliveryColours';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, PageHeader } from '@/components/ui';
 import { advanceStage } from '@/app/orders/actions';
-import { markEventDelivered } from './actions';
 import { FullscreenToggle } from './FullscreenToggle';
 
 type View = 'day' | 'week' | 'month';
@@ -143,9 +142,16 @@ export default async function PlanningPage({
       date: e.startsAt,
       time: e.allDay ? '' : clock(e.startsAt),
       title: group === 'Deliveries' ? rawTitle.replace(/^Deliver(?:y)?\s+to\s+/i, '') : rawTitle,
-      detail: visible ? (e.detail || e.assignedTo) : (e.town || ''),
+      // A stand-alone delivery's destination shows in its own box, not just
+      // summarised in the day's town pill up top — e.detail is never set on
+      // one of these today, but it's kept ahead of the town in case that changes.
+      detail: visible
+        ? (group === 'Deliveries' && !e.orderId ? [e.detail, e.town].filter(Boolean).join(' · ') || e.assignedTo : (e.detail || e.assignedTo))
+        : (e.town || ''),
       group,
-      href: visible ? (e.orderId ? `/orders/${e.orderId}` : e.assetId ? `/assets/${e.assetId}` : undefined) : undefined,
+      href: visible
+        ? (e.orderId ? `/orders/${e.orderId}` : e.assetId ? `/assets/${e.assetId}` : group === 'Deliveries' ? `/planning/deliveries/${e.id}` : undefined)
+        : undefined,
       town: e.town,
       delivered: group === 'Deliveries' ? e.done : undefined,
       markDelivered: group === 'Deliveries' && visible && !e.done && can(user, 'orders.progress') ? { eventId: e.id } : undefined,
@@ -346,13 +352,15 @@ export default async function PlanningPage({
                         {e.weightKg != null && <span className="block text-[11px] text-ink-muted mt-0.5">{tonnes(e.weightKg)}</span>}
                       </div>
                     );
+                    // A stand-alone delivery's "Mark delivered" lives on its own page now
+                    // (click through via e.href) — only an order's stays inline here, since
+                    // an order has no page of its own within Planning to move it to.
                     return (
                       <li key={e.id}>
                         {e.href ? <Link href={e.href} className="block hover:opacity-80">{body}</Link> : body}
-                        {e.markDelivered && (
-                          <form action={'orderId' in e.markDelivered ? advanceStage : markEventDelivered} className="mt-1">
-                            <input type="hidden" name={'orderId' in e.markDelivered ? 'orderId' : 'eventId'}
-                                   value={'orderId' in e.markDelivered ? e.markDelivered.orderId : e.markDelivered.eventId} />
+                        {e.markDelivered && 'orderId' in e.markDelivered && (
+                          <form action={advanceStage} className="mt-1">
+                            <input type="hidden" name="orderId" value={e.markDelivered.orderId} />
                             <button type="submit" className="text-[10px] font-semibold text-brand-700 hover:underline">
                               Mark delivered
                             </button>
