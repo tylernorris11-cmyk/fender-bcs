@@ -209,6 +209,7 @@ export const NAV: Record<string, NavItem[]> = {
   ],
   stock: [
     { label: 'Coil Stock', href: '/stock/coils/stock', company: 'BS_SUPPLIES' },
+    { label: 'Stock Lengths', href: '/stock/lengths', company: 'BS_SUPPLIES' },
     { label: 'Add Coils', href: '/stock/coils', company: 'BS_SUPPLIES' },
     // BCS's day-to-day stock is coils — these still work for BCS (goods-in
     // and movements are already BCS-aware) but stay off their own menu so

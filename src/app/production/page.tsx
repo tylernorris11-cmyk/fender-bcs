@@ -10,6 +10,7 @@ import { isOutOfService } from '@/lib/assets';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, SortSelect, StagePill, Stat, StatRow, Table } from '@/components/ui';
 import { logProduction, startProductionJob } from './actions';
+import { produceStockLength } from '../stock/lengths/actions';
 import { CurrentJobView } from './CurrentJobView';
 
 const PROCESS_LABEL: Record<string, string> = { CUTTING: 'Cutting', BENDING: 'Bending', STEMA: 'Stema' };
@@ -345,6 +346,38 @@ async function BcsView({ orders, sort, user, company }: { orders: any[]; sort?: 
               <input id="customerName" name="customerName" className="input w-48" placeholder="Optional" />
             </div>
             <button className="btn-primary">Start job</button>
+          </form>
+        </div>
+      )}
+
+      {can(user, 'production.progress') && (
+        <div className="card card-pad mb-6">
+          <h2 className="text-lg font-bold mb-1">Produce stock lengths</h2>
+          <p className="text-sm text-ink-muted mb-3">Posts cut ahead of any specific order, straight into stock — see Stock → Stock Lengths.</p>
+          <form action={produceStockLength} className="flex flex-wrap items-end gap-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="label" htmlFor="stockLengthFt">Length (ft)</label>
+                <input id="stockLengthFt" name="lengthFt" type="number" min="1" step="1" required className="input w-24" />
+              </div>
+              <div>
+                <label className="label" htmlFor="stockLengthIn">+ inches</label>
+                <input id="stockLengthIn" name="lengthIn" type="number" min="0" max="11" step="1" defaultValue={0} className="input w-20" />
+              </div>
+            </div>
+            <div>
+              <label className="label" htmlFor="stockThicknessMm">Thickness (mm)</label>
+              <input id="stockThicknessMm" name="thicknessMm" type="number" min="0" step="0.1" required className="input w-28" />
+            </div>
+            <div>
+              <label className="label" htmlFor="stockQty">Qty produced</label>
+              <input id="stockQty" name="qty" type="number" min="1" step="1" required className="input w-24" />
+            </div>
+            <div className="flex-1 min-w-[140px]">
+              <label className="label" htmlFor="stockNote">Note</label>
+              <input id="stockNote" name="note" className="input" placeholder="Optional" />
+            </div>
+            <button className="btn-primary">Add to stock</button>
           </form>
         </div>
       )}

@@ -102,6 +102,7 @@ model User {
   coilsAllocated              Coil[]                   @relation("coilAllocatedBy")
   coilsReceived               Coil[]                   @relation("coilReceivedBy")
   outreachEmailsApproved      OutreachEmail[]          @relation("outreachApprovedBy")
+  stockLengthMovements        StockLengthMovement[]
 }
 
 // ------------------------------------------------------------- customers
@@ -349,6 +350,46 @@ model Coil {
 
   @@index([company])
   @@index([company, receivedAt])
+}
+
+// ------------------------------------------------------- BCS stock lengths
+// Finished fence posts cut ahead of any specific order and held ready in the
+// yard — unlike Coil (raw material, tracked per physical coil) this is a
+// running count per length/thickness spec, since a cut post needs no
+// per-unit traceability the way a coil or a Fender cast does.
+
+enum StockLengthMovementType {
+  PRODUCED // cut and added to stock, from Production
+  ADJUSTMENT // a manual correction — a stock check, a damaged post written off, etc.
+}
+
+model StockLength {
+  id          String   @id @default(cuid())
+  company     Company  @default(BS_SUPPLIES)
+  lengthFt    Int
+  lengthIn    Int      @default(0)
+  thicknessMm Decimal  @db.Decimal(6, 2)
+  qty         Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  movements StockLengthMovement[]
+
+  @@unique([company, lengthFt, lengthIn, thicknessMm])
+}
+
+model StockLengthMovement {
+  id            String                  @id @default(cuid())
+  stockLengthId String
+  type          StockLengthMovementType
+  qty           Int // signed — positive for produced/an upward correction, negative for a downward one
+  note          String                  @default("")
+  userId        String?
+  at            DateTime                @default(now())
+
+  stockLength StockLength @relation(fields: [stockLengthId], references: [id], onDelete: Cascade)
+  user        User?       @relation(fields: [userId], references: [id])
+
+  @@index([stockLengthId, at])
 }
 
 // ------------------------------------------------------------- ordering
