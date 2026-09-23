@@ -1,43 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import type { Company, StockLengthMovementType } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { getActiveCompany } from '@/lib/company';
-import { feetInches, tonnes } from '@/lib/format';
+import { feetInches } from '@/lib/format';
 
-/**
- * Every change to a stock length's weight goes through here — a produced
- * bundle, a manual correction, always logged as its own movement, same
- * principle as StockMovement for Batch. Runs in a transaction so the
- * weight update and its movement record can never separate, and so the
- * below-zero check reads the true current figure, not a stale one.
- */
-async function applyStockLengthMovement({
-  company, lengthFt, lengthIn, thicknessMm, weightKgDelta, type, note, userId,
-}: {
-  company: Company; lengthFt: number; lengthIn: number; thicknessMm: number;
-  weightKgDelta: number; type: StockLengthMovementType; note: string; userId: string;
-}) {
-  return db.$transaction(async (tx) => {
-    const existing = await tx.stockLength.findUnique({
-      where: { company_lengthFt_lengthIn_thicknessMm: { company, lengthFt, lengthIn, thicknessMm } },
-    });
-    const currentKg = Number(existing?.weightKg ?? 0);
-    const newWeightKg = currentKg + weightKgDelta;
-    if (newWeightKg < 0) {
-      throw new Error(`Only ${tonnes(currentKg)} of ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm in stock — can't take off ${tonnes(-weightKgDelta)}.`);
-    }
-
-    const stockLength = existing
-      ? await tx.stockLength.update({ where: { id: existing.id }, data: { weightKg: newWeightKg } })
-      : await tx.stockLength.create({ data: { company, lengthFt, lengthIn, thicknessMm, weightKg: newWeightKg } });
-
-    await tx.stockLengthMovement.create({ data: { stockLengthId: stockLength.id, type, weightKg: weightKgDelta, note, userId } });
-    return stockLength;
-  });
-}
+const NEXT_STOCK_LENGTH_TAG_KEY = 'nextStockLengthTag';
 
 function readSpec(formData: FormData) {
   const lengthFt = Number(formData.get('lengthFt') ?? 0);
@@ -49,7 +18,13 @@ function readSpec(formData: FormData) {
   return { lengthFt, lengthIn, thicknessMm };
 }
 
-/** Logged from Production when a run cuts steel rod ahead of any specific order — see production/page.tsx's "Produce stock lengths" card, which posts here directly. */
+/**
+ * Logged from Production when a run cuts steel rod ahead of any specific
+ * order — see production/page.tsx's "Produce stock lengths" card, which
+ * posts here directly. Each bundle is its own row with its own tag, same
+ * principle as a coil's 4-digit ref, so it can be pulled and traced
+ * individually rather than just adding to a running total.
+ */
 export async function produceStockLength(formData: FormData) {
   const user = await assertPermission('production.progress');
   const company = getActiveCompany(user);
@@ -60,29 +35,44 @@ export async function produceStockLength(formData: FormData) {
   if (!Number.isFinite(weightKg) || weightKg <= 0) throw new Error('Enter the bundle weight produced, in kg.');
   const note = String(formData.get('note') ?? '').trim();
 
-  const stockLength = await applyStockLengthMovement({
-    company, lengthFt, lengthIn, thicknessMm, weightKgDelta: weightKg, type: 'PRODUCED', note, userId: user.id,
+  const stockLength = await db.$transaction(async (tx) => {
+    const setting = await tx.setting.findUnique({ where: { key: NEXT_STOCK_LENGTH_TAG_KEY } });
+    const next = setting ? Number(setting.value) : 1;
+    await tx.setting.upsert({
+      where: { key: NEXT_STOCK_LENGTH_TAG_KEY },
+      create: { key: NEXT_STOCK_LENGTH_TAG_KEY, value: String(next + 1) },
+      update: { value: String(next + 1) },
+    });
+    const tag = `L${String(next).padStart(4, '0')}`;
+    return tx.stockLength.create({
+      data: { company, tag, lengthFt, lengthIn, thicknessMm, weightKg, note, producedById: user.id },
+    });
   });
-  await logActivity('StockLength', stockLength.id, 'Produced', `${weightKg}kg of ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm`, user.id);
+
+  await logActivity('StockLength', stockLength.id, 'Produced', `${stockLength.tag} — ${weightKg}kg of ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm`, user.id);
   revalidatePath('/stock/lengths');
   revalidatePath('/production');
 }
 
-/** A manual correction from the Stock Lengths page itself — a stock check, a damaged bundle written off, etc. Can go either direction. */
-export async function adjustStockLength(formData: FormData) {
+/**
+ * Removes a bundle that's already real stock — used up, scrapped, entered
+ * wrong and easier to redo than fix. A stock.adjust action, mirroring
+ * removeCoilFromStock: there's no partial-weight correction on a bundle,
+ * just remove it and produce a fresh one if the figure was wrong.
+ */
+export async function removeStockLengthFromStock(formData: FormData) {
   const user = await assertPermission('stock.adjust');
-  const company = getActiveCompany(user);
-  if (company !== 'BS_SUPPLIES') throw new Error('Stock lengths are a BCS Products thing.');
+  const id = String(formData.get('stockLengthId'));
+  const stockLength = await db.stockLength.findUniqueOrThrow({ where: { id } });
+  if (stockLength.company !== 'BS_SUPPLIES') throw new Error('Not found.');
 
-  const { lengthFt, lengthIn, thicknessMm } = readSpec(formData);
-  const weightKgDelta = Number(formData.get('weightKgDelta') ?? 0);
-  if (!Number.isFinite(weightKgDelta) || weightKgDelta === 0) throw new Error('Enter a weight to add or take off, in kg — a positive or a negative number.');
-  const note = String(formData.get('note') ?? '').trim();
-  if (!note) throw new Error('Say why — a stock check, damage, whatever it was.');
-
-  const stockLength = await applyStockLengthMovement({
-    company, lengthFt, lengthIn, thicknessMm, weightKgDelta, type: 'ADJUSTMENT', note, userId: user.id,
-  });
-  await logActivity('StockLength', stockLength.id, 'Adjusted', `${weightKgDelta > 0 ? '+' : ''}${weightKgDelta}kg of ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm — ${note}`, user.id);
+  await db.stockLength.delete({ where: { id } });
+  await logActivity(
+    'StockLength',
+    id,
+    'Removed from stock',
+    `${stockLength.tag} — ${Number(stockLength.weightKg)}kg of ${feetInches(stockLength.lengthFt, stockLength.lengthIn)} × ${Number(stockLength.thicknessMm)}mm`,
+    user.id,
+  );
   revalidatePath('/stock/lengths');
 }

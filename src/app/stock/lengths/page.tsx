@@ -1,13 +1,13 @@
+import Link from 'next/link';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
-import { feetInches, shortDate, tonnes } from '@/lib/format';
+import { clock, feetInches, shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
-import { Empty, PageHeader, Stat, StatRow, Table } from '@/components/ui';
-import { SubmitButton } from '@/components/SubmitButton';
-import { adjustStockLength } from './actions';
+import { PageHeader, Stat, StatRow } from '@/components/ui';
+import { StockLengthChip, type StockLengthChipData } from './StockLengthChip';
 
 export default async function StockLengthsPage() {
   const user = await requirePermission('stock.view');
@@ -23,78 +23,81 @@ export default async function StockLengthsPage() {
     );
   }
 
-  const lengths = await db.stockLength.findMany({
+  const bundles = await db.stockLength.findMany({
     where: { company },
-    orderBy: [{ lengthFt: 'asc' }, { lengthIn: 'asc' }, { thicknessMm: 'asc' }],
+    orderBy: [{ lengthFt: 'asc' }, { lengthIn: 'asc' }, { thicknessMm: 'asc' }, { tag: 'asc' }],
+    include: { producedBy: { select: { name: true } } },
   });
 
   const canAdjust = can(user, 'stock.adjust');
-  const totalWeightKg = lengths.reduce((s, l) => s + Number(l.weightKg), 0);
+  const chipData: Record<string, StockLengthChipData> = Object.fromEntries(
+    bundles.map((b) => [
+      b.id,
+      {
+        id: b.id,
+        tag: b.tag,
+        lengthLabel: feetInches(b.lengthFt, b.lengthIn),
+        thicknessMm: Number(b.thicknessMm),
+        weightKg: Number(b.weightKg),
+        note: b.note,
+        producedLabel: `${shortDate(b.producedAt)} at ${clock(b.producedAt)}`,
+        producedByName: b.producedBy?.name ?? null,
+      },
+    ]),
+  );
+
+  const totalWeightKg = bundles.reduce((s, b) => s + Number(b.weightKg ?? 0), 0);
+
+  // One section per length/thickness spec, same idea as Coil Stock grouping
+  // by diameter — a spec is whatever's actually in stock, not a fixed list.
+  const specKey = (b: { lengthFt: number; lengthIn: number; thicknessMm: unknown }) =>
+    `${b.lengthFt}-${b.lengthIn}-${Number(b.thicknessMm)}`;
+  const specs = [...new Map(bundles.map((b) => [specKey(b), { lengthFt: b.lengthFt, lengthIn: b.lengthIn, thicknessMm: Number(b.thicknessMm) }])).values()];
+  const bundlesFor = (spec: { lengthFt: number; lengthIn: number; thicknessMm: number }) =>
+    bundles.filter((b) => b.lengthFt === spec.lengthFt && b.lengthIn === spec.lengthIn && Number(b.thicknessMm) === spec.thicknessMm);
 
   return (
     <Shell user={user} module="stock" nav={NAV.stock} current="/stock/lengths" alerts={alerts.length}>
       <PageHeader
         title="Stock Lengths"
-        blurb="Steel rod cut ahead of any specific order and held ready in the yard, by weight. Add to it from Production — Produce stock lengths."
+        blurb="Steel rod cut ahead of any specific order and held ready in the yard, one tag per bundle. Add to it from Production — Produce stock lengths."
       />
 
       <StatRow>
-        <Stat value={lengths.length} label="Lengths in stock" />
+        <Stat value={bundles.length} label="Bundles in stock" />
         <Stat value={tonnes(totalWeightKg)} label="Total weight" />
+        <Stat value={specs.length} label="Specs in stock" />
       </StatRow>
 
-      <section className="card card-pad mb-6">
-        {lengths.length === 0 ? (
-          <Empty title="Nothing in stock yet — produce some from Production." />
-        ) : (
-          <Table head={<>
-            <th className="th">Length</th><th className="th">Thickness</th>
-            <th className="th">In stock</th><th className="th">Last updated</th>
-          </>}>
-            {lengths.map((l) => (
-              <tr key={l.id} className="row">
-                <td className="td font-semibold">{feetInches(l.lengthFt, l.lengthIn)}</td>
-                <td className="td text-ink-muted">{Number(l.thicknessMm)}mm</td>
-                <td className="td font-semibold">{tonnes(l.weightKg)}</td>
-                <td className="td text-ink-muted">{shortDate(l.updatedAt)}</td>
-              </tr>
-            ))}
-          </Table>
-        )}
-      </section>
-
-      {canAdjust && (
-        <section className="card card-pad max-w-2xl">
-          <h2 className="text-lg font-bold mb-1">Adjust</h2>
-          <p className="text-sm text-ink-muted mb-4">A stock check, a damaged bundle written off — anything that isn&apos;t a fresh cut from Production.</p>
-          <form action={adjustStockLength} className="grid gap-4 sm:grid-cols-2">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="label" htmlFor="lengthFt">Length (ft)</label>
-                <input id="lengthFt" name="lengthFt" type="number" min="1" step="1" required className="input" />
-              </div>
-              <div>
-                <label className="label" htmlFor="lengthIn">+ inches</label>
-                <input id="lengthIn" name="lengthIn" type="number" min="0" max="11" step="1" defaultValue={0} className="input" />
-              </div>
-            </div>
-            <div>
-              <label className="label" htmlFor="thicknessMm">Thickness (mm)</label>
-              <input id="thicknessMm" name="thicknessMm" type="number" min="0" step="0.1" required className="input" />
-            </div>
-            <div>
-              <label className="label" htmlFor="weightKgDelta">Change (kg)</label>
-              <input id="weightKgDelta" name="weightKgDelta" type="number" step="0.1" required className="input" placeholder="-25 or 100" />
-              <p className="hint">Negative to take off, positive to add.</p>
-            </div>
-            <div>
-              <label className="label" htmlFor="note">Reason</label>
-              <input id="note" name="note" required className="input" placeholder="Stock check" />
-            </div>
-            <div className="flex items-end"><SubmitButton pendingLabel="Saving…">Save</SubmitButton></div>
-          </form>
-        </section>
+      {bundles.length === 0 ? (
+        <div className="card card-pad text-center text-ink-muted py-12">
+          Nothing in stock yet — produce some from Production.
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {specs.map((spec) => {
+            const inSpec = bundlesFor(spec);
+            const specWeightKg = inSpec.reduce((s, b) => s + Number(b.weightKg ?? 0), 0);
+            return (
+              <section key={specKey(spec)} className="card card-pad">
+                <div className="flex items-baseline justify-between mb-4">
+                  <h2 className="text-lg font-bold">{feetInches(spec.lengthFt, spec.lengthIn)} × {spec.thicknessMm}mm</h2>
+                  <span className="text-sm text-ink-muted">{inSpec.length} · {tonnes(specWeightKg)}</span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                  {inSpec.map((b) => (
+                    <StockLengthChip key={b.id} bundle={chipData[b.id]} canAdjust={canAdjust} />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
       )}
+
+      <p className="text-xs text-ink-faint mt-4">
+        <Link href="/stock" className="hover:underline">← Back to stock</Link>
+      </p>
     </Shell>
   );
 }

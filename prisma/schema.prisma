@@ -102,7 +102,7 @@ model User {
   coilsAllocated              Coil[]                   @relation("coilAllocatedBy")
   coilsReceived               Coil[]                   @relation("coilReceivedBy")
   outreachEmailsApproved      OutreachEmail[]          @relation("outreachApprovedBy")
-  stockLengthMovements        StockLengthMovement[]
+  stockLengthsProduced        StockLength[]            @relation("stockLengthProducedBy")
 }
 
 // ------------------------------------------------------------- customers
@@ -354,43 +354,26 @@ model Coil {
 
 // ------------------------------------------------------- BCS stock lengths
 // Steel rod cut to length ahead of any specific order and held ready in the
-// yard — unlike Coil (raw material, tracked per physical coil) this is
-// tracked by bundle weight per length/thickness spec, not a count of
-// pieces, and needs no per-unit traceability the way a coil or a Fender
-// cast does.
-
-enum StockLengthMovementType {
-  PRODUCED // cut and added to stock, from Production
-  ADJUSTMENT // a manual correction — a stock check, a damaged post written off, etc.
-}
+// yard — tracked the same way as Coil, one row per physical bundle with its
+// own tag, rather than a running total per spec, so a bundle can be traced
+// back to when it was cut and pulled individually out of stock.
 
 model StockLength {
-  id          String   @id @default(cuid())
-  company     Company  @default(BS_SUPPLIES)
-  lengthFt    Int
-  lengthIn    Int      @default(0)
-  thicknessMm Decimal  @db.Decimal(6, 2)
-  weightKg    Decimal  @default(0) @db.Decimal(10, 2) // steel rod, tracked by bundle weight, not a count of pieces
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  company      Company  @default(BS_SUPPLIES)
+  tag          String   @unique // printed on the bundle, e.g. "L0001"
+  lengthFt     Int
+  lengthIn     Int      @default(0)
+  thicknessMm  Decimal  @db.Decimal(6, 2)
+  weightKg     Decimal  @db.Decimal(10, 2)
+  note         String   @default("")
+  producedAt   DateTime @default(now())
+  producedById String?
 
-  movements StockLengthMovement[]
+  producedBy User? @relation("stockLengthProducedBy", fields: [producedById], references: [id])
 
-  @@unique([company, lengthFt, lengthIn, thicknessMm])
-}
-
-model StockLengthMovement {
-  id            String                  @id @default(cuid())
-  stockLengthId String
-  type          StockLengthMovementType
-  weightKg      Decimal                 @db.Decimal(10, 2) // signed — positive for produced/an upward correction, negative for a downward one
-  note          String                  @default("")
-  userId        String?
-  at            DateTime                @default(now())
-
-  stockLength StockLength @relation(fields: [stockLengthId], references: [id], onDelete: Cascade)
-  user        User?       @relation(fields: [userId], references: [id])
-
-  @@index([stockLengthId, at])
+  @@index([company])
+  @@index([company, lengthFt, lengthIn, thicknessMm])
 }
 
 // ------------------------------------------------------------- ordering
