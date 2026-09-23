@@ -30,6 +30,9 @@ export const longDate = (d?: Date | string | null) =>
 export const clock = (d?: Date | string | null) =>
   d ? new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: UK_TZ }) : '';
 
+/** Today's date in the UK as yyyy-mm-dd, the format a date input wants. */
+export const isoDateUk = (d: Date = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: UK_TZ }).format(d);
+
 /**
  * The inverse of clock() — converts a UK wall-clock date+time (what someone
  * typed into a <input type="date"> and <input type="time">) into the

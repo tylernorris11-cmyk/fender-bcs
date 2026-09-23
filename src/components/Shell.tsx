@@ -21,7 +21,7 @@ export type NavItem = { label: string; href: string; perm?: Permission; company?
 
 const MODULE_TITLE: Record<string, string> = {
   orders: 'Sales Orders', purchaseOrders: 'Purchase Orders', production: 'Production', planning: 'Deliveries', holidays: 'Holidays', timesheets: 'Timesheets',
-  customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', fuel: 'Fuel', hs: 'Health & Safety', setup: 'Set Up', outreach: 'Sales Outreach', alerts: 'Notifications',
+  customers: 'Customers', compliance: 'Compliance', stock: 'Stock', assets: 'Assets', checks: 'Checks', fuel: 'Fuel', hs: 'Health & Safety', setup: 'Set Up', outreach: 'Sales Outreach', alerts: 'Notifications', accounts: 'Accounts',
 };
 
 export function Shell({
@@ -230,6 +230,14 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'Check history', href: '/checks' },
     { label: 'Run a check', href: '/checks/new', perm: 'checks.create' },
     { label: 'Notes', href: '/checks/notes' },
+  ],
+  accounts: [
+    { label: 'Trial balance', href: '/accounts' },
+    { label: 'Journals', href: '/accounts/journals' },
+    { label: 'New journal', href: '/accounts/journals/new', perm: 'accounts.post' },
+    { label: 'Chart of accounts', href: '/accounts/nominal' },
+    { label: 'VAT codes', href: '/accounts/vat-codes' },
+    { label: 'Settings', href: '/accounts/settings', perm: 'accounts.setup' },
   ],
   fuel: [
     { label: 'Fuel log', href: '/fuel' },

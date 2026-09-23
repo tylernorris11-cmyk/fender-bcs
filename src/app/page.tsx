@@ -29,6 +29,7 @@ const TONES = {
   timesheets: { icon: 'bg-yellow-100 text-yellow-700', bar: 'bg-yellow-500', arrow: 'border-yellow-500 text-yellow-600' },
   hs: { icon: 'bg-teal-100 text-teal-700', bar: 'bg-teal-500', arrow: 'border-teal-500 text-teal-600' },
   outreach: { icon: 'bg-pink-100 text-pink-700', bar: 'bg-pink-500', arrow: 'border-pink-500 text-pink-600' },
+  accounts: { icon: 'bg-blue-100 text-blue-700', bar: 'bg-blue-500', arrow: 'border-blue-500 text-blue-600' },
 } as const;
 
 function greeting() {

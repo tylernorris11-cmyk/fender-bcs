@@ -103,6 +103,7 @@ model User {
   coilsReceived               Coil[]                   @relation("coilReceivedBy")
   outreachEmailsApproved      OutreachEmail[]          @relation("outreachApprovedBy")
   stockLengthsProduced        StockLength[]            @relation("stockLengthProducedBy")
+  transactionsPosted          Transaction[]
 }
 
 // ------------------------------------------------------------- customers
@@ -1474,4 +1475,104 @@ model OutreachSuppression {
   companyName String   @default("")
   reason      String   @default("") // opted_out | bounced | manual
   createdAt   DateTime @default(now())
+}
+
+// ------------------------------------------------------------- accounts
+// The ledger, built the way Exchequer keeps it: a chart of accounts per
+// company, and every posted transaction writing debit and credit postings
+// that always balance. Nothing writes here directly — every posting goes
+// through src/lib/ledger.ts, which enforces the balance, the period lock
+// and the numbering. Posted transactions are never edited or deleted; a
+// mistake is put right by posting a reversal.
+
+enum NominalType {
+  PROFIT_AND_LOSS
+  BALANCE_SHEET
+}
+
+model NominalCode {
+  id      String      @id @default(cuid())
+  company Company
+  code    String // Exchequer's nominal code, e.g. "4000"
+  name    String
+  type    NominalType
+  active  Boolean     @default(true)
+
+  postings NominalPosting[]
+
+  @@unique([company, code])
+}
+
+model VatCode {
+  id      String  @id @default(cuid())
+  company Company
+  code    String // Exchequer's single-character VAT code, e.g. "S"
+  name    String
+  rate    Decimal @db.Decimal(5, 2) // a percentage — 20.00 for standard rate
+  active  Boolean @default(true)
+
+  @@unique([company, code])
+}
+
+// One row per company. The financial year start month decides which year
+// and period a date falls in; the lock stops anything posting into a
+// period that's been closed off.
+model AccountsSettings {
+  company        Company @id
+  yearStartMonth Int     @default(4) // 1–12
+  lockedYear     Int? // nothing can post into this year/period or earlier
+  lockedPeriod   Int?
+}
+
+// Exchequer-style document types. Only journals exist so far — later phases
+// add sales orders, delivery notes, invoices and the rest to this same list.
+enum TransactionType {
+  NOM
+}
+
+// The next number for each document type, so numbering can carry on from
+// wherever Exchequer's got to.
+model DocumentSequence {
+  company    Company
+  docType    TransactionType
+  nextNumber Int             @default(1)
+
+  @@id([company, docType])
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  company     Company
+  docType     TransactionType
+  ourRef      String // NOM000123 — Exchequer's own format
+  transDate   DateTime        @db.Date
+  year        Int // the financial year, named by the calendar year it starts in
+  period      Int // 1–12 within that year
+  description String          @default("")
+  postedAt    DateTime        @default(now())
+  postedById  String?
+  reversesId  String?         @unique
+
+  postedBy   User?            @relation(fields: [postedById], references: [id])
+  reverses   Transaction?     @relation("reversal", fields: [reversesId], references: [id])
+  reversedBy Transaction?     @relation("reversal")
+  postings   NominalPosting[]
+
+  @@unique([company, ourRef])
+  @@index([company, year, period])
+}
+
+model NominalPosting {
+  id            String  @id @default(cuid())
+  transactionId String
+  nominalCodeId String
+  debit         Decimal @default(0) @db.Decimal(14, 2)
+  credit        Decimal @default(0) @db.Decimal(14, 2)
+  description   String  @default("")
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  nominalCode NominalCode @relation(fields: [nominalCodeId], references: [id], onDelete: Restrict)
+
+  @@index([transactionId])
+  @@index([nominalCodeId])
 }

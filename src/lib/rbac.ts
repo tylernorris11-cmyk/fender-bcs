@@ -77,6 +77,10 @@ export type Permission =
   // Sales outreach — BCS Products / BS Supplies cold-email agent
   | 'outreach.view'
   | 'outreach.manage' // approve/reject drafts, trigger sends
+  // Accounts — the nominal ledger being built to take over from Exchequer
+  | 'accounts.view' // trial balance, journals, nominal enquiries
+  | 'accounts.post' // post and reverse journals
+  | 'accounts.setup' // chart of accounts, VAT codes, periods, document numbering
   // Commercially sensitive
   | 'finance.costs' // purchase costs and margin — CEO only
   | 'finance.debtors';
@@ -97,6 +101,7 @@ const ALL: Permission[] = [
   'hs.view', 'hs.edit', 'hs.manageTraining',
   'setup.view', 'setup.pricing', 'setup.users', 'setup.lists', 'setup.backups', 'setup.bugs',
   'outreach.view', 'outreach.manage',
+  'accounts.view', 'accounts.post', 'accounts.setup',
   'finance.costs', 'finance.debtors',
 ];
 
@@ -247,6 +252,7 @@ export const MODULES = [
   { key: 'fuel', label: 'Fuel', href: '/fuel', perm: 'fuel.view' as Permission, blurb: 'Log fuel taken from the yard tank against each vehicle.' },
   { key: 'hs', label: 'Health & Safety', href: '/hs', perm: 'hs.view' as Permission, blurb: 'HSE documents, RAMS and mandatory training.' },
   { key: 'outreach', label: 'Sales Outreach', href: '/outreach', perm: 'outreach.view' as Permission, blurb: 'Find new trade customers and review outreach emails before they send.', company: 'BS_SUPPLIES' as Company },
+  { key: 'accounts', label: 'Accounts', href: '/accounts', perm: 'accounts.view' as Permission, blurb: 'Nominal ledger, journals and the trial balance. Being built to take over from Exchequer.' },
 ] as const;
 
 /** Narrow one-off permissions a Master Administrator/Administrator can grant
