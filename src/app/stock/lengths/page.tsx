@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
-import { feetInches, shortDate } from '@/lib/format';
+import { feetInches, shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Stat, StatRow, Table } from '@/components/ui';
 import { SubmitButton } from '@/components/SubmitButton';
@@ -29,18 +29,18 @@ export default async function StockLengthsPage() {
   });
 
   const canAdjust = can(user, 'stock.adjust');
-  const totalPosts = lengths.reduce((s, l) => s + l.qty, 0);
+  const totalWeightKg = lengths.reduce((s, l) => s + Number(l.weightKg), 0);
 
   return (
     <Shell user={user} module="stock" nav={NAV.stock} current="/stock/lengths" alerts={alerts.length}>
       <PageHeader
         title="Stock Lengths"
-        blurb="Fence posts cut ahead of any specific order and held ready in the yard. Add to it from Production — Produce stock lengths."
+        blurb="Steel rod cut ahead of any specific order and held ready in the yard, by weight. Add to it from Production — Produce stock lengths."
       />
 
       <StatRow>
         <Stat value={lengths.length} label="Lengths in stock" />
-        <Stat value={totalPosts.toLocaleString('en-GB')} label="Posts in stock" />
+        <Stat value={tonnes(totalWeightKg)} label="Total weight" />
       </StatRow>
 
       <section className="card card-pad mb-6">
@@ -55,7 +55,7 @@ export default async function StockLengthsPage() {
               <tr key={l.id} className="row">
                 <td className="td font-semibold">{feetInches(l.lengthFt, l.lengthIn)}</td>
                 <td className="td text-ink-muted">{Number(l.thicknessMm)}mm</td>
-                <td className="td font-semibold">{l.qty}</td>
+                <td className="td font-semibold">{tonnes(l.weightKg)}</td>
                 <td className="td text-ink-muted">{shortDate(l.updatedAt)}</td>
               </tr>
             ))}
@@ -66,7 +66,7 @@ export default async function StockLengthsPage() {
       {canAdjust && (
         <section className="card card-pad max-w-2xl">
           <h2 className="text-lg font-bold mb-1">Adjust</h2>
-          <p className="text-sm text-ink-muted mb-4">A stock check, a damaged post written off — anything that isn&apos;t a fresh cut from Production.</p>
+          <p className="text-sm text-ink-muted mb-4">A stock check, a damaged bundle written off — anything that isn&apos;t a fresh cut from Production.</p>
           <form action={adjustStockLength} className="grid gap-4 sm:grid-cols-2">
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -83,8 +83,8 @@ export default async function StockLengthsPage() {
               <input id="thicknessMm" name="thicknessMm" type="number" min="0" step="0.1" required className="input" />
             </div>
             <div>
-              <label className="label" htmlFor="qtyDelta">Change</label>
-              <input id="qtyDelta" name="qtyDelta" type="number" step="1" required className="input" placeholder="-3 or 10" />
+              <label className="label" htmlFor="weightKgDelta">Change (kg)</label>
+              <input id="weightKgDelta" name="weightKgDelta" type="number" step="0.1" required className="input" placeholder="-25 or 100" />
               <p className="hint">Negative to take off, positive to add.</p>
             </div>
             <div>

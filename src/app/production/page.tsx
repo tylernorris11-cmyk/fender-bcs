@@ -353,7 +353,7 @@ async function BcsView({ orders, sort, user, company }: { orders: any[]; sort?: 
       {can(user, 'production.progress') && (
         <div className="card card-pad mb-6">
           <h2 className="text-lg font-bold mb-1">Produce stock lengths</h2>
-          <p className="text-sm text-ink-muted mb-3">Posts cut ahead of any specific order, straight into stock — see Stock → Stock Lengths.</p>
+          <p className="text-sm text-ink-muted mb-3">Steel rod cut ahead of any specific order, straight into stock — see Stock → Stock Lengths.</p>
           <form action={produceStockLength} className="flex flex-wrap items-end gap-3">
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -370,8 +370,8 @@ async function BcsView({ orders, sort, user, company }: { orders: any[]; sort?: 
               <input id="stockThicknessMm" name="thicknessMm" type="number" min="0" step="0.1" required className="input w-28" />
             </div>
             <div>
-              <label className="label" htmlFor="stockQty">Qty produced</label>
-              <input id="stockQty" name="qty" type="number" min="1" step="1" required className="input w-24" />
+              <label className="label" htmlFor="stockWeightKg">Weight produced (kg)</label>
+              <input id="stockWeightKg" name="weightKg" type="number" min="0.1" step="0.1" required className="input w-28" />
             </div>
             <div className="flex-1 min-w-[140px]">
               <label className="label" htmlFor="stockNote">Note</label>

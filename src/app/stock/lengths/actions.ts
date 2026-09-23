@@ -5,35 +5,36 @@ import type { Company, StockLengthMovementType } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { getActiveCompany } from '@/lib/company';
-import { feetInches } from '@/lib/format';
+import { feetInches, tonnes } from '@/lib/format';
 
 /**
- * Every change to a stock length's count goes through here — a produced
- * batch, a manual correction, always logged as its own movement, same
- * principle as StockMovement for Batch. Runs in a transaction so the qty
- * update and its movement record can never separate, and so the
+ * Every change to a stock length's weight goes through here — a produced
+ * bundle, a manual correction, always logged as its own movement, same
+ * principle as StockMovement for Batch. Runs in a transaction so the
+ * weight update and its movement record can never separate, and so the
  * below-zero check reads the true current figure, not a stale one.
  */
 async function applyStockLengthMovement({
-  company, lengthFt, lengthIn, thicknessMm, qtyDelta, type, note, userId,
+  company, lengthFt, lengthIn, thicknessMm, weightKgDelta, type, note, userId,
 }: {
   company: Company; lengthFt: number; lengthIn: number; thicknessMm: number;
-  qtyDelta: number; type: StockLengthMovementType; note: string; userId: string;
+  weightKgDelta: number; type: StockLengthMovementType; note: string; userId: string;
 }) {
   return db.$transaction(async (tx) => {
     const existing = await tx.stockLength.findUnique({
       where: { company_lengthFt_lengthIn_thicknessMm: { company, lengthFt, lengthIn, thicknessMm } },
     });
-    const newQty = (existing?.qty ?? 0) + qtyDelta;
-    if (newQty < 0) {
-      throw new Error(`Only ${existing?.qty ?? 0} of ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm in stock — can't take off ${-qtyDelta}.`);
+    const currentKg = Number(existing?.weightKg ?? 0);
+    const newWeightKg = currentKg + weightKgDelta;
+    if (newWeightKg < 0) {
+      throw new Error(`Only ${tonnes(currentKg)} of ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm in stock — can't take off ${tonnes(-weightKgDelta)}.`);
     }
 
     const stockLength = existing
-      ? await tx.stockLength.update({ where: { id: existing.id }, data: { qty: newQty } })
-      : await tx.stockLength.create({ data: { company, lengthFt, lengthIn, thicknessMm, qty: newQty } });
+      ? await tx.stockLength.update({ where: { id: existing.id }, data: { weightKg: newWeightKg } })
+      : await tx.stockLength.create({ data: { company, lengthFt, lengthIn, thicknessMm, weightKg: newWeightKg } });
 
-    await tx.stockLengthMovement.create({ data: { stockLengthId: stockLength.id, type, qty: qtyDelta, note, userId } });
+    await tx.stockLengthMovement.create({ data: { stockLengthId: stockLength.id, type, weightKg: weightKgDelta, note, userId } });
     return stockLength;
   });
 }
@@ -48,40 +49,40 @@ function readSpec(formData: FormData) {
   return { lengthFt, lengthIn, thicknessMm };
 }
 
-/** Logged from Production when a run cuts extra posts ahead of any specific order — see production/actions.ts's produceStockLength, which calls through to this. */
+/** Logged from Production when a run cuts steel rod ahead of any specific order — see production/page.tsx's "Produce stock lengths" card, which posts here directly. */
 export async function produceStockLength(formData: FormData) {
   const user = await assertPermission('production.progress');
   const company = getActiveCompany(user);
   if (company !== 'BS_SUPPLIES') throw new Error('Stock lengths are a BCS Products thing.');
 
   const { lengthFt, lengthIn, thicknessMm } = readSpec(formData);
-  const qty = Number(formData.get('qty') ?? 0);
-  if (!Number.isFinite(qty) || qty <= 0) throw new Error('Enter how many were produced.');
+  const weightKg = Number(formData.get('weightKg') ?? 0);
+  if (!Number.isFinite(weightKg) || weightKg <= 0) throw new Error('Enter the bundle weight produced, in kg.');
   const note = String(formData.get('note') ?? '').trim();
 
   const stockLength = await applyStockLengthMovement({
-    company, lengthFt, lengthIn, thicknessMm, qtyDelta: qty, type: 'PRODUCED', note, userId: user.id,
+    company, lengthFt, lengthIn, thicknessMm, weightKgDelta: weightKg, type: 'PRODUCED', note, userId: user.id,
   });
-  await logActivity('StockLength', stockLength.id, 'Produced', `${qty} × ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm`, user.id);
+  await logActivity('StockLength', stockLength.id, 'Produced', `${weightKg}kg of ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm`, user.id);
   revalidatePath('/stock/lengths');
   revalidatePath('/production');
 }
 
-/** A manual correction from the Stock Lengths page itself — a stock check, a damaged post written off, etc. Can go either direction. */
+/** A manual correction from the Stock Lengths page itself — a stock check, a damaged bundle written off, etc. Can go either direction. */
 export async function adjustStockLength(formData: FormData) {
   const user = await assertPermission('stock.adjust');
   const company = getActiveCompany(user);
   if (company !== 'BS_SUPPLIES') throw new Error('Stock lengths are a BCS Products thing.');
 
   const { lengthFt, lengthIn, thicknessMm } = readSpec(formData);
-  const qtyDelta = Number(formData.get('qtyDelta') ?? 0);
-  if (!Number.isFinite(qtyDelta) || qtyDelta === 0) throw new Error('Enter how many to add or take off — a positive or a negative number.');
+  const weightKgDelta = Number(formData.get('weightKgDelta') ?? 0);
+  if (!Number.isFinite(weightKgDelta) || weightKgDelta === 0) throw new Error('Enter a weight to add or take off, in kg — a positive or a negative number.');
   const note = String(formData.get('note') ?? '').trim();
   if (!note) throw new Error('Say why — a stock check, damage, whatever it was.');
 
   const stockLength = await applyStockLengthMovement({
-    company, lengthFt, lengthIn, thicknessMm, qtyDelta, type: 'ADJUSTMENT', note, userId: user.id,
+    company, lengthFt, lengthIn, thicknessMm, weightKgDelta, type: 'ADJUSTMENT', note, userId: user.id,
   });
-  await logActivity('StockLength', stockLength.id, 'Adjusted', `${qtyDelta > 0 ? '+' : ''}${qtyDelta} × ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm — ${note}`, user.id);
+  await logActivity('StockLength', stockLength.id, 'Adjusted', `${weightKgDelta > 0 ? '+' : ''}${weightKgDelta}kg of ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm — ${note}`, user.id);
   revalidatePath('/stock/lengths');
 }
