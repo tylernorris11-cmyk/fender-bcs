@@ -22,7 +22,7 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
     include: {
       customer: { include: { accountManager: true } },
       raisedBy: true,
-      lines: { orderBy: { sortOrder: 'asc' }, include: { batch: true, product: true } },
+      lines: { orderBy: { sortOrder: 'asc' }, include: { picks: { include: { batch: true } }, product: true } },
       barMarks: { orderBy: { sortOrder: 'asc' }, include: { qcChecks: true } },
       checklist: { orderBy: { sortOrder: 'asc' }, include: { doneBy: true } },
       ncrs: true,
@@ -146,12 +146,12 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
             <tr key={l.id} className="row">
               <td className="td">
                 <span className="font-semibold">{l.description}</span>
-                {l.batch && (
-                  <span className="block text-xs text-ink-muted mt-0.5">
-                    Picked from {l.batch.heatNumber}
-                    {l.batch.certNumber && <> (cert {l.batch.certNumber})</>}
+                {l.picks.map((p) => (
+                  <span key={p.id} className="block text-xs text-ink-muted mt-0.5">
+                    {qty(p.qty, l.unit)} picked from {p.batch.heatNumber}
+                    {p.batch.certNumber && <> (cert {p.batch.certNumber})</>}
                   </span>
-                )}
+                ))}
               </td>
               <td className="td text-right tabular-nums">{qty(l.qty, l.unit)}</td>
               <td className="td text-right tabular-nums">{money(l.unitPrice)}</td>

@@ -38,13 +38,13 @@ export default async function TracePage({ searchParams }: { searchParams: { q?: 
           OR: [
             { heatNumber: { contains: q, mode: 'insensitive' } },
             { certNumber: { contains: q, mode: 'insensitive' } },
-            { orderLines: { some: { order: { number: { contains: q, mode: 'insensitive' } } } } },
+            { orderLinePicks: { some: { orderLine: { order: { number: { contains: q, mode: 'insensitive' } } } } } },
           ],
         },
         include: {
           product: true,
           supplier: true,
-          orderLines: { include: { order: { include: { customer: true } } } },
+          orderLinePicks: { include: { orderLine: { include: { order: { include: { customer: true } } } } } },
           movements: { include: { user: true }, orderBy: { at: 'desc' } },
           ncrs: true,
         },
@@ -103,15 +103,15 @@ export default async function TracePage({ searchParams }: { searchParams: { q?: 
 
             <div>
               <h3 className="font-bold mb-2">Forward to site</h3>
-              {b.orderLines.length === 0 ? (
+              {b.orderLinePicks.length === 0 ? (
                 <p className="text-sm text-ink-muted">Nothing issued from this cast yet.</p>
               ) : (
                 <ul className="text-sm space-y-2">
-                  {b.orderLines.map((l) => (
-                    <li key={l.id} className="flex justify-between gap-3">
-                      <Link href={`/orders/${l.order.id}`} className="text-brand-700 font-semibold hover:underline">{l.order.number}</Link>
-                      <span className="text-ink-muted flex-1">{l.order.customer.name} · {l.order.town}</span>
-                      <span className="tabular-nums">{Number(l.qty).toFixed(3)}</span>
+                  {b.orderLinePicks.map((p) => (
+                    <li key={p.id} className="flex justify-between gap-3">
+                      <Link href={`/orders/${p.orderLine.order.id}`} className="text-brand-700 font-semibold hover:underline">{p.orderLine.order.number}</Link>
+                      <span className="text-ink-muted flex-1">{p.orderLine.order.customer.name} · {p.orderLine.order.town}</span>
+                      <span className="tabular-nums">{Number(p.qty).toFixed(3)}</span>
                     </li>
                   ))}
                 </ul>

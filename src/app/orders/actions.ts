@@ -129,7 +129,7 @@ export async function advanceStage(formData: FormData) {
   const orderId = String(formData.get('orderId'));
   const order = await db.order.findUniqueOrThrow({
     where: { id: orderId },
-    include: { lines: true, barMarks: true, customer: true },
+    include: { lines: { include: { picks: { select: { id: true } } } }, barMarks: true, customer: true },
   });
 
   const step = NEXT_STAGE[order.stage];
@@ -156,11 +156,15 @@ export async function advanceStage(formData: FormData) {
   // Going into production is where steel is allocated and traceability starts.
   if (step.to === 'IN_PRODUCTION') {
     for (const line of order.lines) {
-      if (!line.productId || line.batchId) continue;
+      if (!line.productId || line.picks.length > 0) continue;
       const product = await db.product.findUnique({ where: { id: line.productId } });
       if (!product?.isRebar) continue;
       const { picked, shortfall } = await pickOldestFirst(line.productId, Number(line.qty), order.number, user.id);
-      if (picked[0]) await db.orderLine.update({ where: { id: line.id }, data: { batchId: picked[0].batchId } });
+      if (picked.length > 0) {
+        await db.orderLineBatch.createMany({
+          data: picked.map((p) => ({ orderLineId: line.id, batchId: p.batchId, qty: p.qty })),
+        });
+      }
       if (shortfall > 0) {
         await logActivity('Order', orderId, 'Short on stock', `${shortfall} short on ${line.description}`, user.id);
       }

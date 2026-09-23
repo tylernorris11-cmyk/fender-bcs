@@ -16,7 +16,7 @@ export default async function DeliverySheet({ params }: { params: { id: string }
     where: { id: params.id },
     include: {
       customer: true,
-      lines: { orderBy: { sortOrder: 'asc' }, include: { batch: { include: { supplier: true } } } },
+      lines: { orderBy: { sortOrder: 'asc' }, include: { picks: { include: { batch: true } } } },
       barMarks: { orderBy: { sortOrder: 'asc' } },
     },
   });
@@ -73,7 +73,21 @@ export default async function DeliverySheet({ params }: { params: { id: string }
           {order.lines.map((l) => (
             <tr key={l.id} className="border-b border-black/10">
               <td className="py-2">{l.description}</td>
-              {!isBsSupplies && <><td className="py-2">{l.batch?.heatNumber ?? '—'}</td><td className="py-2">{l.batch?.certNumber ?? '—'}</td></>}
+              {!isBsSupplies && (
+                <>
+                  <td className="py-2">
+                    {l.picks.length === 0 ? '—' : l.picks.map((p) => (
+                      <div key={p.id}>
+                        {p.batch.heatNumber}
+                        {l.picks.length > 1 && <span className="text-ink-muted"> · {qty(p.qty, l.unit)}</span>}
+                      </div>
+                    ))}
+                  </td>
+                  <td className="py-2">
+                    {l.picks.length === 0 ? '—' : l.picks.map((p) => <div key={p.id}>{p.batch.certNumber || '—'}</div>)}
+                  </td>
+                </>
+              )}
               <td className="py-2 text-right">{qty(l.qty, l.unit)}</td>
               <td className="py-2 text-right">{money(l.lineTotal)}</td>
             </tr>

@@ -244,7 +244,7 @@ model Batch {
   product            Product               @relation(fields: [productId], references: [id])
   supplier           Supplier              @relation(fields: [supplierId], references: [id])
   movements          StockMovement[]
-  orderLines         OrderLine[]
+  orderLinePicks     OrderLineBatch[]
   ncrs               Ncr[]
   matchedCastNumbers ExtractedCastNumber[]
 
@@ -446,12 +446,26 @@ model OrderLine {
   unitPrice   Decimal @db.Decimal(12, 2)
   lineTotal   Decimal @db.Decimal(12, 2)
   weightKg    Decimal @default(0) @db.Decimal(12, 3)
-  batchId     String? // set when stock is picked, gives the cert on the note
   sortOrder   Int     @default(0)
 
-  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id])
-  batch   Batch?   @relation(fields: [batchId], references: [id])
+  order   Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?         @relation(fields: [productId], references: [id])
+  picks   OrderLineBatch[]
+}
+
+// Every cast an order line was picked from. One line can span several when a
+// cast runs out partway, and CARES needs every one of them on the delivery note.
+model OrderLineBatch {
+  id          String  @id @default(cuid())
+  orderLineId String
+  batchId     String
+  qty         Decimal @db.Decimal(12, 3)
+
+  orderLine OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+  batch     Batch     @relation(fields: [batchId], references: [id])
+
+  @@index([orderLineId])
+  @@index([batchId])
 }
 
 // --------------------------------------------------------- purchase orders

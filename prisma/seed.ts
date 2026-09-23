@@ -641,15 +641,16 @@ async function main() {
     let sort = 0;
     for (const [code, qty, unitPrice] of s.lines) {
       const product = await db.product.findUniqueOrThrow({ where: { id: products[code] } });
+      const picked = ['DELIVERED', 'COMPLETED', 'OUT_FOR_DELIVERY'].includes(s.stage) && product.isRebar;
       await db.orderLine.create({
         data: {
           orderId: order.id, productId: product.id, description: product.name,
           qty, unit: product.unit, unitPrice, lineTotal: +(qty * unitPrice).toFixed(2),
           weightKg: +(qty * Number(product.kgPerUnit)).toFixed(3),
-          batchId: ['DELIVERED', 'COMPLETED', 'OUT_FOR_DELIVERY'].includes(s.stage) && product.isRebar
-            ? batches[code === 'RB12-500B' ? 'H260503' : code === 'RB16-500B' ? 'H260505' : 'H260501']
-            : null,
           sortOrder: sort++,
+          picks: picked
+            ? { create: { qty, batchId: batches[code === 'RB12-500B' ? 'H260503' : code === 'RB16-500B' ? 'H260505' : 'H260501'] } }
+            : undefined,
         },
       });
     }
