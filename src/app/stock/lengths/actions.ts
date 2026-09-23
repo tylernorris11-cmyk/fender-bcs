@@ -18,6 +18,24 @@ function readSpec(formData: FormData) {
   return { lengthFt, lengthIn, thicknessMm };
 }
 
+/** Claims the next tag in sequence and creates the bundle in one transaction — shared by every way a bundle can enter stock. */
+async function createBundle(data: {
+  company: 'BS_SUPPLIES'; lengthFt: number; lengthIn: number; thicknessMm: number;
+  weightKg: number; note: string; identityNumber: string | null; producedById?: string;
+}) {
+  return db.$transaction(async (tx) => {
+    const setting = await tx.setting.findUnique({ where: { key: NEXT_STOCK_LENGTH_TAG_KEY } });
+    const next = setting ? Number(setting.value) : 1;
+    await tx.setting.upsert({
+      where: { key: NEXT_STOCK_LENGTH_TAG_KEY },
+      create: { key: NEXT_STOCK_LENGTH_TAG_KEY, value: String(next + 1) },
+      update: { value: String(next + 1) },
+    });
+    const tag = `L${String(next).padStart(4, '0')}`;
+    return tx.stockLength.create({ data: { ...data, tag } });
+  });
+}
+
 /**
  * Logged from Production when a run cuts steel rod ahead of any specific
  * order — see production/page.tsx's "Produce stock lengths" card, which
@@ -35,23 +53,40 @@ export async function produceStockLength(formData: FormData) {
   if (!Number.isFinite(weightKg) || weightKg <= 0) throw new Error('Enter the bundle weight produced, in kg.');
   const note = String(formData.get('note') ?? '').trim();
 
-  const stockLength = await db.$transaction(async (tx) => {
-    const setting = await tx.setting.findUnique({ where: { key: NEXT_STOCK_LENGTH_TAG_KEY } });
-    const next = setting ? Number(setting.value) : 1;
-    await tx.setting.upsert({
-      where: { key: NEXT_STOCK_LENGTH_TAG_KEY },
-      create: { key: NEXT_STOCK_LENGTH_TAG_KEY, value: String(next + 1) },
-      update: { value: String(next + 1) },
-    });
-    const tag = `L${String(next).padStart(4, '0')}`;
-    return tx.stockLength.create({
-      data: { company, tag, lengthFt, lengthIn, thicknessMm, weightKg, note, producedById: user.id },
-    });
-  });
+  const stockLength = await createBundle({ company, lengthFt, lengthIn, thicknessMm, weightKg, note, identityNumber: null, producedById: user.id });
 
   await logActivity('StockLength', stockLength.id, 'Produced', `${stockLength.tag} — ${weightKg}kg of ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm`, user.id);
   revalidatePath('/stock/lengths');
   revalidatePath('/production');
+}
+
+/**
+ * For a bundle that's already sitting in stock — a stocktake catch-up, or
+ * one already carrying its own identity number — rather than one just cut
+ * from Production. Goes straight into stock with its own new tag, same as
+ * addExistingCoil does for a coil that's already in the yard.
+ */
+export async function addExistingStockLength(formData: FormData) {
+  const user = await assertPermission('stock.adjust');
+  const company = getActiveCompany(user);
+  if (company !== 'BS_SUPPLIES') throw new Error('Stock lengths are a BCS Products thing.');
+
+  const { lengthFt, lengthIn, thicknessMm } = readSpec(formData);
+  const weightKg = Number(formData.get('weightKg') ?? 0);
+  if (!Number.isFinite(weightKg) || weightKg <= 0) throw new Error('Enter the bundle weight, in kg.');
+  const identityNumber = String(formData.get('identityNumber') ?? '').trim() || null;
+  const note = String(formData.get('note') ?? '').trim();
+
+  const stockLength = await createBundle({ company, lengthFt, lengthIn, thicknessMm, weightKg, note, identityNumber, producedById: user.id });
+
+  await logActivity(
+    'StockLength',
+    stockLength.id,
+    'Added to stock',
+    `${stockLength.tag} — already in the yard, ${weightKg}kg of ${feetInches(lengthFt, lengthIn)} × ${thicknessMm}mm${identityNumber ? ` — ID ${identityNumber}` : ''}`,
+    user.id,
+  );
+  revalidatePath('/stock/lengths');
 }
 
 /**

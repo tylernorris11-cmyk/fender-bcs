@@ -359,16 +359,17 @@ model Coil {
 // back to when it was cut and pulled individually out of stock.
 
 model StockLength {
-  id           String   @id @default(cuid())
-  company      Company  @default(BS_SUPPLIES)
-  tag          String   @unique // printed on the bundle, e.g. "L0001"
-  lengthFt     Int
-  lengthIn     Int      @default(0)
-  thicknessMm  Decimal  @db.Decimal(6, 2)
-  weightKg     Decimal  @db.Decimal(10, 2)
-  note         String   @default("")
-  producedAt   DateTime @default(now())
-  producedById String?
+  id             String   @id @default(cuid())
+  company        Company  @default(BS_SUPPLIES)
+  tag            String   @unique // printed on the bundle, e.g. "L0001"
+  lengthFt       Int
+  lengthIn       Int      @default(0)
+  thicknessMm    Decimal  @db.Decimal(6, 2)
+  weightKg       Decimal  @db.Decimal(10, 2)
+  identityNumber String? // an identity number already on the bundle, rather than free stock
+  note           String   @default("")
+  producedAt     DateTime @default(now())
+  producedById   String?
 
   producedBy User? @relation("stockLengthProducedBy", fields: [producedById], references: [id])
 

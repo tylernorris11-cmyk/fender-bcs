@@ -11,6 +11,7 @@ export type StockLengthChipData = {
   lengthLabel: string;
   thicknessMm: number;
   weightKg: number;
+  identityNumber: string | null;
   note: string;
   producedLabel: string;
   producedByName: string | null;
@@ -35,6 +36,7 @@ export function StockLengthChip({ bundle, canAdjust }: { bundle: StockLengthChip
       >
         <p className="text-sm font-bold leading-tight">{bundle.tag}</p>
         <p className="text-[11px] text-ink-muted leading-tight">{bundle.weightKg.toLocaleString('en-GB')}</p>
+        {bundle.identityNumber && <p className="text-[10px] text-amber-700 font-semibold leading-tight truncate">{bundle.identityNumber}</p>}
       </button>
 
       {open && (
@@ -67,6 +69,12 @@ export function StockLengthChip({ bundle, canAdjust }: { bundle: StockLengthChip
                     <dt className="text-ink-muted">Weight</dt>
                     <dd className="font-medium text-right">{bundle.weightKg.toLocaleString('en-GB')} kg</dd>
                   </div>
+                  {bundle.identityNumber && (
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-ink-muted">Identity number</dt>
+                      <dd className="font-medium text-right text-amber-700">{bundle.identityNumber}</dd>
+                    </div>
+                  )}
                   <div className="flex justify-between gap-4">
                     <dt className="text-ink-muted shrink-0">Produced</dt>
                     <dd className="font-medium text-right">
