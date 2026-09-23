@@ -234,6 +234,7 @@ export const NAV: Record<string, NavItem[]> = {
   fuel: [
     { label: 'Fuel log', href: '/fuel' },
     { label: 'Add entry', href: '/fuel/new', perm: 'fuel.create' },
+    { label: 'History', href: '/fuel/history', perm: 'fuel.history' },
   ],
   hs: [
     { label: 'Overview', href: '/hs' },

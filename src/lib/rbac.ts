@@ -50,6 +50,7 @@ export type Permission =
   // Fuel — logging fill-ups against the yard tank meter
   | 'fuel.view'
   | 'fuel.create'
+  | 'fuel.history' // month-to-month usage trend — Master Admin/Admin only
   // Planning
   | 'planning.view'
   | 'planning.edit'
@@ -90,7 +91,7 @@ const ALL: Permission[] = [
   'assets.view', 'assets.edit',
   'purchaseOrders.view', 'purchaseOrders.create', 'purchaseOrders.edit',
   'checks.view', 'checks.create',
-  'fuel.view', 'fuel.create',
+  'fuel.view', 'fuel.create', 'fuel.history',
   'planning.view', 'planning.edit',
   'holidays.view', 'timesheets.viewAll',
   'hs.view', 'hs.edit', 'hs.manageTraining',
