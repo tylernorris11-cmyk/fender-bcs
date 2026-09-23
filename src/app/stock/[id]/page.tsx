@@ -7,9 +7,13 @@ import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { money, clock, qty as fmtQty, shortDate, productSpec } from '@/lib/format';
 import { blobFileHref } from '@/lib/blob';
+import { codeOptions } from '@/lib/ledger';
+import { groupPaths } from '@/lib/stockGroups';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, Table } from '@/components/ui';
-import { setBatchStatus, toggleProductActive } from '../actions';
+import { CodeSelect, NoCodesYet } from '@/components/CodeSelect';
+import { SubmitButton } from '@/components/SubmitButton';
+import { setBatchStatus, toggleProductActive, updateStockRecord } from '../actions';
 
 export default async function StockItemPage({ params }: { params: { id: string } }) {
   const user = await requirePermission('stock.view');
@@ -21,10 +25,21 @@ export default async function StockItemPage({ params }: { params: { id: string }
     include: {
       batches: { include: { supplier: true }, orderBy: { receivedAt: 'asc' } },
       movements: { include: { user: true, batch: true }, orderBy: { at: 'desc' }, take: 40 },
+      preferredSupplier: true,
     },
   });
   if (!product) notFound();
   if (!user.companies.includes(product.company)) notFound();
+
+  const canEditRecord = can(user, 'stock.adjust');
+  const canSetCodes = can(user, 'accounts.setup');
+  const [groups, suppliers, codes] = await Promise.all([
+    db.stockGroup.findMany({ where: { company: product.company } }),
+    db.supplier.findMany({ where: { company: product.company }, orderBy: { name: 'asc' }, select: { id: true, code: true, name: true } }),
+    codeOptions(product.company),
+  ]);
+  const paths = groupPaths(groups);
+  const groupPath = paths.find((g) => g.id === product.stockGroupId)?.path ?? product.category;
   const caresApplies = product.company === 'FENDER';
 
   const available = product.batches.filter((b) => b.status === 'Available').reduce((s, b) => s + Number(b.qtyRemaining), 0);
@@ -138,6 +153,45 @@ export default async function StockItemPage({ params }: { params: { id: string }
           ))}
           {product.movements.length === 0 && <li className="py-3 text-ink-muted">No movements recorded.</li>}
         </ul>
+      </section>
+
+      <section className="card card-pad mt-6">
+        <h2 className="text-lg font-bold mb-1">Stock record</h2>
+        <p className="text-sm text-ink-muted mb-4">Its stock group, who it&apos;s normally bought from, and the codes a sale of it will post to.</p>
+        {canEditRecord ? (
+          <form action={updateStockRecord} className="grid gap-5 sm:grid-cols-2 max-w-3xl">
+            <input type="hidden" name="productId" value={product.id} />
+            <div>
+              <label className="label" htmlFor="stockGroupId">Stock group</label>
+              <select id="stockGroupId" name="stockGroupId" required defaultValue={product.stockGroupId ?? ''} className="input">
+                <option value="" disabled>Choose…</option>
+                {paths.map((g) => <option key={g.id} value={g.id}>{g.path}</option>)}
+              </select>
+              <p className="hint"><Link href="/stock/groups" className="underline">Add or rename groups</Link></p>
+            </div>
+            <div>
+              <label className="label" htmlFor="preferredSupplierId">Preferred supplier</label>
+              <select id="preferredSupplierId" name="preferredSupplierId" defaultValue={product.preferredSupplierId ?? ''} className="input">
+                <option value="">None</option>
+                {suppliers.map((s) => <option key={s.id} value={s.id}>{s.code ? `${s.code} ` : ''}{s.name}</option>)}
+              </select>
+            </div>
+            {canSetCodes && (codes.vatCodes.length + codes.nominalCodes.length === 0 ? <NoCodesYet /> : (
+              <>
+                <CodeSelect name="vatCodeId" label="VAT code" options={codes.vatCodes} defaultValue={product.vatCodeId} />
+                <CodeSelect name="salesNominalId" label="Sales nominal code" options={codes.nominalCodes} defaultValue={product.salesNominalId} />
+                <CodeSelect name="costOfSalesNominalId" label="Cost of sales nominal code" options={codes.nominalCodes} defaultValue={product.costOfSalesNominalId} />
+                <CodeSelect name="stockNominalId" label="Stock value nominal code" options={codes.nominalCodes} defaultValue={product.stockNominalId} />
+              </>
+            ))}
+            <div className="sm:col-span-2"><SubmitButton pendingLabel="Saving…">Save stock record</SubmitButton></div>
+          </form>
+        ) : (
+          <dl className="grid gap-x-8 gap-y-2 sm:grid-cols-2 text-sm max-w-3xl">
+            <div className="flex justify-between gap-4"><dt className="text-ink-muted">Stock group</dt><dd className="font-semibold">{groupPath}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-ink-muted">Preferred supplier</dt><dd className="font-semibold">{product.preferredSupplier?.name ?? '—'}</dd></div>
+          </dl>
+        )}
       </section>
     </Shell>
   );

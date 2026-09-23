@@ -298,11 +298,34 @@ export async function toggleTown(formData: FormData) {
   revalidatePath('/setup/towns');
 }
 
+/** Exchequer location codes: up to 3 letters and numbers, e.g. SCU. */
+async function checkedLocationCode(raw: FormDataEntryValue | null, exceptId?: string) {
+  const code = String(raw ?? '').trim().toUpperCase();
+  if (!code) return null;
+  if (!/^[A-Z0-9]{1,3}$/.test(code)) throw new Error('Location codes are up to 3 letters and numbers, like SCU.');
+  const clash = await db.location.findFirst({ where: { code, ...(exceptId ? { id: { not: exceptId } } : {}) } });
+  if (clash) throw new Error(`${code} is already the code for ${clash.name}.`);
+  return code;
+}
+
 export async function addLocation(formData: FormData) {
   await assertPermission('setup.lists');
   const name = String(formData.get('name') ?? '').trim();
   if (!name) return;
-  await db.location.upsert({ where: { name }, update: { active: true }, create: { name } });
+  const existing = await db.location.findUnique({ where: { name } });
+  const code = await checkedLocationCode(formData.get('code'), existing?.id);
+  await db.location.upsert({
+    where: { name },
+    update: { active: true, ...(code ? { code } : {}) },
+    create: { name, code },
+  });
+  revalidatePath('/setup/locations');
+}
+
+export async function setLocationCode(formData: FormData) {
+  await assertPermission('setup.lists');
+  const id = String(formData.get('locationId'));
+  await db.location.update({ where: { id }, data: { code: await checkedLocationCode(formData.get('code'), id) } });
   revalidatePath('/setup/locations');
 }
 

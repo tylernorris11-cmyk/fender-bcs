@@ -111,7 +111,7 @@ model User {
 model Customer {
   id               String   @id @default(cuid())
   company          Company  @default(FENDER)
-  code             String   @unique // CUST-0001
+  code             String // Exchequer account code, e.g. FARN01 — unique within each company
   name             String
   contactName      String   @default("")
   phone            String   @default("")
@@ -125,12 +125,17 @@ model Customer {
   accountManagerId String?
   customerSince    DateTime @default(now())
   notes            String   @default("")
+  vatCodeId        String? // default VAT code for this account's invoices
+  nominalCodeId    String? // default sales nominal code, for lines with no stock record behind them
 
   accountManager User?              @relation("accountManager", fields: [accountManagerId], references: [id])
+  vatCode        VatCode?           @relation(fields: [vatCodeId], references: [id])
+  nominalCode    NominalCode?       @relation("customerNominal", fields: [nominalCodeId], references: [id])
   orders         Order[]
   ncrs           Ncr[]
   documents      CustomerDocument[]
 
+  @@unique([company, code])
   @@index([company])
 }
 
@@ -149,9 +154,9 @@ model CustomerDocument {
 model Product {
   id        String  @id @default(cuid())
   company   Company @default(FENDER)
-  code      String  @unique // RB12-500B
+  code      String // Exchequer stock code, e.g. RB12-500B — unique within each company
   name      String
-  category  String // Reinforcing bar | Mesh fabric | Cut & bent | Dowels | ...
+  category  String // the stock group's name, kept in step with stockGroupId so existing screens keep reading it
   unit      String  @default("t") // t | each | sheets | m
   kgPerUnit Decimal @default(1000) @db.Decimal(12, 3)
   standard  String  @default("") // BS 4449:2005 B500B etc.
@@ -167,12 +172,45 @@ model Product {
   thicknessMm    Decimal? @db.Decimal(6, 2)
   bundleWeightKg Decimal? @db.Decimal(10, 2)
 
+  // The Exchequer stock record side: its group, who it's normally bought
+  // from, and where a sale, its cost and the stock itself post to.
+  stockGroupId         String?
+  preferredSupplierId  String?
+  vatCodeId            String?
+  salesNominalId       String?
+  costOfSalesNominalId String?
+  stockNominalId       String?
+
+  stockGroup         StockGroup?         @relation(fields: [stockGroupId], references: [id])
+  preferredSupplier  Supplier?           @relation("preferredSupplier", fields: [preferredSupplierId], references: [id])
+  vatCode            VatCode?            @relation(fields: [vatCodeId], references: [id])
+  salesNominal       NominalCode?        @relation("productSales", fields: [salesNominalId], references: [id])
+  costOfSalesNominal NominalCode?        @relation("productCostOfSales", fields: [costOfSalesNominalId], references: [id])
+  stockNominal       NominalCode?        @relation("productStock", fields: [stockNominalId], references: [id])
   prices             Price[]
   batches            Batch[]
   orderLines         OrderLine[]
   movements          StockMovement[]
   purchaseOrderLines PurchaseOrderLine[]
 
+  @@unique([company, code])
+  @@index([company])
+}
+
+// Exchequer's stock groups. They can nest, e.g. Reinforcing bar > B500B.
+// The code is Exchequer's own group code, filled in by the import.
+model StockGroup {
+  id       String  @id @default(cuid())
+  company  Company
+  code     String?
+  name     String
+  parentId String?
+
+  parent   StockGroup?  @relation("stockGroupTree", fields: [parentId], references: [id])
+  children StockGroup[] @relation("stockGroupTree")
+  products Product[]
+
+  @@unique([company, code])
   @@index([company])
 }
 
@@ -203,23 +241,31 @@ model PurchaseCost {
 // ------------------------------------------------- suppliers and batches
 
 model Supplier {
-  id          String   @id @default(cuid())
-  company     Company  @default(FENDER)
-  name        String   @unique
-  country     String   @default("United Kingdom")
-  contactName String   @default("")
-  email       String   @default("")
-  phone       String   @default("")
-  notes       String   @default("")
-  approvedFor String   @default("") // e.g. "BS 4449:2005 B500B bar"
-  blocked     Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id            String   @id @default(cuid())
+  company       Company  @default(FENDER)
+  code          String? // Exchequer account code, e.g. ACEE02 — unique within each company
+  name          String
+  country       String   @default("United Kingdom")
+  contactName   String   @default("")
+  email         String   @default("")
+  phone         String   @default("")
+  notes         String   @default("")
+  approvedFor   String   @default("") // e.g. "BS 4449:2005 B500B bar"
+  blocked       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  vatCodeId     String? // default VAT code for this supplier's invoices
+  nominalCodeId String? // default purchases nominal code
 
-  batches        Batch[]
-  certificates   Certificate[]
-  ncrs           Ncr[]
-  purchaseOrders PurchaseOrder[]
+  vatCode           VatCode?        @relation(fields: [vatCodeId], references: [id])
+  nominalCode       NominalCode?    @relation("supplierNominal", fields: [nominalCodeId], references: [id])
+  batches           Batch[]
+  certificates      Certificate[]
+  ncrs              Ncr[]
+  purchaseOrders    PurchaseOrder[]
+  preferredProducts Product[]       @relation("preferredSupplier")
 
+  @@unique([company, code])
+  @@unique([company, name])
   @@index([company])
 }
 
@@ -1013,6 +1059,7 @@ model Town {
 model Location {
   id     String  @id @default(cuid())
   name   String  @unique
+  code   String? @unique // Exchequer's short location code, e.g. SCU
   active Boolean @default(true)
 }
 
@@ -1498,7 +1545,12 @@ model NominalCode {
   type    NominalType
   active  Boolean     @default(true)
 
-  postings NominalPosting[]
+  postings                   NominalPosting[]
+  customerDefaults           Customer[]       @relation("customerNominal")
+  supplierDefaults           Supplier[]       @relation("supplierNominal")
+  productSalesDefaults       Product[]        @relation("productSales")
+  productCostOfSalesDefaults Product[]        @relation("productCostOfSales")
+  productStockDefaults       Product[]        @relation("productStock")
 
   @@unique([company, code])
 }
@@ -1510,6 +1562,10 @@ model VatCode {
   name    String
   rate    Decimal @db.Decimal(5, 2) // a percentage — 20.00 for standard rate
   active  Boolean @default(true)
+
+  customers Customer[]
+  suppliers Supplier[]
+  products  Product[]
 
   @@unique([company, code])
 }

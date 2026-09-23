@@ -1,16 +1,27 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
+import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
+import { codeOptions } from '@/lib/ledger';
+import { groupPaths } from '@/lib/stockGroups';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
+import { CodeSelect, NoCodesYet } from '@/components/CodeSelect';
 import { createProduct } from '../actions';
 
 export default async function NewProductPage() {
   const user = await requirePermission('stock.adjust');
-  const alerts = await getAlerts(user);
-  const isFender = getActiveCompany(user) === 'FENDER';
+  const company = getActiveCompany(user);
+  const [alerts, groups, suppliers, codes] = await Promise.all([
+    getAlerts(user),
+    db.stockGroup.findMany({ where: { company } }),
+    db.supplier.findMany({ where: { company }, orderBy: { name: 'asc' }, select: { id: true, code: true, name: true } }),
+    codeOptions(company),
+  ]);
+  const isFender = company === 'FENDER';
 
   return (
     <Shell user={user} module="stock" nav={NAV.stock} current="/stock" alerts={alerts.length}>
@@ -22,9 +33,9 @@ export default async function NewProductPage() {
 
       <form action={createProduct} className="card card-pad grid gap-5 sm:grid-cols-2 max-w-3xl">
         <div>
-          <label className="label" htmlFor="code">Product code</label>
-          <input id="code" name="code" required className="input" placeholder={isFender ? 'RB12-500B' : 'FP-6-3'} />
-          <p className="hint">Unique — this is what shows on orders and delivery notes.</p>
+          <label className="label" htmlFor="code">Stock code</label>
+          <input id="code" name="code" required maxLength={21} className="input font-mono uppercase" placeholder={isFender ? 'RB12-500B' : 'FP-6-3'} />
+          <p className="hint">The Exchequer stock code. It shows on orders and delivery notes.</p>
         </div>
 
         <div>
@@ -33,8 +44,20 @@ export default async function NewProductPage() {
         </div>
 
         <div>
-          <label className="label" htmlFor="category">Category</label>
-          <input id="category" name="category" required className="input" placeholder="Reinforcing bar" />
+          <label className="label" htmlFor="stockGroupId">Stock group</label>
+          <select id="stockGroupId" name="stockGroupId" required defaultValue="" className="input">
+            <option value="" disabled>Choose…</option>
+            {groupPaths(groups).map((g) => <option key={g.id} value={g.id}>{g.path}</option>)}
+          </select>
+          <p className="hint"><Link href="/stock/groups" className="underline">Add or rename groups</Link></p>
+        </div>
+
+        <div>
+          <label className="label" htmlFor="preferredSupplierId">Preferred supplier</label>
+          <select id="preferredSupplierId" name="preferredSupplierId" defaultValue="" className="input">
+            <option value="">None</option>
+            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.code ? `${s.code} ` : ''}{s.name}</option>)}
+          </select>
         </div>
 
         <div>
@@ -104,6 +127,20 @@ export default async function NewProductPage() {
               <p className="hint">Flags as low stock once what&apos;s available drops to this or below. Leave at 0 to skip.</p>
             </div>
           </>
+        )}
+
+        {can(user, 'accounts.setup') && (
+          <fieldset className="sm:col-span-2 grid gap-5 sm:grid-cols-2 border-t border-hairline pt-5">
+            <legend className="text-sm font-bold mb-3">Accounts</legend>
+            {codes.vatCodes.length + codes.nominalCodes.length === 0 ? <NoCodesYet /> : (
+              <>
+                <CodeSelect name="vatCodeId" label="VAT code" options={codes.vatCodes} />
+                <CodeSelect name="salesNominalId" label="Sales nominal code" options={codes.nominalCodes} />
+                <CodeSelect name="costOfSalesNominalId" label="Cost of sales nominal code" options={codes.nominalCodes} />
+                <CodeSelect name="stockNominalId" label="Stock value nominal code" options={codes.nominalCodes} />
+              </>
+            )}
+          </fieldset>
         )}
 
         <div><button className="btn-primary">Add product</button></div>

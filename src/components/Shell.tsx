@@ -167,6 +167,7 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'All purchase orders', href: '/purchase-orders' },
     { label: 'New purchase order', href: '/purchase-orders/new', perm: 'purchaseOrders.create' },
     { label: 'Awaiting delivery', href: '/purchase-orders?status=SENT' },
+    { label: 'Suppliers', href: '/purchase-orders/suppliers' },
   ],
   production: [
     { label: 'Work in progress', href: '/production' },
@@ -216,6 +217,7 @@ export const NAV: Record<string, NavItem[]> = {
     // it doesn't compete with the two things they actually use; still
     // reachable from the Stock page itself for whoever needs them.
     { label: 'All stock', href: '/stock', company: 'FENDER' },
+    { label: 'Stock groups', href: '/stock/groups', company: 'FENDER' },
     { label: 'Goods in', href: '/stock/goods-in', perm: 'stock.goodsIn', company: 'FENDER' },
     { label: 'Movements', href: '/stock/movements', company: 'FENDER' },
     { label: 'Bar counter', href: '/stock/bar-counter', perm: 'barCounter.view', company: 'FENDER' },

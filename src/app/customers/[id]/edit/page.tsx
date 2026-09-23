@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
+import { codeOptions } from '@/lib/ledger';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
 import { CustomerForm } from '../../CustomerForm';
@@ -19,6 +20,7 @@ export default async function EditCustomerPage({ params }: { params: { id: strin
   ]);
   if (!customer) notFound();
   if (!user.companies.includes(customer.company)) notFound();
+  const codes = await codeOptions(customer.company);
 
   return (
     <Shell user={user} module="customers" nav={NAV.customers} current="/customers" alerts={alerts.length}>
@@ -31,12 +33,14 @@ export default async function EditCustomerPage({ params }: { params: { id: strin
         action={updateCustomer}
         managers={managers}
         towns={towns.map((t) => t.name)}
+        codes={codes}
         submitLabel="Save changes"
         values={{
-          id: customer.id, name: customer.name, contactName: customer.contactName, phone: customer.phone,
+          id: customer.id, code: customer.code, name: customer.name, contactName: customer.contactName, phone: customer.phone,
           email: customer.email, address: customer.address, town: customer.town, postcode: customer.postcode,
           paymentTerms: customer.paymentTerms, status: customer.status, accountManagerId: customer.accountManagerId,
           creditLimit: String(customer.creditLimit), notes: customer.notes,
+          vatCodeId: customer.vatCodeId, nominalCodeId: customer.nominalCodeId,
         }}
       />
     </Shell>

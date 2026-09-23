@@ -54,6 +54,41 @@ export function isPeriodLocked(settings: AccountsSettingsValues, year: number, p
   return year < settings.lockedYear || (year === settings.lockedYear && period <= settings.lockedPeriod);
 }
 
+/**
+ * A VAT or nominal code picked on a form, checked to belong to the company
+ * whose record it's going on. Blank means none; anything else that doesn't
+ * match is refused rather than quietly saved against the other company's books.
+ */
+export async function checkedVatCodeId(raw: FormDataEntryValue | null, company: Company): Promise<string | null> {
+  const id = String(raw ?? '');
+  if (!id) return null;
+  const vat = await db.vatCode.findUnique({ where: { id } });
+  if (!vat || vat.company !== company) throw new Error("That VAT code doesn't belong to this company.");
+  return id;
+}
+
+export async function checkedNominalCodeId(raw: FormDataEntryValue | null, company: Company): Promise<string | null> {
+  const id = String(raw ?? '');
+  if (!id) return null;
+  const code = await db.nominalCode.findUnique({ where: { id } });
+  if (!code || code.company !== company) throw new Error("That nominal code doesn't belong to this company.");
+  return id;
+}
+
+export type CodeOption = { id: string; label: string };
+
+/** Every VAT and nominal code for a company, ready for a dropdown. Retired ones stay listed (marked) so a record already using one isn't silently cleared on save. */
+export async function codeOptions(company: Company): Promise<{ vatCodes: CodeOption[]; nominalCodes: CodeOption[] }> {
+  const [vat, nominal] = await Promise.all([
+    db.vatCode.findMany({ where: { company }, orderBy: { code: 'asc' } }),
+    db.nominalCode.findMany({ where: { company }, orderBy: { code: 'asc' } }),
+  ]);
+  return {
+    vatCodes: vat.map((v) => ({ id: v.id, label: `${v.code} ${v.name} (${Number(v.rate)}%)${v.active ? '' : ', retired'}` })),
+    nominalCodes: nominal.map((n) => ({ id: n.id, label: `${n.code} ${n.name}${n.active ? '' : ' (retired)'}` })),
+  };
+}
+
 /** Exchequer's own reference format: the document type, then six digits. */
 export function formatRef(docType: TransactionType, n: number) {
   return `${docType}${String(n).padStart(6, '0')}`;

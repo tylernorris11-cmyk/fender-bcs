@@ -2,21 +2,53 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import type { Company } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
-import { can } from '@/lib/rbac';
+import { can, type SessionUser } from '@/lib/rbac';
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
+import { checkedNominalCodeId, checkedVatCodeId } from '@/lib/ledger';
+
+/** The stock group chosen on a form, checked to be this company's. */
+async function checkedGroup(raw: FormDataEntryValue | null, company: Company) {
+  const id = String(raw ?? '');
+  if (!id) throw new Error('Choose a stock group.');
+  const group = await db.stockGroup.findUnique({ where: { id } });
+  if (!group || group.company !== company) throw new Error("That stock group doesn't belong to this company.");
+  return group;
+}
+
+async function checkedSupplierId(raw: FormDataEntryValue | null, company: Company) {
+  const id = String(raw ?? '');
+  if (!id) return null;
+  const supplier = await db.supplier.findUnique({ where: { id } });
+  if (!supplier || supplier.company !== company) throw new Error("That supplier doesn't belong to this company.");
+  return id;
+}
+
+/** VAT code and the three nominal codes a stock record posts to — only an accounts admin sets these. */
+async function stockLedgerDefaults(formData: FormData, user: SessionUser, company: Company) {
+  if (!can(user, 'accounts.setup')) return {};
+  return {
+    vatCodeId: await checkedVatCodeId(formData.get('vatCodeId'), company),
+    salesNominalId: await checkedNominalCodeId(formData.get('salesNominalId'), company),
+    costOfSalesNominalId: await checkedNominalCodeId(formData.get('costOfSalesNominalId'), company),
+    stockNominalId: await checkedNominalCodeId(formData.get('stockNominalId'), company),
+  };
+}
 
 export async function createProduct(formData: FormData) {
   const user = await assertPermission('stock.adjust');
   const company = getActiveCompany(user);
   const code = String(formData.get('code') ?? '').trim().toUpperCase();
   const name = String(formData.get('name') ?? '').trim();
-  const category = String(formData.get('category') ?? '').trim();
-  if (!code || !name || !category) throw new Error('Give it a code, a name and a category.');
+  if (!code || !name) throw new Error('Give it a stock code and a name.');
+  if (code.length > 21) throw new Error('Stock codes are 21 characters at most, the same as Exchequer.');
+  const group = await checkedGroup(formData.get('stockGroupId'), company);
+  const category = group.name;
 
-  if (await db.product.findUnique({ where: { code } })) {
-    throw new Error(`${code} is already in use — codes have to be unique.`);
+  if (await db.product.findUnique({ where: { company_code: { company, code } } })) {
+    throw new Error(`${code} is already in use. Stock codes have to be unique.`);
   }
 
   const numOrNull = (key: string) => {
@@ -36,12 +68,90 @@ export async function createProduct(formData: FormData) {
       lengthIn: numOrNull('lengthIn'),
       thicknessMm: numOrNull('thicknessMm'),
       bundleWeightKg: numOrNull('bundleWeightKg'),
+      stockGroupId: group.id,
+      preferredSupplierId: await checkedSupplierId(formData.get('preferredSupplierId'), company),
+      ...(await stockLedgerDefaults(formData, user, company)),
     },
   });
 
   await logActivity('Product', product.id, 'Added', `${code} — ${name}`, user.id);
   revalidatePath('/stock');
   redirect(`/stock/${product.id}`);
+}
+
+/** The Exchequer stock record fields on an existing product: its group, preferred supplier and the codes it posts to. */
+export async function updateStockRecord(formData: FormData) {
+  const user = await assertPermission('stock.adjust');
+  const id = String(formData.get('productId'));
+  const product = await db.product.findUniqueOrThrow({ where: { id } });
+  assertCompanyAccess(user, product.company);
+  const group = await checkedGroup(formData.get('stockGroupId'), product.company);
+
+  await db.product.update({
+    where: { id },
+    data: {
+      stockGroupId: group.id,
+      category: group.name,
+      preferredSupplierId: await checkedSupplierId(formData.get('preferredSupplierId'), product.company),
+      ...(await stockLedgerDefaults(formData, user, product.company)),
+    },
+  });
+  await logActivity('Product', id, 'Stock record updated', '', user.id);
+  revalidatePath(`/stock/${id}`);
+  revalidatePath('/stock');
+}
+
+// ------------------------------------------------------------ stock groups
+
+function readGroupCode(raw: FormDataEntryValue | null) {
+  const code = String(raw ?? '').trim().toUpperCase();
+  if (code.length > 21) throw new Error('Group codes are 21 characters at most, the same as Exchequer.');
+  return code || null;
+}
+
+async function checkGroupCodeFree(company: Company, code: string | null, exceptId?: string) {
+  if (!code) return;
+  const clash = await db.stockGroup.findFirst({ where: { company, code, ...(exceptId ? { id: { not: exceptId } } : {}) } });
+  if (clash) throw new Error(`Group code ${code} is already used by ${clash.name}.`);
+}
+
+export async function addStockGroup(formData: FormData) {
+  const user = await assertPermission('stock.adjust');
+  const company = getActiveCompany(user);
+  const name = String(formData.get('name') ?? '').trim();
+  if (!name) throw new Error('Give the group a name.');
+  const code = readGroupCode(formData.get('code'));
+  await checkGroupCodeFree(company, code);
+
+  const parentId = String(formData.get('parentId') ?? '') || null;
+  if (parentId) {
+    const parent = await db.stockGroup.findUnique({ where: { id: parentId } });
+    if (!parent || parent.company !== company) throw new Error("That parent group doesn't belong to this company.");
+  }
+
+  const group = await db.stockGroup.create({ data: { company, name, code, parentId } });
+  await logActivity('StockGroup', group.id, 'Added', `${code ?? ''} ${name}`.trim(), user.id);
+  revalidatePath('/stock/groups');
+}
+
+/** Renaming a group renames the category every product in it shows, so the two never disagree. */
+export async function updateStockGroup(formData: FormData) {
+  const user = await assertPermission('stock.adjust');
+  const id = String(formData.get('stockGroupId'));
+  const group = await db.stockGroup.findUniqueOrThrow({ where: { id } });
+  assertCompanyAccess(user, group.company);
+  const name = String(formData.get('name') ?? '').trim();
+  if (!name) throw new Error('Give the group a name.');
+  const code = readGroupCode(formData.get('code'));
+  await checkGroupCodeFree(group.company, code, id);
+
+  await db.$transaction([
+    db.stockGroup.update({ where: { id }, data: { name, code } }),
+    db.product.updateMany({ where: { stockGroupId: id }, data: { category: name } }),
+  ]);
+  await logActivity('StockGroup', id, 'Updated', `${code ?? ''} ${name}`.trim(), user.id);
+  revalidatePath('/stock/groups');
+  revalidatePath('/stock');
 }
 
 export async function toggleProductActive(formData: FormData) {

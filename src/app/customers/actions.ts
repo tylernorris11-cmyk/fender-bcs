@@ -2,15 +2,31 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import type { Company } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
-import { can } from '@/lib/rbac';
+import { can, type SessionUser } from '@/lib/rbac';
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
+import { readAccountCode, suggestAccountCode } from '@/lib/accountCodes';
+import { checkedNominalCodeId, checkedVatCodeId } from '@/lib/ledger';
 
-async function nextCustomerCode() {
-  const last = await db.customer.findFirst({ orderBy: { code: 'desc' }, select: { code: true } });
-  const seq = last ? Number(last.code.split('-')[1]) + 1 : 1;
-  return `CUST-${String(seq).padStart(4, '0')}`;
+/** The code typed in, or Exchequer's usual suggestion from the name — refused if another account in the company has it. */
+async function accountCodeFor(formData: FormData, company: Company, name: string, exceptId?: string) {
+  const isTaken = async (code: string) =>
+    !!(await db.customer.findFirst({ where: { company, code, ...(exceptId ? { id: { not: exceptId } } : {}) }, select: { id: true } }));
+  const typed = readAccountCode(formData.get('code'));
+  if (!typed) return suggestAccountCode(name, isTaken);
+  if (await isTaken(typed)) throw new Error(`Account code ${typed} is already used by another customer.`);
+  return typed;
+}
+
+/** Default VAT and sales nominal codes — only an accounts admin sets these. */
+async function ledgerDefaults(formData: FormData, user: SessionUser, company: Company) {
+  if (!can(user, 'accounts.setup')) return {};
+  return {
+    vatCodeId: await checkedVatCodeId(formData.get('vatCodeId'), company),
+    nominalCodeId: await checkedNominalCodeId(formData.get('nominalCodeId'), company),
+  };
 }
 
 function readForm(formData: FormData) {
@@ -37,11 +53,13 @@ export async function createCustomer(formData: FormData) {
   // Only someone with customers.credit sets the limit; everyone else opens the
   // account on nothing and a director sets the number.
   const creditLimit = can(user, 'customers.credit') ? Number(formData.get('creditLimit') ?? 0) : 0;
+  const company = getActiveCompany(user);
+  const code = await accountCodeFor(formData, company, data.name);
 
   const customer = await db.customer.create({
-    data: { ...data, code: await nextCustomerCode(), creditLimit, company: getActiveCompany(user) },
+    data: { ...data, ...(await ledgerDefaults(formData, user, company)), code, creditLimit, company },
   });
-  await logActivity('Customer', customer.id, 'Account opened', data.name, user.id);
+  await logActivity('Customer', customer.id, 'Account opened', `${code} ${data.name}`, user.id);
   revalidatePath('/customers');
   redirect(`/customers/${customer.id}`);
 }
@@ -52,8 +70,13 @@ export async function updateCustomer(formData: FormData) {
   const existing = await db.customer.findUniqueOrThrow({ where: { id }, select: { company: true } });
   assertCompanyAccess(user, existing.company);
   const data = readForm(formData);
+  if (!data.name) throw new Error('The account needs a name.');
 
-  const patch: Record<string, unknown> = { ...data };
+  const patch: Record<string, unknown> = {
+    ...data,
+    ...(await ledgerDefaults(formData, user, existing.company)),
+    code: await accountCodeFor(formData, existing.company, data.name, id),
+  };
   if (can(user, 'customers.credit')) {
     patch.creditLimit = Number(formData.get('creditLimit') ?? 0);
   }
