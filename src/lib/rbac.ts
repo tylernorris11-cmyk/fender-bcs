@@ -262,6 +262,7 @@ export const MODULES = [
  * added; nothing here should duplicate something a role already covers. */
 export const GRANTABLE_EXTRA_PERMISSIONS = [
   { key: 'compliance.fcpCosh' as Permission, label: 'Upload FCP Data & Cosh sheets' },
+  { key: 'planning.edit' as Permission, label: 'Add deliveries and assign drivers' },
 ] as const;
 
 /** Every module a Master Administrator can hide for someone in Set Up — everything except Set Up itself. */
