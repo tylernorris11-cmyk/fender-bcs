@@ -161,3 +161,61 @@
     background-image: repeating-linear-gradient(45deg, #16110A 0px, #16110A 10px, #F5C518 10px, #F5C518 20px);
   }
 }
+
+/* The delivery board's dark version, only while it's fullscreen on a wall
+   screen: FullscreenToggle adds .board-dark to the board and takes it off
+   again on exit. Scoped overrides of the handful of light colours the board
+   uses, rather than a site-wide dark mode, so nothing else changes. */
+.board-dark.bg-canvas,
+.board-dark .bg-canvas {
+  background-color: #0c1412;
+}
+.board-dark {
+  color: #e7eeeb;
+  color-scheme: dark;
+}
+.board-dark .card,
+.board-dark .bg-white {
+  background-color: #15201d;
+}
+.board-dark .card {
+  border-color: #22302c;
+  box-shadow: none;
+}
+.board-dark .border-hairline {
+  border-color: #2b3a36;
+}
+.board-dark .text-ink-muted {
+  color: #a5b6b0;
+}
+.board-dark .text-ink-faint {
+  color: #7b8d87;
+}
+.board-dark .btn-secondary {
+  background-color: #1c2926;
+  border-color: #2b3a36;
+  color: #e7eeeb;
+}
+.board-dark .hover\:bg-canvas:hover,
+.board-dark .btn-secondary:hover {
+  background-color: #243330;
+}
+.board-dark .text-forest {
+  color: rgb(var(--color-brand-100));
+}
+.board-dark .text-brand-700 {
+  color: rgb(var(--color-brand-500));
+}
+.board-dark .text-signal {
+  color: #f87171;
+}
+/* Delivery boxes keep their coloured edge on a tinted dark background.
+   Black deliveries get a pale edge, since a black one would vanish. */
+.board-dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.18); }
+.board-dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.18); }
+.board-dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.18); }
+.board-dark .bg-slate-100 { background-color: rgba(148, 163, 184, 0.14); }
+.board-dark .border-slate-800 { border-color: #e2e8f0; }
+.board-dark .bg-brand-50 { background-color: rgb(var(--color-brand) / 0.18); }
+.board-dark .bg-violet-50 { background-color: rgba(139, 92, 246, 0.18); }
+.board-dark .bg-sky-50 { background-color: rgba(56, 189, 248, 0.18); }

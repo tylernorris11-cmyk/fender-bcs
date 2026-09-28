@@ -9,8 +9,9 @@ const REFRESH_EVERY_MS = 5 * 60 * 1000;
 // Applied to the target element only while it's the fullscreen element —
 // the browser's own fullscreen sizing (fixed, inset 0) is default black
 // letterboxing, so this gives it a proper background, breathing room and
-// its own scroll for whatever doesn't fit on one screen.
-const FULLSCREEN_CLASSES = ['bg-canvas', 'p-6', 'overflow-y-auto', 'h-screen', 'w-screen'];
+// its own scroll for whatever doesn't fit on one screen. board-dark turns
+// on the dark version in globals.css.
+const FULLSCREEN_CLASSES = ['bg-canvas', 'p-6', 'overflow-y-auto', 'h-screen', 'w-screen', 'board-dark'];
 
 /**
  * Puts one element — found by id, not a React ref, since this button
