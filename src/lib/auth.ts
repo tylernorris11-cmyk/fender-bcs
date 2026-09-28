@@ -179,7 +179,7 @@ export async function notifyMasterAdmins({
 }: { subject: string; text: string; path: string; telegram?: boolean; email?: boolean; photo?: string | null }): Promise<void> {
   const h = headers();
   const link = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host')}${path}`;
-  const admins = email ? await db.user.findMany({ where: { role: 'MASTER_ADMIN', active: true } }) : [];
+  const admins = email ? await db.user.findMany({ where: { role: 'MASTER_ADMIN', active: true, adminEmails: true } }) : [];
   const fullMessage = `${subject}\n\n${text}\n\n${link}`;
   await Promise.all([
     ...admins.map((a) => sendEmail({ to: a.email, subject, text: `${text}\n\n${link}` })),

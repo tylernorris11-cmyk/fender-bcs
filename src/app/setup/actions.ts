@@ -137,6 +137,20 @@ export async function updateUserRole(formData: FormData) {
   revalidatePath('/setup/users');
 }
 
+/** Turns the admin emails on or off for one Master Administrator. Their access doesn't change, only what lands in their inbox. */
+export async function setAdminEmails(formData: FormData) {
+  const admin = await assertPermission('setup.users');
+  if (admin.role !== 'MASTER_ADMIN') throw new Error('Only a Master Administrator can change this.');
+  const userId = String(formData.get('userId'));
+  const adminEmails = formData.get('adminEmails') === '1';
+  const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  if (target.role !== 'MASTER_ADMIN') throw new Error('Only Master Administrators get the admin emails.');
+
+  await db.user.update({ where: { id: userId }, data: { adminEmails } });
+  await logActivity('User', userId, adminEmails ? 'Admin emails turned on' : 'Admin emails turned off', target.name, admin.id);
+  revalidatePath('/setup/users');
+}
+
 export async function updateUserCompanies(formData: FormData) {
   const admin = await assertPermission('setup.users');
   const userId = String(formData.get('userId'));

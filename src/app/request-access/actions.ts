@@ -59,7 +59,7 @@ export async function submitAccessRequest(formData: FormData) {
   });
 
   // Best-effort — the request is already saved regardless of whether this send works.
-  const admins = await db.user.findMany({ where: { role: 'MASTER_ADMIN', active: true } });
+  const admins = await db.user.findMany({ where: { role: 'MASTER_ADMIN', active: true, adminEmails: true } });
   const h = headers();
   const origin = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host')}`;
   const companyText = companies.map((c) => COMPANY_LABEL[c]).join(' and ');

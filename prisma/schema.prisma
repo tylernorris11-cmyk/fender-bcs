@@ -55,6 +55,7 @@ model User {
   resetTokenHash    String? // sha256 of the token emailed for "forgot password" — never the plain token
   resetTokenExpires DateTime?
   companies         Company[] @default([FENDER]) // which companies this account may view
+  adminEmails       Boolean   @default(true) // Master Administrators only: false stops the admin emails (holiday and access requests, failed checks and so on) while keeping full access
 
   ordersRaised                Order[]                  @relation("raisedBy")
   accountsManaged             Customer[]               @relation("accountManager")

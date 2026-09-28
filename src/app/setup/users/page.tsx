@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import type { Role } from '@prisma/client';
+import { UserPlus } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
@@ -7,8 +9,10 @@ import { shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { COMPANY_LABEL } from '@/lib/company';
 import { Avatar, PageHeader, Pill, SortTh, Table } from '@/components/ui';
+import { SubmitButton } from '@/components/SubmitButton';
+import { UrlModal } from '@/components/UrlModal';
 import {
-  resetPassword, toggleUserActive, updateAllHiddenModules, updateExtraPermissions, updateHolidayAllowance, updateUserCompanies, updateUserRole,
+  resetPassword, setAdminEmails, toggleUserActive, updateAllHiddenModules, updateExtraPermissions, updateHolidayAllowance, updateUserCompanies, updateUserRole,
 } from '../actions';
 import { AddUserForm } from './AddUserForm';
 
@@ -16,7 +20,30 @@ const COMPANIES = ['FENDER', 'BS_SUPPLIES'] as const;
 
 const ALL_ROLES = Object.keys(ROLE_LABELS) as Role[];
 
-export default async function UsersPage({ searchParams }: { searchParams: { sort?: string; dir?: string } }) {
+type SearchParams = { sort?: string; dir?: string; user?: string; add?: string };
+
+/** The page address with the sort kept and the pop-up changed. */
+function hrefWith(searchParams: SearchParams, patch: { user?: string; add?: string }) {
+  const params = new URLSearchParams();
+  if (searchParams.sort) params.set('sort', searchParams.sort);
+  if (searchParams.dir) params.set('dir', searchParams.dir);
+  if (patch.user) params.set('user', patch.user);
+  if (patch.add) params.set('add', patch.add);
+  const qs = params.toString();
+  return `/setup/users${qs ? `?${qs}` : ''}`;
+}
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="border-t border-hairline pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
+      <h3 className="font-bold mb-1">{title}</h3>
+      {hint && <p className="text-xs text-ink-muted mb-3">{hint}</p>}
+      {children}
+    </section>
+  );
+}
+
+export default async function UsersPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requirePermission('setup.users');
   const alerts = await getAlerts(user);
   const isMaster = user.role === 'MASTER_ADMIN';
@@ -34,219 +61,204 @@ export default async function UsersPage({ searchParams }: { searchParams: { sort
       : [{ active: 'desc' }, { name: 'asc' }],
   });
 
+  const selected = users.find((u) => u.id === searchParams.user);
+  const closeHref = hrefWith(searchParams, {});
+
   return (
     <Shell user={user} module="setup" nav={NAV.setup} current="/setup/users" alerts={alerts.length}>
-      <PageHeader title="Users & roles" blurb="Who can get in, and what each of them can reach." />
+      <PageHeader
+        title="Users & roles"
+        blurb="Who can get in. Click someone to change their role, access, holidays or password."
+        actions={<Link href={hrefWith(searchParams, { add: '1' })} scroll={false} className="btn-primary"><UserPlus size={16} /> Add someone</Link>}
+      />
 
       <section className="card card-pad mb-6">
         <Table head={<>
           <SortTh label="Person" field="name" basePath="/setup/users" searchParams={searchParams} />
           <SortTh label="Role" field="role" basePath="/setup/users" searchParams={searchParams} />
+          <th className="th">Companies</th>
           <SortTh label="Last signed in" field="lastLogin" basePath="/setup/users" searchParams={searchParams} />
-          <th className="th">Company access</th>
-          <th className="th" title="The full year total, including bank holidays — not on top of them.">Holiday days/yr</th>
-          <th className="th">Status</th><th className="th sr-only">Reset password</th>
+          <th className="th">Status</th>
         </>}>
-          {users.map((u) => {
-            const locked = !isMaster && u.role === 'MASTER_ADMIN';
-            return (
+          {users.map((u) => (
             <tr key={u.id} className="row">
               <td className="td">
-                <span className="flex items-center gap-3">
+                <Link href={hrefWith(searchParams, { user: u.id })} scroll={false} className="flex items-center gap-3 group">
                   <Avatar name={u.name} colour={u.colour} size={34} />
                   <span>
-                    <span className="block font-semibold">{u.name}</span>
-                    <span className="block text-xs text-ink-faint">{u.email}{u.jobTitle && ` · ${u.jobTitle}`}</span>
+                    <span className="block font-semibold text-brand-700 group-hover:underline">{u.name}</span>
+                    <span className="block text-xs text-ink-faint">{u.jobTitle || u.email}</span>
                   </span>
-                </span>
+                </Link>
               </td>
-              <td className="td">
-                {locked ? (
-                  <span className="text-sm text-ink-muted">{ROLE_LABELS[u.role]}</span>
-                ) : (
-                  <form action={updateUserRole} className="flex gap-2 items-center">
-                    <input type="hidden" name="userId" value={u.id} />
-                    <select name="role" defaultValue={u.role} className="input w-44 py-1.5" aria-label={`Role for ${u.name}`}>
-                      {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                    </select>
-                    <button className="btn-secondary btn-sm">Save</button>
-                  </form>
-                )}
-              </td>
+              <td className="td text-ink-muted">{ROLE_LABELS[u.role]}</td>
+              <td className="td text-ink-muted text-sm">{u.companies.map((c) => COMPANY_LABEL[c]).join(', ')}</td>
               <td className="td text-ink-muted whitespace-nowrap">{u.lastLoginAt ? shortDate(u.lastLoginAt) : 'Never'}</td>
-              <td className="td">
-                {locked ? (
-                  <span className="text-xs text-ink-faint">Every company</span>
-                ) : (
-                  <form action={updateUserCompanies} className="flex flex-col gap-1">
-                    <input type="hidden" name="userId" value={u.id} />
-                    {grantableCompanies.map((c) => (
-                      <label key={c} className="flex items-center gap-1.5 text-xs">
-                        <input type="checkbox" name="companies" value={c} defaultChecked={u.companies.includes(c)}
-                               disabled={u.role === 'MASTER_ADMIN'} className="h-3.5 w-3.5 accent-brand" />
-                        {COMPANY_LABEL[c]}
-                      </label>
-                    ))}
-                    {u.companies.filter((c) => !grantableCompanies.includes(c)).map((c) => (
-                      <span key={c} className="text-xs text-ink-faint">{COMPANY_LABEL[c]} (not yours to grant)</span>
-                    ))}
-                    {u.role !== 'MASTER_ADMIN' && <button className="btn-secondary btn-sm mt-1 self-start">Save</button>}
-                  </form>
-                )}
-              </td>
-              <td className="td">
-                <form action={updateHolidayAllowance} className="flex flex-col gap-1.5">
-                  <span className="flex gap-2 items-center">
-                    <input type="hidden" name="userId" value={u.id} />
-                    <input name="holidayAllowanceDays" type="number" min="0" step="1" defaultValue={u.holidayAllowanceDays}
-                           className="input w-16 py-1.5" aria-label={`Holiday days a year for ${u.name}`} />
-                    <button className="btn-secondary btn-sm">Save</button>
-                  </span>
-                  <label className="flex items-center gap-1.5 text-xs text-ink-muted">
-                    <input type="checkbox" name="bankHolidaysComeOff" defaultChecked={u.bankHolidaysComeOff} className="h-3.5 w-3.5 accent-brand" />
-                    Bank holidays come off
-                  </label>
-                </form>
-              </td>
-              <td className="td">
-                {locked ? (
-                  u.active ? <Pill tone="good">Active</Pill> : <Pill tone="bad">Suspended</Pill>
-                ) : (
-                  <form action={toggleUserActive} className="flex items-center gap-2">
-                    <input type="hidden" name="userId" value={u.id} />
-                    {u.active ? <Pill tone="good">Active</Pill> : <Pill tone="bad">Suspended</Pill>}
-                    <button className="text-xs text-ink-faint hover:text-ink underline">
-                      {u.active ? 'suspend' : 'reactivate'}
-                    </button>
-                  </form>
-                )}
-              </td>
-              <td className="td">
-                {locked ? null : (
-                <form action={resetPassword} className="flex gap-2 justify-end">
-                  <input type="hidden" name="userId" value={u.id} />
-                  <input name="password" type="text" className="input w-44 py-1.5" placeholder="New password"
-                         aria-label={`New password for ${u.name}`} />
-                  <button className="btn-secondary btn-sm">Reset</button>
-                </form>
-                )}
-              </td>
+              <td className="td">{u.active ? <Pill tone="good">Active</Pill> : <Pill tone="bad">Suspended</Pill>}</td>
             </tr>
-            );
-          })}
+          ))}
         </Table>
       </section>
 
-      <section className="card card-pad mb-6">
-        <h2 className="text-lg font-bold mb-1">Who can see what</h2>
-        <p className="text-sm text-ink-muted mb-4">
-          Untick a module and it disappears for that person everywhere — home screen, menus, search, and the page itself
-          if they go straight to the address. A Master Administrator can always see everything, so they aren&apos;t listed here.
-        </p>
-        <form action={updateAllHiddenModules}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
-            <thead>
-              <tr>
-                <th className="th text-left">Person</th>
-                {TOGGLEABLE_MODULES.map((m) => <th key={m.key} className="th text-center whitespace-nowrap px-2">{m.label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {users.filter((u) => u.role !== 'MASTER_ADMIN').map((u) => (
-                <tr key={u.id} className="row">
-                  <td className="td font-semibold whitespace-nowrap">
-                    {u.name}
-                    <input type="hidden" name="userIds" value={u.id} />
-                  </td>
-                  {TOGGLEABLE_MODULES.map((m) => (
-                    <td key={m.key} className="td text-center">
-                      <input type="checkbox" name={`visible_${u.id}`} value={m.key}
-                             defaultChecked={!u.hiddenModules.includes(m.key)}
-                             className="h-4 w-4 accent-brand" aria-label={`${u.name} can see ${m.label}`} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {users.filter((u) => u.role !== 'MASTER_ADMIN').length === 0 && (
-                <tr><td colSpan={TOGGLEABLE_MODULES.length + 1} className="td text-ink-muted">Nobody else to set this for yet.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {users.filter((u) => u.role !== 'MASTER_ADMIN').length > 0 && (
-          <button className="btn-primary mt-4">Save all</button>
-        )}
-        </form>
-      </section>
+      <details className="card card-pad">
+        <summary className="font-bold cursor-pointer">What each role can reach</summary>
+        <ul className="space-y-4 text-sm mt-4">
+          {ROLES.map((r) => (
+            <li key={r}>
+              <div className="flex items-center gap-2">
+                <strong>{ROLE_LABELS[r]}</strong>
+                <Pill tone={r === 'ADMIN' || r === 'MASTER_ADMIN' ? 'bad' : 'neutral'}>{PERMISSIONS[r].length} permissions</Pill>
+              </div>
+              <p className="text-ink-muted mt-0.5">{ROLE_BLURBS[r]}</p>
+            </li>
+          ))}
+        </ul>
+      </details>
 
-      <section className="card card-pad mb-6">
-        <h2 className="text-lg font-bold mb-1">Extra access</h2>
-        <p className="text-sm text-ink-muted mb-4">
-          One-off extras on top of a person&apos;s role — for when someone needs just one narrow thing, not a whole different role.
-        </p>
-        <form action={updateExtraPermissions}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[600px] text-sm">
-            <thead>
-              <tr>
-                <th className="th text-left">Person</th>
-                {GRANTABLE_EXTRA_PERMISSIONS.map((p) => <th key={p.key} className="th text-center whitespace-nowrap px-2">{p.label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {users.filter((u) => u.role !== 'MASTER_ADMIN').map((u) => (
-                <tr key={u.id} className="row">
-                  <td className="td font-semibold whitespace-nowrap">
-                    {u.name}
-                    <input type="hidden" name="userIds" value={u.id} />
-                  </td>
-                  {GRANTABLE_EXTRA_PERMISSIONS.map((p) => (
-                    <td key={p.key} className="td text-center">
-                      <input type="checkbox" name={`extra_${u.id}`} value={p.key}
-                             defaultChecked={u.extraPermissions.includes(p.key)}
-                             className="h-4 w-4 accent-brand" aria-label={`${u.name}: ${p.label}`} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {users.filter((u) => u.role !== 'MASTER_ADMIN').length === 0 && (
-                <tr><td colSpan={GRANTABLE_EXTRA_PERMISSIONS.length + 1} className="td text-ink-muted">Nobody else to set this for yet.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {users.filter((u) => u.role !== 'MASTER_ADMIN').length > 0 && (
-          <button className="btn-primary mt-4">Save all</button>
-        )}
-        </form>
-      </section>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="card card-pad">
-          <h2 className="text-lg font-bold mb-4">Add someone</h2>
+      {searchParams.add && (
+        <UrlModal closeHref={closeHref} title={<h2 className="text-xl font-bold">Add someone</h2>}>
           <AddUserForm roles={ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }))} />
-        </section>
+        </UrlModal>
+      )}
 
-        <section className="card card-pad">
-          <h2 className="text-lg font-bold mb-4">What each role can reach</h2>
-          <ul className="space-y-4 text-sm">
-            {ROLES.map((r) => (
-              <li key={r}>
-                <div className="flex items-center gap-2">
-                  <strong>{ROLE_LABELS[r]}</strong>
-                  <Pill tone={r === 'ADMIN' || r === 'MASTER_ADMIN' ? 'bad' : 'neutral'}>{PERMISSIONS[r].length} permissions</Pill>
+      {selected && (() => {
+        const u = selected;
+        const locked = !isMaster && u.role === 'MASTER_ADMIN';
+        const isTargetMaster = u.role === 'MASTER_ADMIN';
+        return (
+          <UrlModal
+            closeHref={closeHref}
+            title={
+              <div className="flex items-center gap-3">
+                <Avatar name={u.name} colour={u.colour} size={44} />
+                <div className="min-w-0">
+                  <h2 className="text-xl font-bold truncate">{u.name}</h2>
+                  <p className="text-sm text-ink-muted truncate">{u.email}{u.jobTitle && ` · ${u.jobTitle}`}</p>
+                  <p className="text-xs text-ink-faint">Last signed in {u.lastLoginAt ? shortDate(u.lastLoginAt) : 'never'}</p>
                 </div>
-                <p className="text-ink-muted mt-0.5">{ROLE_BLURBS[r]}</p>
-              </li>
-            ))}
-          </ul>
-          <p className="hint mt-5">
-            Permissions are set in <code>src/lib/rbac.ts</code>. Change the matrix there and every screen and action follows,
-            because nothing in the app decides access on its own.
-          </p>
-        </section>
-      </div>
+              </div>
+            }
+          >
+            {locked && (
+              <p className="banner-warn mb-4">Only a Master Administrator can change another Master Administrator&apos;s account.</p>
+            )}
+
+            <Section title="Role">
+              {locked ? (
+                <p className="text-sm">{ROLE_LABELS[u.role]}</p>
+              ) : (
+                <form key={`role-${u.role}`} action={updateUserRole} className="flex flex-wrap gap-2 items-center">
+                  <input type="hidden" name="userId" value={u.id} />
+                  <select name="role" defaultValue={u.role} className="input w-56 py-1.5" aria-label={`Role for ${u.name}`}>
+                    {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                  </select>
+                  <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">Save</SubmitButton>
+                </form>
+              )}
+              <p className="text-xs text-ink-muted mt-2">{ROLE_BLURBS[u.role]}</p>
+              {isMaster && isTargetMaster && (
+                <form key={`emails-${u.adminEmails}`} action={setAdminEmails} className="mt-3 flex items-center gap-3 text-sm">
+                  <input type="hidden" name="userId" value={u.id} />
+                  <input type="hidden" name="adminEmails" value={u.adminEmails ? '0' : '1'} />
+                  <span>Admin emails: <strong>{u.adminEmails ? 'on' : 'off'}</strong></span>
+                  <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">{u.adminEmails ? 'Turn off' : 'Turn on'}</SubmitButton>
+                </form>
+              )}
+            </Section>
+
+            <Section title="Company access" hint={isTargetMaster ? 'Master Administrators always have every company.' : undefined}>
+              {locked || isTargetMaster ? (
+                <p className="text-sm">{u.companies.map((c) => COMPANY_LABEL[c]).join(', ')}</p>
+              ) : (
+                <form key={`companies-${u.companies.join()}`} action={updateUserCompanies} className="flex flex-wrap items-center gap-4">
+                  <input type="hidden" name="userId" value={u.id} />
+                  {grantableCompanies.map((c) => (
+                    <label key={c} className="flex items-center gap-1.5 text-sm">
+                      <input type="checkbox" name="companies" value={c} defaultChecked={u.companies.includes(c)} className="h-4 w-4 accent-brand" />
+                      {COMPANY_LABEL[c]}
+                    </label>
+                  ))}
+                  {u.companies.filter((c) => !grantableCompanies.includes(c)).map((c) => (
+                    <span key={c} className="text-xs text-ink-faint">{COMPANY_LABEL[c]} (not yours to grant)</span>
+                  ))}
+                  <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">Save</SubmitButton>
+                </form>
+              )}
+            </Section>
+
+            <Section title="Holidays" hint="The full year total, including bank holidays, not on top of them.">
+              <form key={`hol-${u.holidayAllowanceDays}-${u.bankHolidaysComeOff}`} action={updateHolidayAllowance} className="flex flex-wrap items-center gap-3">
+                <input type="hidden" name="userId" value={u.id} />
+                <label className="flex items-center gap-2 text-sm">
+                  <input name="holidayAllowanceDays" type="number" min="0" step="1" defaultValue={u.holidayAllowanceDays}
+                         className="input w-20 py-1.5" aria-label={`Holiday days a year for ${u.name}`} />
+                  days a year
+                </label>
+                <label className="flex items-center gap-1.5 text-sm">
+                  <input type="checkbox" name="bankHolidaysComeOff" defaultChecked={u.bankHolidaysComeOff} className="h-4 w-4 accent-brand" />
+                  Bank holidays come off
+                </label>
+                <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">Save</SubmitButton>
+              </form>
+            </Section>
+
+            {!isTargetMaster && (
+              <Section title="What they can see" hint="Untick an area and it disappears for them everywhere: home screen, menus, search, and the page itself.">
+                <form key={`vis-${u.hiddenModules.join()}`} action={updateAllHiddenModules}>
+                  <input type="hidden" name="userIds" value={u.id} />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+                    {TOGGLEABLE_MODULES.map((m) => (
+                      <label key={m.key} className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name={`visible_${u.id}`} value={m.key} defaultChecked={!u.hiddenModules.includes(m.key)}
+                               className="h-4 w-4 accent-brand" />
+                        {m.label}
+                      </label>
+                    ))}
+                  </div>
+                  <SubmitButton className="btn-secondary btn-sm mt-3" pendingLabel="Saving…">Save</SubmitButton>
+                </form>
+              </Section>
+            )}
+
+            {!isTargetMaster && (
+              <Section title="Extra access" hint="One narrow extra on top of their role, without changing the role.">
+                <form key={`extra-${u.extraPermissions.join()}`} action={updateExtraPermissions}>
+                  <input type="hidden" name="userIds" value={u.id} />
+                  <div className="grid gap-2">
+                    {GRANTABLE_EXTRA_PERMISSIONS.map((p) => (
+                      <label key={p.key} className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name={`extra_${u.id}`} value={p.key} defaultChecked={u.extraPermissions.includes(p.key)}
+                               className="h-4 w-4 accent-brand" />
+                        {p.label}
+                      </label>
+                    ))}
+                  </div>
+                  <SubmitButton className="btn-secondary btn-sm mt-3" pendingLabel="Saving…">Save</SubmitButton>
+                </form>
+              </Section>
+            )}
+
+            {!locked && (
+              <Section title="Account">
+                <div className="flex flex-wrap items-center gap-3 mb-3">
+                  {u.active ? <Pill tone="good">Active</Pill> : <Pill tone="bad">Suspended</Pill>}
+                  <form key={`active-${u.active}`} action={toggleUserActive}>
+                    <input type="hidden" name="userId" value={u.id} />
+                    <SubmitButton className={u.active ? 'btn-danger btn-sm' : 'btn-secondary btn-sm'} pendingLabel="Saving…">
+                      {u.active ? 'Suspend' : 'Reactivate'}
+                    </SubmitButton>
+                  </form>
+                </div>
+                <form action={resetPassword} className="flex flex-wrap gap-2 items-center">
+                  <input type="hidden" name="userId" value={u.id} />
+                  <input name="password" type="text" className="input w-56 py-1.5" placeholder="New password" aria-label={`New password for ${u.name}`} />
+                  <SubmitButton className="btn-secondary btn-sm" pendingLabel="Resetting…">Reset password</SubmitButton>
+                </form>
+              </Section>
+            )}
+          </UrlModal>
+        );
+      })()}
     </Shell>
   );
 }
