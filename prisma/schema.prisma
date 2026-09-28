@@ -1088,14 +1088,15 @@ model Note {
 }
 
 model Driver {
-  id        String    @id @default(cuid())
-  name      String
-  phone     String    @default("")
-  licence   String    @default("")
-  cpcExpiry DateTime?
-  depot     String    @default("Scunthorpe")
-  active    Boolean   @default(true)
-  userId    String?   @unique // set when this row was auto-created from a User with role DRIVER
+  id          String    @id @default(cuid())
+  name        String
+  phone       String    @default("")
+  licence     String    @default("")
+  cpcExpiry   DateTime?
+  cpcRequired Boolean   @default(true) // false for someone who only drives vehicles that don't need a Driver CPC — never asked for an expiry date
+  depot       String    @default("Scunthorpe")
+  active      Boolean   @default(true)
+  userId      String?   @unique // set when this row was auto-created from a User with role DRIVER
 
   user       User?           @relation(fields: [userId], references: [id])
   deliveries PlanningEvent[]

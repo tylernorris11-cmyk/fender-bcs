@@ -71,6 +71,52 @@ export function formatHours(minutes: number): string {
 
 export const weekParam = (monday: Date) => isoDay(monday);
 
+export type ShiftTimes = { startTime: string; endTime: string; breakMinutes: number };
+export type TimeOff = { note: string; half: boolean };
+export type PrefilledDay = ShiftTimes & { note: string };
+
+const LOOK_BACK_WEEKS = 4;
+
+/**
+ * What a week nobody's touched yet starts as. Each day copies the same
+ * weekday the week before; if that day was time off (a booked holiday or a
+ * bank holiday), or that week was never filled in at all, it looks another
+ * week back, so neither carries forward. Time off this week starts as a day off with the reason
+ * noted, and a half day copies the usual hours with a note to trim them.
+ * Days that haven't happened yet are left alone, and notes aren't copied —
+ * they're about that particular day.
+ */
+export function prefillWeek(
+  monday: Date,
+  today: Date,
+  history: Map<string, ShiftTimes>,
+  timeOff: (d: Date) => TimeOff | null,
+): Map<string, PrefilledDay> {
+  const out = new Map<string, PrefilledDay>();
+  const filledWeeks = new Set([...history.keys()].map((iso) => isoDay(mondayOf(parseDayInput(iso)!))));
+  for (const date of weekDays(monday)) {
+    if (date > today) continue;
+    const off = timeOff(date);
+    if (off && !off.half) {
+      out.set(isoDay(date), { startTime: '00:00', endTime: '00:00', breakMinutes: 0, note: off.note });
+      continue;
+    }
+
+    let usual: ShiftTimes | undefined;
+    for (let back = 1; back <= LOOK_BACK_WEEKS; back++) {
+      const earlier = addDays(date, -7 * back);
+      if (timeOff(earlier) || !filledWeeks.has(isoDay(mondayOf(earlier)))) continue;
+      usual = history.get(isoDay(earlier));
+      break;
+    }
+    const worked = usual && !isZeroDay(usual.startTime, usual.endTime, usual.breakMinutes);
+
+    if (worked) out.set(isoDay(date), { ...usual!, note: off?.note ?? '' });
+    else if (off) out.set(isoDay(date), { startTime: '00:00', endTime: '00:00', breakMinutes: 0, note: off.note });
+  }
+  return out;
+}
+
 /** "Mon 14 Sep" */
 export function dayLabel(d: Date): string {
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });

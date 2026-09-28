@@ -7,7 +7,7 @@ import { ensureDriverRecords } from '@/lib/drivers';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortTh, Table } from '@/components/ui';
 import { SubmitButton } from '@/components/SubmitButton';
-import { addDriver, addUserAsDriver, removeDriver, updateDriverCpcExpiry } from '../actions';
+import { addDriver, addUserAsDriver, removeDriver, setDriverCpcRequired, updateDriverCpcExpiry } from '../actions';
 
 export default async function DriversPage({ searchParams }: { searchParams: { sort?: string; dir?: string } }) {
   const user = await requirePermission('setup.lists');
@@ -33,8 +33,8 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
           <th className="th">CPC expiry</th><th className="th sr-only">Remove</th>
         </>}>
           {drivers.map((d) => {
-            const days = d.cpcExpiry ? daysUntil(d.cpcExpiry)! : null;
-            const incomplete = d.userId && (!d.licence || !d.cpcExpiry);
+            const days = d.cpcRequired && d.cpcExpiry ? daysUntil(d.cpcExpiry)! : null;
+            const incomplete = d.userId && (!d.licence || (d.cpcRequired && !d.cpcExpiry));
             return (
               <tr key={d.id} className="row">
                 <td className="td font-semibold">
@@ -46,14 +46,18 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
                 </td>
                 <td className="td text-ink-muted">{d.licence}</td>
                 <td className="td">
-                  <form action={updateDriverCpcExpiry} className="flex items-center gap-2">
-                    <input type="hidden" name="driverId" value={d.id} />
-                    <input
-                      type="date" name="cpcExpiry" defaultValue={d.cpcExpiry ? d.cpcExpiry.toISOString().slice(0, 10) : ''}
-                      className="input py-1.5 w-40" aria-label={`CPC expiry for ${d.name}`}
-                    />
-                    <button type="submit" className="btn-secondary btn-sm">Save</button>
-                  </form>
+                  {d.cpcRequired ? (
+                    <form action={updateDriverCpcExpiry} className="flex items-center gap-2">
+                      <input type="hidden" name="driverId" value={d.id} />
+                      <input
+                        type="date" name="cpcExpiry" defaultValue={d.cpcExpiry ? d.cpcExpiry.toISOString().slice(0, 10) : ''}
+                        className="input py-1.5 w-40" aria-label={`CPC expiry for ${d.name}`}
+                      />
+                      <button type="submit" className="btn-secondary btn-sm">Save</button>
+                    </form>
+                  ) : (
+                    <Pill tone="neutral">Not needed</Pill>
+                  )}
                   {days !== null && (
                     <span className="block mt-1">
                       {days < 0 ? <Pill tone="bad">Expired {shortDate(d.cpcExpiry)}</Pill>
@@ -61,6 +65,13 @@ export default async function DriversPage({ searchParams }: { searchParams: { so
                         : null}
                     </span>
                   )}
+                  <form action={setDriverCpcRequired} className="mt-1">
+                    <input type="hidden" name="driverId" value={d.id} />
+                    <input type="hidden" name="cpcRequired" value={d.cpcRequired ? '0' : '1'} />
+                    <button type="submit" className="text-xs text-ink-faint hover:text-ink underline">
+                      {d.cpcRequired ? "Doesn't need a CPC" : 'Needs a CPC after all'}
+                    </button>
+                  </form>
                 </td>
                 <td className="td">
                   <form action={removeDriver}>

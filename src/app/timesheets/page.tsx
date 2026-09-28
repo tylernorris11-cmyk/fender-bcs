@@ -4,8 +4,10 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { shortDate } from '@/lib/format';
-import { addDays, isoDay, isWeekend, parseDayInput } from '@/lib/holidays';
-import { dayLabel, dueWeekMonday, mondayOf, reminderStage, todayInLondon, weekDays, weekRangeLabel } from '@/lib/timesheets';
+import { addDays, bankHolidayName, isoDay, isWeekend, parseDayInput } from '@/lib/holidays';
+import {
+  dayLabel, dueWeekMonday, mondayOf, prefillWeek, reminderStage, todayInLondon, weekDays, weekRangeLabel, type TimeOff,
+} from '@/lib/timesheets';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill } from '@/components/ui';
 import { TimesheetWeekForm, type TimesheetDay } from './TimesheetWeekForm';
@@ -21,14 +23,37 @@ export default async function TimesheetPage({ searchParams }: { searchParams: { 
   const next = isoDay(addDays(monday, 7));
   const dueMonday = dueWeekMonday(today);
 
-  const [entries, submitted] = await Promise.all([
+  const lookBackFrom = addDays(monday, -28);
+  const [entries, submitted, history, holidays] = await Promise.all([
     db.timesheetEntry.findMany({ where: { userId: user.id, date: { gte: monday, lte: addDays(monday, 6) } } }),
     db.timesheetWeek.findUnique({ where: { userId_weekStart: { userId: user.id, weekStart: monday } } }),
+    db.timesheetEntry.findMany({ where: { userId: user.id, date: { gte: lookBackFrom, lt: monday } } }),
+    db.holidayRequest.findMany({
+      where: { userId: user.id, status: 'APPROVED', startDate: { lte: addDays(monday, 6) }, endDate: { gte: lookBackFrom } },
+    }),
   ]);
   const byDate = new Map(entries.map((e) => [isoDay(e.date), e]));
 
+  // A recent week with nothing saved starts filled in from the week before,
+  // with this week's holidays and bank holidays already set as days off.
+  // Nothing's recorded until they press Save or hand it in.
+  const timeOff = (d: Date): TimeOff | null => {
+    const bank = bankHolidayName(d);
+    if (bank) return { note: bank, half: false };
+    const booked = holidays.find((h) => h.startDate <= d && h.endDate >= d);
+    if (!booked) return null;
+    return booked.half
+      ? { note: `Half day holiday (${booked.half === 'AM' ? 'morning' : 'afternoon'})`, half: true }
+      : { note: 'Holiday', half: false };
+  };
+  const untouched = entries.length === 0 && !submitted && monday >= addDays(thisMonday, -14);
+  const prefill = untouched
+    ? prefillWeek(monday, today, new Map(history.map((e) => [isoDay(e.date), e])), timeOff)
+    : new Map();
+  const daysOff = [...prefill.entries()].filter(([, p]) => p.note).map(([iso, p]) => `${dayLabel(parseDayInput(iso)!)}: ${p.note}`);
+
   const days: TimesheetDay[] = weekDays(monday).map((date) => {
-    const e = byDate.get(isoDay(date));
+    const e = byDate.get(isoDay(date)) ?? prefill.get(isoDay(date));
     return {
       iso: isoDay(date),
       label: dayLabel(date),
@@ -62,6 +87,15 @@ export default async function TimesheetPage({ searchParams }: { searchParams: { 
             ? <Pill tone={isDueWeek ? 'warn' : 'neutral'}>{isDueWeek ? (reminderStage(today) === 'overdue' ? 'Overdue — not handed in' : 'Due Wednesday — not handed in') : 'Not handed in'}</Pill>
             : <Pill tone="neutral">Week in progress</Pill>}
       </div>
+
+      {prefill.size > 0 && (
+        <div className="banner-warn mb-4">
+          <span>
+            Filled in from your last week to save you typing it. Check each day, then Save or hand it in. Nothing&apos;s recorded until you do.
+            {daysOff.length > 0 && <> Time off already set: {daysOff.join(', ')}.</>}
+          </span>
+        </div>
+      )}
 
       <section className="card card-pad">
         <TimesheetWeekForm

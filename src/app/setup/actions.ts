@@ -415,6 +415,18 @@ export async function updateDriverCpcExpiry(formData: FormData) {
   revalidatePath('/setup/drivers');
 }
 
+/** For someone on the register who only drives vehicles that don't need a
+ * Driver CPC — they're never asked for an expiry date, on the register or
+ * by the pop-up. Flipping it back on starts the prompts again. */
+export async function setDriverCpcRequired(formData: FormData) {
+  const admin = await assertPermission('setup.lists');
+  const driverId = String(formData.get('driverId') ?? '');
+  const cpcRequired = formData.get('cpcRequired') === '1';
+  const driver = await db.driver.update({ where: { id: driverId }, data: { cpcRequired } });
+  await logActivity('Driver', driverId, cpcRequired ? 'CPC needed' : 'CPC not needed', driver.name, admin.id);
+  revalidatePath('/setup/drivers');
+}
+
 /** A driver setting their own CPC expiry, from the pop-up prompt (see
  * DriverCpcReminder) rather than the admin register — needs no setup.lists
  * permission, just a driver record of their own to set it on. */

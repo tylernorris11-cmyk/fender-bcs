@@ -9,11 +9,12 @@ import { DriverCpcReminderModal } from './DriverCpcReminderModal';
  * date on file — a pop-up on whatever page they open, asking for it
  * directly, until they give it or dismiss it for the day. Nobody not on the
  * register sees this; ensureDriverRecords is what puts someone with the
- * Driver role on it in the first place.
+ * Driver role on it in the first place. Nor does anyone marked on the
+ * register as not needing a CPC at all.
  */
 export async function DriverCpcReminder({ user }: { user: SessionUser }) {
-  const driver = await db.driver.findUnique({ where: { userId: user.id }, select: { cpcExpiry: true } });
-  if (!driver || driver.cpcExpiry) return null;
+  const driver = await db.driver.findUnique({ where: { userId: user.id }, select: { cpcExpiry: true, cpcRequired: true } });
+  if (!driver || !driver.cpcRequired || driver.cpcExpiry) return null;
 
   const today = isoDay(todayInLondon());
   return <DriverCpcReminderModal dismissKey={`driver-cpc-reminder:${user.id}:${today}`} />;
