@@ -40,8 +40,8 @@ export async function createDelivery(formData: FormData) {
   if (Number.isNaN(startsAt.getTime())) throw new Error('That date could not be read.');
 
   const weightRaw = String(formData.get('weightTonnes') ?? '').trim();
-  const weightKg = weightRaw ? Number(weightRaw) * 1000 : null;
-  if (weightRaw && (!Number.isFinite(weightKg) || weightKg! < 0)) throw new Error('Enter the weight in tonnes, e.g. 2.4.');
+  const weightKg = Number(weightRaw) * 1000;
+  if (!weightRaw || !Number.isFinite(weightKg) || weightKg <= 0) throw new Error('Enter the weight in tonnes, e.g. 2.4. Every delivery needs one.');
 
   const colourRaw = String(formData.get('colour') ?? 'BLUE') as DeliveryColour;
   const colour = DELIVERY_COLOURS.includes(colourRaw) ? colourRaw : 'BLUE';

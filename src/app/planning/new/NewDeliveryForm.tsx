@@ -44,7 +44,7 @@ export function NewDeliveryForm({
 
       <div>
         <label className="label" htmlFor="weightTonnes">Weight (tonnes)</label>
-        <input id="weightTonnes" name="weightTonnes" type="number" step="0.001" min="0" className="input max-w-[160px]" placeholder="2.4" />
+        <input id="weightTonnes" name="weightTonnes" type="number" step="0.001" min="0.001" required className="input max-w-[160px]" placeholder="2.4" />
       </div>
 
       <div>
