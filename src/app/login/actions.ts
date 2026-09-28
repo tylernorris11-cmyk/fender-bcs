@@ -56,7 +56,7 @@ export async function signIn(formData: FormData) {
 
   attempts.delete(email);
   await db.user.update({ where: { id: user!.id }, data: { lastLoginAt: new Date() } });
-  setSessionCookie(user!.id);
+  setSessionCookie(user!.id, user!.staysSignedIn);
 
   // A password set by someone else (admin reset, approved access request)
   // means straight to a dedicated reset screen — not wherever they were headed.

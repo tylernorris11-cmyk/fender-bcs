@@ -9,6 +9,7 @@ import { sendTelegramMessage, sendTelegramPhoto } from './telegram';
 
 const COOKIE = 'fs_session';
 const MAX_AGE = 60 * 60 * 12; // a working day, then sign in again
+const SHARED_SCREEN_MAX_AGE = 60 * 60 * 24 * 365; // accounts marked staysSignedIn — about the longest a browser keeps a cookie
 
 function secret(): string {
   const s = process.env.SESSION_SECRET;
@@ -85,12 +86,12 @@ function sign(payload: string): string {
   return crypto.createHmac('sha256', secret()).update(payload).digest('base64url');
 }
 
-export function createSessionToken(userId: string): string {
-  const body = `${userId}.${Date.now() + MAX_AGE * 1000}`;
+export function createSessionToken(userId: string, maxAge = MAX_AGE): string {
+  const body = `${userId}.${Date.now() + maxAge * 1000}`;
   return `${Buffer.from(body).toString('base64url')}.${sign(body)}`;
 }
 
-function readSessionToken(token: string): string | null {
+function readSessionToken(token: string): { userId: string; expires: number } | null {
   const [encoded, mac] = token.split('.');
   if (!encoded || !mac) return null;
   const body = Buffer.from(encoded, 'base64url').toString();
@@ -99,16 +100,17 @@ function readSessionToken(token: string): string | null {
   if (!crypto.timingSafeEqual(Buffer.from(mac), Buffer.from(expected))) return null;
   const [userId, expires] = body.split('.');
   if (!userId || Number(expires) < Date.now()) return null;
-  return userId;
+  return { userId, expires: Number(expires) };
 }
 
-export function setSessionCookie(userId: string) {
-  cookies().set(COOKIE, createSessionToken(userId), {
+export function setSessionCookie(userId: string, staysSignedIn = false) {
+  const maxAge = staysSignedIn ? SHARED_SCREEN_MAX_AGE : MAX_AGE;
+  cookies().set(COOKIE, createSessionToken(userId, maxAge), {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: MAX_AGE,
+    maxAge,
   });
 }
 
@@ -121,19 +123,22 @@ export function clearSessionCookie() {
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const token = cookies().get(COOKIE)?.value;
   if (!token) return null;
-  const userId = readSessionToken(token);
-  if (!userId) return null;
+  const session = readSessionToken(token);
+  if (!session) return null;
 
   const user = await db.user.findUnique({
-    where: { id: userId },
+    where: { id: session.userId },
     select: {
       id: true, name: true, email: true, role: true, jobTitle: true, initials: true, colour: true, active: true,
-      companies: true, hiddenModules: true, extraPermissions: true, onTimesheets: true,
+      companies: true, hiddenModules: true, extraPermissions: true, onTimesheets: true, staysSignedIn: true,
     },
   });
   if (!user || !user.active) return null;
-  const { active: _active, ...session } = user;
-  return session;
+  // A year-long sign-in only counts while the account is still marked as a
+  // shared screen — switching that off in People signs it out on its next page.
+  if (!user.staysSignedIn && session.expires - Date.now() > MAX_AGE * 1000) return null;
+  const { active: _active, staysSignedIn: _staysSignedIn, ...sessionUser } = user;
+  return sessionUser;
 }
 
 /** Use at the top of every protected page. Sends people to sign in. */

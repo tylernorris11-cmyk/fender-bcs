@@ -12,7 +12,7 @@ import { Avatar, PageHeader, Pill, SortTh, Table } from '@/components/ui';
 import { SubmitButton } from '@/components/SubmitButton';
 import { UrlModal } from '@/components/UrlModal';
 import {
-  resetPassword, setAdminEmails, toggleUserActive, updateAllHiddenModules, updateExtraPermissions, updateHolidayAllowance, updateUserCompanies, updateUserRole,
+  resetPassword, setAdminEmails, setStaysSignedIn, toggleUserActive, updateAllHiddenModules, updateExtraPermissions, updateHolidayAllowance, updateUserCompanies, updateUserRole,
 } from '../actions';
 import { AddUserForm } from './AddUserForm';
 
@@ -254,6 +254,17 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
                   <input name="password" type="text" className="input w-56 py-1.5" placeholder="New password" aria-label={`New password for ${u.name}`} />
                   <SubmitButton className="btn-secondary btn-sm" pendingLabel="Resetting…">Reset password</SubmitButton>
                 </form>
+                {isMaster && (
+                  <form key={`signed-in-${u.staysSignedIn}`} action={setStaysSignedIn} className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                    <input type="hidden" name="userId" value={u.id} />
+                    <input type="hidden" name="staysSignedIn" value={u.staysSignedIn ? '0' : '1'} />
+                    <span>
+                      Stays signed in: <strong>{u.staysSignedIn ? 'yes, for a year' : 'no, 12 hours'}</strong>
+                      <span className="block text-xs text-ink-muted">For a shared screen like the delivery board. Turning it off signs it out straight away.</span>
+                    </span>
+                    <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">{u.staysSignedIn ? 'Turn off' : 'Turn on'}</SubmitButton>
+                  </form>
+                )}
               </Section>
             )}
           </UrlModal>

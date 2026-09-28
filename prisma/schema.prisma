@@ -56,6 +56,7 @@ model User {
   resetTokenExpires DateTime?
   companies         Company[] @default([FENDER]) // which companies this account may view
   adminEmails       Boolean   @default(true) // Master Administrators only: false stops the admin emails (holiday and access requests, failed checks and so on) while keeping full access
+  staysSignedIn     Boolean   @default(false) // a shared screen, e.g. the delivery board: signs in for a year instead of 12 hours; turning it off signs it out at once
 
   ordersRaised                Order[]                  @relation("raisedBy")
   accountsManaged             Customer[]               @relation("accountManager")

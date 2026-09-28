@@ -151,6 +151,19 @@ export async function setAdminEmails(formData: FormData) {
   revalidatePath('/setup/users');
 }
 
+/** A shared screen like the delivery board: signs in for a year instead of
+ * 12 hours. Turning it off signs that screen out on its next page (see
+ * getCurrentUser); turning it on takes effect the next time it signs in. */
+export async function setStaysSignedIn(formData: FormData) {
+  const admin = await assertPermission('setup.users');
+  if (admin.role !== 'MASTER_ADMIN') throw new Error('Only a Master Administrator can change this.');
+  const userId = String(formData.get('userId'));
+  const staysSignedIn = formData.get('staysSignedIn') === '1';
+  const target = await db.user.update({ where: { id: userId }, data: { staysSignedIn } });
+  await logActivity('User', userId, staysSignedIn ? 'Set to stay signed in' : 'Stay signed in turned off', target.name, admin.id);
+  revalidatePath('/setup/users');
+}
+
 export async function updateUserCompanies(formData: FormData) {
   const admin = await assertPermission('setup.users');
   const userId = String(formData.get('userId'));
