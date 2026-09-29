@@ -5,12 +5,12 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
-import { clock, shortDate, tonnes } from '@/lib/format';
+import { clock, isoDateUk, shortDate, tonnes } from '@/lib/format';
 import { DELIVERY_COLOUR_LABEL, DELIVERY_COLOUR_SWATCH } from '@/lib/deliveryColours';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill } from '@/components/ui';
 import { SubmitButton } from '@/components/SubmitButton';
-import { assignDeliveryDriver, markEventDelivered } from '../../actions';
+import { markEventDelivered, updateDelivery } from '../../actions';
 
 /** A stand-alone delivery's own page — reached by clicking it on the board.
  * Deliberately narrow: everything but the driver is set once when it's
@@ -60,9 +60,13 @@ export default async function DeliveryDetailPage({ params }: { params: { id: str
         </div>
 
         {canEdit ? (
-          <form action={assignDeliveryDriver} className="flex items-end gap-3">
+          <form key={`${event.startsAt.toISOString()}-${event.driverId}`} action={updateDelivery} className="flex flex-wrap items-end gap-3">
             <input type="hidden" name="eventId" value={event.id} />
-            <div className="flex-1 max-w-xs">
+            <div>
+              <label className="label" htmlFor="date">Date</label>
+              <input id="date" name="date" type="date" required defaultValue={isoDateUk(event.startsAt)} className="input w-44" />
+            </div>
+            <div className="flex-1 min-w-[180px] max-w-xs">
               <label className="label" htmlFor="driverId">Driver</label>
               <select id="driverId" name="driverId" defaultValue={event.driverId ?? ''} className="input">
                 <option value="">Not assigned</option>

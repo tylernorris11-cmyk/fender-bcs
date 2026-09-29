@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import type { DeliveryColour } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
-import { ukTimeToUtc } from '@/lib/format';
+import { clock, isoDateUk, shortDate, ukTimeToUtc } from '@/lib/format';
 
 /** Marks a stand-alone delivery entry (one not tied to a real Order) as
  * delivered, so it greys out on the planning board. */
@@ -73,12 +73,12 @@ export async function createDelivery(formData: FormData) {
  * on the board — for when nobody was available to run it at the time it
  * was added. Only applies to a stand-alone delivery (see createDelivery);
  * a real Order has no driver field to assign here. */
-export async function assignDeliveryDriver(formData: FormData) {
+export async function updateDelivery(formData: FormData) {
   const user = await assertPermission('planning.edit');
   const eventId = String(formData.get('eventId'));
 
   const event = await db.planningEvent.findUniqueOrThrow({ where: { id: eventId } });
-  if (event.type !== 'DELIVERY' || event.orderId) throw new Error('Only a stand-alone delivery can have a driver assigned here.');
+  if (event.type !== 'DELIVERY' || event.orderId) throw new Error('Only a stand-alone delivery can be changed here.');
 
   const driverId = String(formData.get('driverId') ?? '') || null;
   let driverName = 'Not assigned';
@@ -88,8 +88,19 @@ export async function assignDeliveryDriver(formData: FormData) {
     driverName = driver.name;
   }
 
-  await db.planningEvent.update({ where: { id: eventId }, data: { driverId } });
-  await logActivity('PlanningEvent', eventId, 'Driver assigned', `${event.title} — ${driverName}`, user.id);
+  // Moving the date keeps a timed delivery at the same UK time on the new day.
+  const dateRaw = String(formData.get('date') ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) throw new Error('Pick a date.');
+  const startsAt = event.allDay ? new Date(dateRaw) : ukTimeToUtc(dateRaw, clock(event.startsAt));
+  if (Number.isNaN(startsAt.getTime())) throw new Error('That date could not be read.');
+  const moved = dateRaw !== isoDateUk(event.startsAt);
+
+  await db.planningEvent.update({ where: { id: eventId }, data: { driverId, startsAt } });
+  const changes = [
+    ...(moved ? [`moved from ${shortDate(event.startsAt)} to ${shortDate(startsAt)}`] : []),
+    ...(driverId !== event.driverId ? [`driver ${driverName}`] : []),
+  ];
+  if (changes.length) await logActivity('PlanningEvent', eventId, 'Delivery updated', `${event.title} — ${changes.join(', ')}`, user.id);
   revalidatePath('/planning');
   revalidatePath(`/planning/deliveries/${eventId}`);
 }

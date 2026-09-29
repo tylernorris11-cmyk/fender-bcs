@@ -6,7 +6,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { COMPANY_LABEL } from '@/lib/company';
-import { clock, shortDate, tonnes } from '@/lib/format';
+import { clock, shortDate } from '@/lib/format';
 import { bankHolidayName, eachDayInclusive, isoDay, utcDay } from '@/lib/holidays';
 import { DELIVERY_COLOUR_BOARD } from '@/lib/deliveryColours';
 import { NAV, Shell } from '@/components/Shell';
@@ -361,10 +361,14 @@ export default async function PlanningPage({
                           <>
                             <div className="flex items-center gap-1.5">
                               <span className={`flex-1 min-w-0 truncate text-xs font-medium ${e.delivered ? 'line-through text-ink-faint' : ''}`}>{e.title}</span>
+                              {e.weightKg != null && (
+                                <span className="shrink-0 text-xs font-semibold tabular-nums">
+                                  {(e.weightKg / 1000).toLocaleString('en-GB', { maximumFractionDigits: 2 })} t
+                                </span>
+                              )}
                               {e.delivered && <span className="shrink-0 text-[10px] font-bold text-ink-faint uppercase tracking-wide">Delivered</span>}
                             </div>
                             {e.detail && <span className="block text-[11px] text-ink-muted mt-0.5">{e.detail}</span>}
-                            {e.weightKg != null && <span className="block text-[11px] text-ink-muted mt-0.5">{tonnes(e.weightKg)}</span>}
                           </>
                         ) : (
                           <>
