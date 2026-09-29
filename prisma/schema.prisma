@@ -1036,6 +1036,7 @@ model PlanningEvent {
   driverId   String? // stand-alone deliveries only — who's running it, shown as an initials badge on the board
   weightKg   Decimal?       @db.Decimal(12, 3) // stand-alone deliveries only
   colour     DeliveryColour @default(BLUE) // stand-alone deliveries only — a colour tag on the board, picked when it's added
+  hiab       Boolean        @default(false) // stand-alone deliveries only — needs a hiab (lorry crane) to unload, shown as a yellow H on the board
   assignedTo String         @default("")
   done       Boolean        @default(false)
 

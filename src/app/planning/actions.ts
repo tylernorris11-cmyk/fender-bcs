@@ -62,6 +62,7 @@ export async function createDelivery(formData: FormData) {
       weightKg,
       colour,
       driverId,
+      hiab: formData.get('hiab') === 'on',
     },
   });
   await logActivity('PlanningEvent', event.id, 'Delivery added', `${customerName} — ${town}`, user.id);
@@ -69,10 +70,9 @@ export async function createDelivery(formData: FormData) {
   redirect(`/planning?view=day&date=${dateRaw}`);
 }
 
-/** Assigns, changes or clears the driver on a stand-alone delivery already
- * on the board — for when nobody was available to run it at the time it
- * was added. Only applies to a stand-alone delivery (see createDelivery);
- * a real Order has no driver field to assign here. */
+/** Changes the date, driver or hiab on a stand-alone delivery already on
+ * the board. Only applies to a stand-alone delivery (see createDelivery);
+ * a real Order has none of these fields to change here. */
 export async function updateDelivery(formData: FormData) {
   const user = await assertPermission('planning.edit');
   const eventId = String(formData.get('eventId'));
@@ -94,13 +94,39 @@ export async function updateDelivery(formData: FormData) {
   const startsAt = event.allDay ? new Date(dateRaw) : ukTimeToUtc(dateRaw, clock(event.startsAt));
   if (Number.isNaN(startsAt.getTime())) throw new Error('That date could not be read.');
   const moved = dateRaw !== isoDateUk(event.startsAt);
+  const hiab = formData.get('hiab') === 'on';
 
-  await db.planningEvent.update({ where: { id: eventId }, data: { driverId, startsAt } });
+  await db.planningEvent.update({ where: { id: eventId }, data: { driverId, startsAt, hiab } });
   const changes = [
     ...(moved ? [`moved from ${shortDate(event.startsAt)} to ${shortDate(startsAt)}`] : []),
     ...(driverId !== event.driverId ? [`driver ${driverName}`] : []),
+    ...(hiab !== event.hiab ? [hiab ? 'needs a hiab' : 'no hiab needed'] : []),
   ];
   if (changes.length) await logActivity('PlanningEvent', eventId, 'Delivery updated', `${event.title} — ${changes.join(', ')}`, user.id);
   revalidatePath('/planning');
   revalidatePath(`/planning/deliveries/${eventId}`);
+}
+
+/** Takes a stand-alone delivery off the board for good — put on by mistake,
+ * or cancelled. What it was is kept in the activity log, since the delivery
+ * itself is gone. A real Order's delivery isn't removed here; that follows
+ * the order. */
+export async function deleteDelivery(formData: FormData) {
+  const user = await assertPermission('planning.edit');
+  const eventId = String(formData.get('eventId'));
+
+  const event = await db.planningEvent.findUniqueOrThrow({ where: { id: eventId }, include: { driver: { select: { name: true } } } });
+  if (event.type !== 'DELIVERY' || event.orderId) throw new Error('Only a stand-alone delivery can be deleted here.');
+
+  await db.planningEvent.delete({ where: { id: eventId } });
+  const details = [
+    shortDate(event.startsAt),
+    event.town,
+    event.weightKg != null ? `${Number(event.weightKg) / 1000} t` : '',
+    event.driver ? `driver ${event.driver.name}` : '',
+    event.hiab ? 'hiab' : '',
+  ].filter(Boolean).join(', ');
+  await logActivity('PlanningEvent', eventId, 'Delivery deleted', `${event.title} — ${details}`, user.id);
+  revalidatePath('/planning');
+  redirect(`/planning?view=day&date=${isoDateUk(event.startsAt)}`);
 }

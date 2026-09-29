@@ -11,6 +11,8 @@ import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill } from '@/components/ui';
 import { SubmitButton } from '@/components/SubmitButton';
 import { markEventDelivered, updateDelivery } from '../../actions';
+import { HiabBadge } from '../../HiabBadge';
+import { DeleteDeliveryButton } from './DeleteDeliveryButton';
 
 /** A stand-alone delivery's own page — reached by clicking it on the board.
  * Deliberately narrow: everything but the driver is set once when it's
@@ -56,11 +58,12 @@ export default async function DeliveryDetailPage({ params }: { params: { id: str
             <span className="h-3 w-3 rounded-full inline-block" style={{ backgroundColor: DELIVERY_COLOUR_SWATCH[event.colour] }} aria-hidden />
             {DELIVERY_COLOUR_LABEL[event.colour]}
           </span>
+          {event.hiab && <span className="flex items-center gap-1.5"><HiabBadge /> Needs a hiab</span>}
           {event.done && <Pill tone="good">Delivered</Pill>}
         </div>
 
         {canEdit ? (
-          <form key={`${event.startsAt.toISOString()}-${event.driverId}`} action={updateDelivery} className="flex flex-wrap items-end gap-3">
+          <form key={`${event.startsAt.toISOString()}-${event.driverId}-${event.hiab}`} action={updateDelivery} className="flex flex-wrap items-end gap-3">
             <input type="hidden" name="eventId" value={event.id} />
             <div>
               <label className="label" htmlFor="date">Date</label>
@@ -73,6 +76,10 @@ export default async function DeliveryDetailPage({ params }: { params: { id: str
                 {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
+            <label className="flex items-center gap-2 text-sm font-medium basis-full">
+              <input type="checkbox" name="hiab" defaultChecked={event.hiab} className="h-4 w-4 accent-brand" />
+              Needs a hiab <HiabBadge />
+            </label>
             <SubmitButton pendingLabel="Saving…">Save</SubmitButton>
           </form>
         ) : (
@@ -81,6 +88,15 @@ export default async function DeliveryDetailPage({ params }: { params: { id: str
           </p>
         )}
       </section>
+
+      {canEdit && (
+        <div className="max-w-lg mt-6">
+          <DeleteDeliveryButton
+            eventId={event.id}
+            summary={`${event.title.replace(/^Deliver(?:y)?\s+to\s+/i, '')} on ${shortDate(event.startsAt)}`}
+          />
+        </div>
+      )}
     </Shell>
   );
 }

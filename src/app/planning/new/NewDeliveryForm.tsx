@@ -5,6 +5,7 @@ import type { DeliveryColour } from '@prisma/client';
 import { DELIVERY_COLOURS, DELIVERY_COLOUR_LABEL, DELIVERY_COLOUR_SWATCH } from '@/lib/deliveryColours';
 import { SubmitButton } from '@/components/SubmitButton';
 import { createDelivery } from '../actions';
+import { HiabBadge } from '../HiabBadge';
 
 type Driver = { id: string; name: string };
 
@@ -54,6 +55,11 @@ export function NewDeliveryForm({
           {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </div>
+
+      <label className="flex items-center gap-2.5 text-sm font-medium">
+        <input type="checkbox" name="hiab" className="h-4 w-4 accent-brand" />
+        Needs a hiab <HiabBadge />
+      </label>
 
       <fieldset>
         <legend className="label">Colour on the board</legend>

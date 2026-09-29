@@ -13,6 +13,7 @@ import { NAV, Shell } from '@/components/Shell';
 import { Avatar, PageHeader } from '@/components/ui';
 import { advanceStage } from '@/app/orders/actions';
 import { FullscreenToggle } from './FullscreenToggle';
+import { HiabBadge } from './HiabBadge';
 
 type View = 'day' | 'week' | 'month';
 
@@ -28,6 +29,7 @@ type Entry = {
   colour?: DeliveryColour;
   weightKg?: number;
   driverBadge?: { name: string; colour: string };
+  hiab?: boolean;
 };
 
 // Holiday/leave is a third data source, not folded into Entry[]: it isn't a
@@ -163,6 +165,7 @@ export default async function PlanningPage({
       driverBadge: group === 'Deliveries' && !e.orderId && e.driver
         ? { name: e.driver.name, colour: e.driver.user?.colour ?? '#0D4A42' }
         : undefined,
+      hiab: group === 'Deliveries' && !e.orderId && e.hiab,
     });
   }
 
@@ -356,6 +359,9 @@ export default async function PlanningPage({
                           <span className="absolute -top-2 -left-2 z-10" title={e.driverBadge.name}>
                             <Avatar name={e.driverBadge.name} colour={e.driverBadge.colour} size={18} />
                           </span>
+                        )}
+                        {e.hiab && (
+                          <span className="absolute -top-2 -right-2 z-10"><HiabBadge /></span>
                         )}
                         {e.group === 'Deliveries' ? (
                           <>
