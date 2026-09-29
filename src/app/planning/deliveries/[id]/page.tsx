@@ -10,7 +10,7 @@ import { DELIVERY_COLOUR_LABEL, DELIVERY_COLOUR_SWATCH } from '@/lib/deliveryCol
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill } from '@/components/ui';
 import { SubmitButton } from '@/components/SubmitButton';
-import { markEventDelivered, updateDelivery } from '../../actions';
+import { setEventDelivered, updateDelivery } from '../../actions';
 import { HiabBadge } from '../../HiabBadge';
 import { DeleteDeliveryButton } from './DeleteDeliveryButton';
 
@@ -40,10 +40,13 @@ export default async function DeliveryDetailPage({ params }: { params: { id: str
       <PageHeader
         title={event.title.replace(/^Deliver(?:y)?\s+to\s+/i, '')}
         blurb={`${shortDate(event.startsAt)}${event.allDay ? '' : ` at ${clock(event.startsAt)}`} · ${event.town}`}
-        actions={!event.done && can(user, 'orders.progress') ? (
-          <form action={markEventDelivered}>
+        actions={can(user, 'orders.progress') || can(user, 'planning.edit') ? (
+          <form action={setEventDelivered}>
             <input type="hidden" name="eventId" value={event.id} />
-            <SubmitButton pendingLabel="Marking…">Mark delivered</SubmitButton>
+            <input type="hidden" name="done" value={event.done ? '0' : '1'} />
+            <SubmitButton className={event.done ? 'btn-secondary' : 'btn-primary'} pendingLabel="Saving…">
+              {event.done ? 'Mark as not delivered' : 'Mark delivered'}
+            </SubmitButton>
           </form>
         ) : undefined}
       />

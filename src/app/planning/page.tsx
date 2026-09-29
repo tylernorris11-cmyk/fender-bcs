@@ -11,9 +11,9 @@ import { bankHolidayName, eachDayInclusive, isoDay, utcDay } from '@/lib/holiday
 import { DELIVERY_COLOUR_BOARD } from '@/lib/deliveryColours';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, PageHeader } from '@/components/ui';
-import { advanceStage } from '@/app/orders/actions';
 import { FullscreenToggle } from './FullscreenToggle';
 import { HiabBadge } from './HiabBadge';
+import { DeliveredCircle, type DeliveredControl } from './DeliveredCircle';
 
 type View = 'day' | 'week' | 'month';
 
@@ -22,7 +22,7 @@ type Entry = {
   group: 'Deliveries' | 'Vehicles & machinery' | 'Other';
   href?: string; town?: string; date: Date;
   delivered?: boolean;
-  markDelivered?: { orderId: string } | { eventId: string };
+  deliveredControl?: DeliveredControl;
   driver?: string;
   // Only ever set on a stand-alone delivery (a PlanningEvent, not a real
   // Order) — an order-derived delivery keeps the plain green board styling.
@@ -100,6 +100,7 @@ export default async function PlanningPage({
   ]);
 
   const entries: Entry[] = [];
+  const canMarkDelivered = can(user, 'orders.progress') || can(user, 'planning.edit');
 
   for (const o of orders) {
     // Both companies share this board because they share lorries — but a
@@ -116,7 +117,7 @@ export default async function PlanningPage({
       href: visible ? `/orders/${o.id}` : undefined,
       town: o.town,
       delivered: o.stage === 'DELIVERED' || o.stage === 'COMPLETED',
-      markDelivered: visible && o.stage === 'OUT_FOR_DELIVERY' && can(user, 'orders.progress') ? { orderId: o.id } : undefined,
+      deliveredControl: visible && o.stage === 'OUT_FOR_DELIVERY' && can(user, 'orders.progress') ? { orderId: o.id } : undefined,
     });
   }
 
@@ -158,7 +159,7 @@ export default async function PlanningPage({
         : undefined,
       town: e.town,
       delivered: group === 'Deliveries' ? e.done : undefined,
-      markDelivered: group === 'Deliveries' && visible && !e.done && can(user, 'orders.progress') ? { eventId: e.id } : undefined,
+      deliveredControl: group === 'Deliveries' && visible && !e.orderId && canMarkDelivered ? { eventId: e.id, done: e.done } : undefined,
       driver: group === 'Deliveries' && visible ? (e.assignedTo || undefined) : undefined,
       colour: group === 'Deliveries' && !e.orderId ? e.colour : undefined,
       weightKg: group === 'Deliveries' && !e.orderId && e.weightKg != null ? Number(e.weightKg) : undefined,
@@ -354,7 +355,7 @@ export default async function PlanningPage({
                   {dayEntries.map((e) => {
                     const boardTone = e.delivered ? 'border-hairline bg-canvas' : e.colour ? DELIVERY_COLOUR_BOARD[e.colour] : GROUP_TONE[e.group];
                     const body = (
-                      <div className={`relative border-l-[3px] rounded-r-md px-2 py-1.5 ${boardTone} ${e.delivered ? 'opacity-60' : ''} ${e.driverBadge ? 'pl-3' : ''}`}>
+                      <div className={`relative border-l-[3px] rounded-r-md px-2 py-1.5 ${boardTone} ${e.delivered ? 'opacity-60' : ''} ${e.driverBadge ? 'pl-3' : ''} ${e.deliveredControl ? 'pr-4' : ''}`}>
                         {e.driverBadge && (
                           <span className="absolute -top-2 -left-2 z-10" title={e.driverBadge.name}>
                             <Avatar name={e.driverBadge.name} colour={e.driverBadge.colour} size={18} />
@@ -386,20 +387,12 @@ export default async function PlanningPage({
                         )}
                       </div>
                     );
-                    // A stand-alone delivery's "Mark delivered" lives on its own page now
-                    // (click through via e.href) — only an order's stays inline here, since
-                    // an order has no page of its own within Planning to move it to.
+                    // The green circle sits beside the link rather than inside it, so a
+                    // tap on it marks the delivery instead of opening it.
                     return (
-                      <li key={e.id}>
+                      <li key={e.id} className="relative">
                         {e.href ? <Link href={e.href} className="block hover:opacity-80">{body}</Link> : body}
-                        {e.markDelivered && 'orderId' in e.markDelivered && (
-                          <form action={advanceStage} className="mt-1">
-                            <input type="hidden" name="orderId" value={e.markDelivered.orderId} />
-                            <button type="submit" className="text-[10px] font-semibold text-brand-700 hover:underline">
-                              Mark delivered
-                            </button>
-                          </form>
-                        )}
+                        {e.deliveredControl && <DeliveredCircle control={e.deliveredControl} />}
                       </li>
                     );
                   })}

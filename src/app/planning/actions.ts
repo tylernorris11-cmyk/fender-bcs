@@ -5,16 +5,26 @@ import { redirect } from 'next/navigation';
 import type { DeliveryColour } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
+import { can } from '@/lib/rbac';
 import { clock, isoDateUk, shortDate, ukTimeToUtc } from '@/lib/format';
 
-/** Marks a stand-alone delivery entry (one not tied to a real Order) as
- * delivered, so it greys out on the planning board. */
-export async function markEventDelivered(formData: FormData) {
-  const user = await assertPermission('orders.progress');
+/** Marks a stand-alone delivery (one not tied to a real Order) as delivered,
+ * so it greys out on the board, or back again if it was ticked by mistake.
+ * Anyone who moves orders along or plans deliveries can do it — that
+ * includes the shared board screen. */
+export async function setEventDelivered(formData: FormData) {
+  const user = await assertPermission('planning.view');
+  if (!can(user, 'orders.progress') && !can(user, 'planning.edit')) throw new Error('You do not have permission to do that.');
   const eventId = String(formData.get('eventId'));
-  const event = await db.planningEvent.update({ where: { id: eventId }, data: { done: true } });
-  await logActivity('PlanningEvent', eventId, 'Marked delivered', event.title, user.id);
+  const done = formData.get('done') === '1';
+
+  const existing = await db.planningEvent.findUniqueOrThrow({ where: { id: eventId } });
+  if (existing.type !== 'DELIVERY' || existing.orderId) throw new Error('Only a stand-alone delivery can be marked here.');
+
+  const event = await db.planningEvent.update({ where: { id: eventId }, data: { done } });
+  await logActivity('PlanningEvent', eventId, done ? 'Marked delivered' : 'Marked not delivered', event.title, user.id);
   revalidatePath('/planning');
+  revalidatePath(`/planning/deliveries/${eventId}`);
 }
 
 const DELIVERY_COLOURS: DeliveryColour[] = ['BLUE', 'RED', 'BLACK', 'GREEN'];
