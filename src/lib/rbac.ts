@@ -268,7 +268,7 @@ export const MODULES = [
   { key: 'assets', label: 'Assets', href: '/assets', perm: 'assets.view' as Permission, blurb: 'Manage company assets, equipment and maintenance.' },
   { key: 'checks', label: 'Checks', href: '/checks', perm: 'checks.view' as Permission, blurb: 'Morning checks on machines, lorries and pickups before use.' },
   { key: 'fuel', label: 'Fuel', href: '/fuel', perm: 'fuel.view' as Permission, blurb: 'Log fuel taken from the yard tank against each vehicle.' },
-  { key: 'hs', label: 'Health & Safety', href: '/hs', perm: 'hs.view' as Permission, blurb: 'HSE documents, RAMS and mandatory training.' },
+  { key: 'hs', label: 'Health & Safety', href: '/hs', perm: 'hs.view' as Permission, blurb: 'Risk assessments, incidents, actions and training.' },
   { key: 'outreach', label: 'Sales Outreach', href: '/outreach', perm: 'outreach.view' as Permission, blurb: 'Find new trade customers and review outreach emails before they send.', company: 'BS_SUPPLIES' as Company },
   { key: 'accounts', label: 'Accounts', href: '/accounts', perm: 'accounts.view' as Permission, blurb: 'Nominal ledger, journals and the trial balance. Being built to take over from Exchequer.' },
 ] as const;

@@ -10,14 +10,16 @@ import { X } from 'lucide-react';
  * top-level navigation to a data: URL (a `target="_blank"` link to one just
  * silently fails to open), so this never navigates anywhere at all.
  */
-export function PhotoLightbox({ src, alt = '' }: { src: string; alt?: string }) {
+export function PhotoLightbox({
+  src, alt = '', buttonClassName = 'inline-block mt-3', thumbClassName = 'h-32 w-32',
+}: { src: string; alt?: string; buttonClassName?: string; thumbClassName?: string }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="inline-block mt-3">
+      <button type="button" onClick={() => setOpen(true)} className={buttonClassName}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} className="h-32 w-32 rounded-xl object-cover border border-hairline hover:opacity-90" />
+        <img src={src} alt={alt} className={`${thumbClassName} rounded-xl object-cover border border-hairline hover:opacity-90`} />
       </button>
 
       {open && (

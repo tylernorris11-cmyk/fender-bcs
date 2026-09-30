@@ -107,6 +107,14 @@ model User {
   stockLengthsProduced        StockLength[]            @relation("stockLengthProducedBy")
   transactionsPosted          Transaction[]
   steelStockAdded             SteelStockItem[]         @relation("steelStockAddedBy")
+  hsAssessmentsCreated        HsAssessment[]           @relation("hsAssessmentCreatedBy")
+  hsIncidentsReported         HsIncident[]             @relation("hsIncidentReportedBy")
+  hsIncidentsInvestigating    HsIncident[]             @relation("hsIncidentInvestigator")
+  hsActionsOwned              HsAction[]               @relation("hsActionOwner")
+  hsActionsCompleted          HsAction[]               @relation("hsActionCompletedBy")
+  hsActionsCreated            HsAction[]               @relation("hsActionCreatedBy")
+  hsTrainingRecords           HsTrainingRecord[]       @relation("hsTrainingRecordFor")
+  hsTrainingRecordsAdded      HsTrainingRecord[]       @relation("hsTrainingRecordAddedBy")
 }
 
 // ------------------------------------------------------------- customers
@@ -1440,6 +1448,167 @@ model UserTrainingAssignment {
 
   @@unique([userId, moduleId])
   @@index([moduleId])
+}
+
+enum HsAssessmentKind {
+  RISK_ASSESSMENT
+  METHOD_STATEMENT
+}
+
+enum HsRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// A risk assessment or method statement on the register. Either the
+/// signed copy uploaded as a file, hazards and controls written in the app,
+/// or both. Its status (live, review due, overdue) is worked out from
+/// reviewDue, never stored, so it can't go stale.
+model HsAssessment {
+  id             String           @id @default(cuid())
+  company        Company? // null = both companies, same as HseDocument
+  kind           HsAssessmentKind
+  ref            String           @unique // RA-001 / MS-001
+  title          String
+  area           String           @default("")
+  riskLevel      HsRiskLevel      @default(MEDIUM) // worked out from the hazards when there are any, chosen by hand when it's only a file
+  reviewDue      DateTime
+  lastReviewedAt DateTime?
+  steps          String[]         @default([]) // method statements: the sequence of work, in order
+  fileUrl        String           @default("")
+  fileName       String           @default("")
+  archived       Boolean          @default(false)
+  createdById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  createdBy User?      @relation("hsAssessmentCreatedBy", fields: [createdById], references: [id])
+  hazards   HsHazard[]
+  actions   HsAction[]
+
+  @@index([company, kind, archived])
+}
+
+/// One row of a risk assessment: the hazard, who it could hurt, what's done
+/// about it, and the risk left once those controls are in place, scored
+/// likelihood × severity on the usual 5 × 5 matrix.
+model HsHazard {
+  id           String @id @default(cuid())
+  assessmentId String
+  hazard       String
+  whoAtRisk    String @default("")
+  controls     String @default("")
+  likelihood   Int // 1–5
+  severity     Int // 1–5
+  sortOrder    Int    @default(0)
+
+  assessment HsAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+}
+
+enum HsIncidentType {
+  INCIDENT
+  NEAR_MISS
+  HAZARD
+}
+
+enum HsIncidentStatus {
+  UNDER_REVIEW
+  INVESTIGATION
+  CLOSED
+}
+
+model HsIncident {
+  id              String           @id @default(cuid())
+  company         Company
+  ref             String           @unique // INC-2026-008
+  type            HsIncidentType
+  status          HsIncidentStatus @default(UNDER_REVIEW)
+  occurredAt      DateTime
+  area            String           @default("")
+  description     String
+  injuredPerson   String           @default("")
+  injury          String           @default("") // blank when nobody was hurt
+  immediateAction String           @default("")
+  riddor          Boolean          @default(false) // reportable to the HSE under RIDDOR
+  investigatorId  String?
+  findings        String           @default("") // what the investigation found, including the root cause
+  reportedById    String?
+  reportedAt      DateTime         @default(now())
+  closedAt        DateTime?
+
+  investigator User?             @relation("hsIncidentInvestigator", fields: [investigatorId], references: [id])
+  reportedBy   User?             @relation("hsIncidentReportedBy", fields: [reportedById], references: [id])
+  photos       HsIncidentPhoto[]
+  actions      HsAction[]
+
+  @@index([company, status])
+  @@index([occurredAt])
+}
+
+model HsIncidentPhoto {
+  id         String   @id @default(cuid())
+  incidentId String
+  fileUrl    String
+  addedAt    DateTime @default(now())
+
+  incident HsIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId])
+}
+
+/// Something someone has to do to make things safer — raised from an
+/// incident, from a risk assessment, or on its own. Open until completedAt
+/// is set; overdue is worked out from dueOn.
+model HsAction {
+  id            String    @id @default(cuid())
+  company       Company
+  title         String
+  ownerId       String?
+  dueOn         DateTime
+  completedAt   DateTime?
+  completedById String?
+  note          String    @default("")
+  incidentId    String?
+  assessmentId  String?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+
+  owner       User?         @relation("hsActionOwner", fields: [ownerId], references: [id])
+  completedBy User?         @relation("hsActionCompletedBy", fields: [completedById], references: [id])
+  createdBy   User?         @relation("hsActionCreatedBy", fields: [createdById], references: [id])
+  incident    HsIncident?   @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  assessment  HsAssessment? @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+
+  @@index([company, completedAt])
+  @@index([incidentId])
+  @@index([assessmentId])
+}
+
+/// A certificate or ticket someone holds — forklift, overhead crane, first
+/// aid and the like — and when it runs out. Separate from TrainingModule,
+/// which is the app's own read-and-sign training. personName covers anyone
+/// who doesn't have an account.
+model HsTrainingRecord {
+  id              String    @id @default(cuid())
+  userId          String?
+  personName      String    @default("")
+  course          String
+  achievedOn      DateTime?
+  expiresOn       DateTime? // blank = doesn't expire
+  certificateUrl  String    @default("")
+  certificateName String    @default("")
+  notes           String    @default("")
+  addedById       String?
+  addedAt         DateTime  @default(now())
+
+  user    User? @relation("hsTrainingRecordFor", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy User? @relation("hsTrainingRecordAddedBy", fields: [addedById], references: [id])
+
+  @@index([userId])
+  @@index([expiresOn])
 }
 
 /// One day's hours for one person. Times are the person's own wall-clock

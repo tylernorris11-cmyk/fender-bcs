@@ -245,10 +245,20 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'Add entry', href: '/fuel/new', perm: 'fuel.create' },
     { label: 'History', href: '/fuel/history', perm: 'fuel.history' },
   ],
+  // Plant and machine checks stay in Assets and Checks rather than being
+  // repeated here. Incidents, reporting and everyone's certificates are for
+  // whoever runs H&S; everyone else sees the register, their own actions and
+  // their own training.
   hs: [
-    { label: 'Overview', href: '/hs' },
-    { label: 'Documents', href: '/hs/documents' },
+    { label: 'Dashboard', href: '/hs' },
+    { label: 'Risk assessments', href: '/hs/risk-assessments' },
+    { label: 'Method statements', href: '/hs/method-statements' },
+    { label: 'Training & competence', href: '/hs/competence', perm: 'hs.edit' },
     { label: 'My training', href: '/hs/training' },
+    { label: 'Incidents & near misses', href: '/hs/incidents', perm: 'hs.edit' },
+    { label: 'Actions', href: '/hs/actions' },
+    { label: 'Documents', href: '/hs/documents' },
+    { label: 'Reporting', href: '/hs/reporting', perm: 'hs.edit' },
     { label: 'Manage training', href: '/hs/training/manage', perm: 'hs.manageTraining' },
   ],
   // Trimmed to one link per area — Home is the full directory
