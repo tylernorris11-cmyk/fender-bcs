@@ -24,15 +24,13 @@ export const MODULE_COLORS: Record<string, string> = {
  * gets an in-progress flag (the corner ribbon on the home tiles, the
  * hazard banner in Shell, the WIP tag in the module switcher). One
  * function so all three can't drift out of sync with each other. */
-const STABLE_MODULE_KEYS = new Set(['assets', 'checks', 'fuel', 'holidays', 'timesheets', 'alerts', 'planning']);
+const STABLE_MODULE_KEYS = new Set(['assets', 'checks', 'fuel', 'holidays', 'timesheets', 'alerts', 'planning', 'stock']);
 
 /** Stable only on the BCS Products side — its production process (cutting
  * fence post to length from coil) is much simpler than Fender's
  * cut-and-bend-to-BS-8666 workflow and has had enough real use there,
- * while Fender's side hasn't. Same for stock: BCS's is just coils now,
- * with real day-to-day use behind it, while Fender's fuller product/batch
- * system hasn't had the same run. */
-const STABLE_FOR_BS_SUPPLIES_ONLY = new Set(['production', 'stock']);
+ * while Fender's side hasn't. */
+const STABLE_FOR_BS_SUPPLIES_ONLY = new Set(['production']);
 
 export function isStableModule(key: string, company: Company | null | undefined): boolean {
   if (STABLE_MODULE_KEYS.has(key)) return true;
