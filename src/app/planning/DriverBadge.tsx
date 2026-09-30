@@ -13,9 +13,12 @@ export type DriverTick = { eventId: string; done: boolean };
  */
 export function DriverBadge({ name, colour, tick }: { name: string; colour: string; tick?: DriverTick }) {
   const done = !!tick?.done;
+  // Flex rather than block/inline-block wrappers, so each is exactly the
+  // avatar's 20px and not the taller text line around it; otherwise the
+  // green ring sits lower than the circle it's meant to go round.
   const face = (
-    <span className="relative inline-block">
-      <span className={`block rounded-full ${done ? 'ring-2 ring-emerald-500' : ''}`}>
+    <span className="relative flex">
+      <span className={`flex rounded-full ${done ? 'ring-2 ring-emerald-500' : ''}`}>
         <Avatar name={name} colour={colour} size={20} />
       </span>
       {done && (
@@ -38,7 +41,7 @@ export function DriverBadge({ name, colour, tick }: { name: string; colour: stri
         type="submit"
         title={done ? `Delivered by ${name}. Tap to undo` : `${name}. Tap to mark delivered`}
         aria-label={done ? `Delivered by ${name}. Mark as not delivered` : `Mark delivered by ${name}`}
-        className="block rounded-full transition-transform hover:scale-110 active:scale-90"
+        className="flex rounded-full transition-transform hover:scale-110 active:scale-90"
       >
         {face}
       </button>
