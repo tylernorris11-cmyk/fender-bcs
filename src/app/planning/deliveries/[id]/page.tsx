@@ -40,7 +40,7 @@ export default async function DeliveryDetailPage({ params }: { params: { id: str
       <PageHeader
         title={event.title.replace(/^Deliver(?:y)?\s+to\s+/i, '')}
         blurb={`${shortDate(event.startsAt)}${event.allDay ? '' : ` at ${clock(event.startsAt)}`} · ${event.town}`}
-        actions={can(user, 'orders.progress') || can(user, 'planning.edit') ? (
+        actions={(can(user, 'orders.progress') || can(user, 'planning.edit')) && (event.done || event.driverId) ? (
           <form action={setEventDelivered}>
             <input type="hidden" name="eventId" value={event.id} />
             <input type="hidden" name="done" value={event.done ? '0' : '1'} />
@@ -64,6 +64,10 @@ export default async function DeliveryDetailPage({ params }: { params: { id: str
           {event.hiab && <span className="flex items-center gap-1.5"><HiabBadge /> Needs a hiab</span>}
           {event.done && <Pill tone="good">Delivered</Pill>}
         </div>
+
+        {!event.driverId && !event.done && (
+          <p className="text-sm text-ink-muted">Assign a driver to be able to mark it delivered.</p>
+        )}
 
         {canEdit ? (
           <form key={`${event.startsAt.toISOString()}-${event.driverId}-${event.hiab}`} action={updateDelivery} className="flex flex-wrap items-end gap-3">

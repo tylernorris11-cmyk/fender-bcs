@@ -13,7 +13,7 @@ import { NAV, Shell } from '@/components/Shell';
 import { Avatar, PageHeader } from '@/components/ui';
 import { FullscreenToggle } from './FullscreenToggle';
 import { HiabBadge } from './HiabBadge';
-import { DeliveredCircle, type DeliveredControl } from './DeliveredCircle';
+import { DriverBadge, type DriverTick } from './DriverBadge';
 
 type View = 'day' | 'week' | 'month';
 
@@ -22,13 +22,12 @@ type Entry = {
   group: 'Deliveries' | 'Vehicles & machinery' | 'Other';
   href?: string; town?: string; date: Date;
   delivered?: boolean;
-  deliveredControl?: DeliveredControl;
   driver?: string;
   // Only ever set on a stand-alone delivery (a PlanningEvent, not a real
   // Order) — an order-derived delivery keeps the plain green board styling.
   colour?: DeliveryColour;
   weightKg?: number;
-  driverBadge?: { name: string; colour: string };
+  driverBadge?: { name: string; colour: string; tick?: DriverTick };
   hiab?: boolean;
 };
 
@@ -117,7 +116,6 @@ export default async function PlanningPage({
       href: visible ? `/orders/${o.id}` : undefined,
       town: o.town,
       delivered: o.stage === 'DELIVERED' || o.stage === 'COMPLETED',
-      deliveredControl: visible && o.stage === 'OUT_FOR_DELIVERY' && can(user, 'orders.progress') ? { orderId: o.id } : undefined,
     });
   }
 
@@ -159,12 +157,15 @@ export default async function PlanningPage({
         : undefined,
       town: e.town,
       delivered: group === 'Deliveries' ? e.done : undefined,
-      deliveredControl: group === 'Deliveries' && visible && !e.orderId && canMarkDelivered ? { eventId: e.id, done: e.done } : undefined,
       driver: group === 'Deliveries' && visible ? (e.assignedTo || undefined) : undefined,
       colour: group === 'Deliveries' && !e.orderId ? e.colour : undefined,
       weightKg: group === 'Deliveries' && !e.orderId && e.weightKg != null ? Number(e.weightKg) : undefined,
       driverBadge: group === 'Deliveries' && !e.orderId && e.driver
-        ? { name: e.driver.name, colour: e.driver.user?.colour ?? '#0D4A42' }
+        ? {
+            name: e.driver.name,
+            colour: e.driver.user?.colour ?? '#0D4A42',
+            tick: visible && canMarkDelivered ? { eventId: e.id, done: e.done } : undefined,
+          }
         : undefined,
       hiab: group === 'Deliveries' && !e.orderId && e.hiab,
     });
@@ -355,12 +356,7 @@ export default async function PlanningPage({
                   {dayEntries.map((e) => {
                     const boardTone = e.delivered ? 'border-hairline bg-canvas' : e.colour ? DELIVERY_COLOUR_BOARD[e.colour] : GROUP_TONE[e.group];
                     const body = (
-                      <div className={`relative border-l-[3px] rounded-r-md px-2 py-1.5 ${boardTone} ${e.delivered ? 'opacity-60' : ''} ${e.driverBadge ? 'pl-3' : ''} ${e.deliveredControl ? 'pr-4' : ''}`}>
-                        {e.driverBadge && (
-                          <span className="absolute -top-2 -left-2 z-10" title={e.driverBadge.name}>
-                            <Avatar name={e.driverBadge.name} colour={e.driverBadge.colour} size={18} />
-                          </span>
-                        )}
+                      <div className={`relative border-l-[3px] rounded-r-md px-2 py-1.5 ${boardTone} ${e.delivered ? 'opacity-60' : ''} ${e.driverBadge ? 'pl-3' : ''}`}>
                         {e.hiab && (
                           <span className="absolute -top-2 -right-2 z-10"><HiabBadge /></span>
                         )}
@@ -387,12 +383,12 @@ export default async function PlanningPage({
                         )}
                       </div>
                     );
-                    // The green circle sits beside the link rather than inside it, so a
-                    // tap on it marks the delivery instead of opening it.
+                    // The driver badge sits beside the link rather than inside it, so a
+                    // tap on it ticks the delivery off instead of opening it.
                     return (
                       <li key={e.id} className="relative">
                         {e.href ? <Link href={e.href} className="block hover:opacity-80">{body}</Link> : body}
-                        {e.deliveredControl && <DeliveredCircle control={e.deliveredControl} />}
+                        {e.driverBadge && <DriverBadge {...e.driverBadge} />}
                       </li>
                     );
                   })}

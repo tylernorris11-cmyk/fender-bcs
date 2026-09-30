@@ -20,6 +20,7 @@ export async function setEventDelivered(formData: FormData) {
 
   const existing = await db.planningEvent.findUniqueOrThrow({ where: { id: eventId } });
   if (existing.type !== 'DELIVERY' || existing.orderId) throw new Error('Only a stand-alone delivery can be marked here.');
+  if (done && !existing.driverId) throw new Error('Assign a driver before marking it delivered.');
 
   const event = await db.planningEvent.update({ where: { id: eventId }, data: { done } });
   await logActivity('PlanningEvent', eventId, done ? 'Marked delivered' : 'Marked not delivered', event.title, user.id);
