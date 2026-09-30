@@ -231,6 +231,24 @@ export function can(user: Pick<SessionUser, 'role' | 'hiddenModules' | 'extraPer
   return (PERMISSIONS[user.role]?.includes(perm) ?? false) || (user.extraPermissions?.includes(perm) ?? false);
 }
 
+/**
+ * Everyone working on Fender's side can see Fender's stock and book coils
+ * and bundles in and out, whatever their role or Set Up hiding says. Only
+ * while Fender is the company they're looking at, so BCS stock access is
+ * unchanged for people on both. Shared screens (like the delivery board)
+ * aren't people and keep exactly what they were given.
+ */
+export const FENDER_EVERYONE_PERMISSIONS: Permission[] = ['stock.view', 'stock.goodsIn', 'stock.adjust'];
+
+export function withCompanyGrants<T extends Pick<SessionUser, 'hiddenModules' | 'extraPermissions'>>(user: T, company: Company, sharedScreen: boolean): T {
+  if (company !== 'FENDER' || sharedScreen) return user;
+  return {
+    ...user,
+    hiddenModules: user.hiddenModules.filter((m) => m !== 'stock'),
+    extraPermissions: [...new Set([...user.extraPermissions, ...FENDER_EVERYONE_PERMISSIONS])],
+  };
+}
+
 export function canAny(user: SessionUser | null | undefined, ...perms: Permission[]): boolean {
   return perms.some((p) => can(user, p));
 }

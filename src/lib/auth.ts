@@ -3,7 +3,8 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import crypto from 'node:crypto';
 import { db } from './db';
-import { can, type Permission, type SessionUser } from './rbac';
+import { can, withCompanyGrants, type Permission, type SessionUser } from './rbac';
+import { getActiveCompany } from './company';
 import { sendEmail } from './email';
 import { sendTelegramMessage, sendTelegramPhoto } from './telegram';
 
@@ -137,8 +138,8 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   // A year-long sign-in only counts while the account is still marked as a
   // shared screen — switching that off in People signs it out on its next page.
   if (!user.staysSignedIn && session.expires - Date.now() > MAX_AGE * 1000) return null;
-  const { active: _active, staysSignedIn: _staysSignedIn, ...sessionUser } = user;
-  return sessionUser;
+  const { active: _active, staysSignedIn, ...sessionUser } = user;
+  return withCompanyGrants(sessionUser, getActiveCompany(sessionUser), staysSignedIn);
 }
 
 /** Use at the top of every protected page. Sends people to sign in. */
