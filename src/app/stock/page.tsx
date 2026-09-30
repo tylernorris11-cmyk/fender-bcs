@@ -1,146 +1,73 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ChevronRight, Plus } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import type { SteelGauge } from '@prisma/client';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
-import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
-import { qty as fmtQty, productSpec } from '@/lib/format';
+import { tonnes } from '@/lib/format';
+import { GAUGE_ITEM, GAUGE_LABEL, GAUGE_PATH, HEAVY_GAUGE_DIAMETERS, LIGHT_GAUGE_DIAMETERS } from '@/lib/steelStock';
 import { NAV, Shell } from '@/components/Shell';
-import { PageHeader, Pill, SortSelect, Stat, StatRow } from '@/components/ui';
+import { PageHeader, Stat, StatRow } from '@/components/ui';
 
-export default async function StockPage({ searchParams }: { searchParams: { category?: string; sort?: string; depot?: string; inactive?: string } }) {
+export default async function StockPage() {
   const user = await requirePermission('stock.view');
   const alerts = await getAlerts(user);
-  const company = getActiveCompany(user);
   // Coils are BCS's day-to-day stock — the Stock tile leads straight there
-  // rather than the general product list, same reasoning as trimming it
-  // off their Stock menu.
-  if (company === 'BS_SUPPLIES') redirect('/stock/coils/stock');
-  const caresApplies = company === 'FENDER';
-  const depot = searchParams.depot;
-  const showInactive = searchParams.inactive === '1';
+  // rather than an overview, same reasoning as trimming it off their Stock menu.
+  if (getActiveCompany(user) === 'BS_SUPPLIES') redirect('/stock/coils/stock');
 
-  const [products, locations] = await Promise.all([
-    db.product.findMany({
-      where: { company, active: !showInactive, ...(searchParams.category ? { category: searchParams.category } : {}) },
-      orderBy: [{ category: 'asc' }, { name: 'asc' }],
-      include: { batches: { where: { status: { in: ['Available', 'Quarantined'] }, ...(depot ? { depot } : {}) } } },
-    }),
-    db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
-  ]);
+  // Fender's stock is two sections: light gauge coils and heavy gauge
+  // bundles. This is the at-a-glance total of each, per size.
+  const totals = await db.steelStockItem.groupBy({
+    by: ['gauge', 'diameterMm'],
+    where: { company: 'FENDER' },
+    _count: { _all: true },
+    _sum: { weightKg: true },
+  });
+  const countOf = (gauge: SteelGauge, dia?: number) =>
+    totals.filter((t) => t.gauge === gauge && (dia === undefined || t.diameterMm === dia)).reduce((s, t) => s + t._count._all, 0);
+  const weightOf = (gauge: SteelGauge, dia?: number) =>
+    totals.filter((t) => t.gauge === gauge && (dia === undefined || t.diameterMm === dia)).reduce((s, t) => s + Number(t._sum.weightKg ?? 0), 0);
 
-  const availableOf = (p: (typeof products)[number]) =>
-    p.batches.filter((b) => b.status === 'Available').reduce((s, b) => s + Number(b.qtyRemaining), 0);
-
-  const liveBatches = products.reduce((s, p) => s + p.batches.length, 0);
-  const missingCerts = products.reduce((s, p) => s + p.batches.filter((b) => !b.millCertUrl).length, 0);
-  const quarantinedCount = products.reduce((s, p) => s + p.batches.filter((b) => b.status === 'Quarantined').length, 0);
-  const lowStock = products.filter((p) => {
-    const available = p.batches.filter((b) => b.status === 'Available').reduce((s, b) => s + Number(b.qtyRemaining), 0);
-    return Number(p.reorderAt) > 0 && available <= Number(p.reorderAt);
-  }).length;
-
-  const byCategory = products.reduce<Record<string, typeof products>>((acc, p) => {
-    (acc[p.category] ??= []).push(p);
-    return acc;
-  }, {});
-
-  if (searchParams.sort === 'qty') {
-    for (const items of Object.values(byCategory)) items.sort((a, b) => availableOf(a) - availableOf(b));
-  }
+  const sections: { gauge: SteelGauge; diameters: number[] }[] = [
+    { gauge: 'LIGHT', diameters: LIGHT_GAUGE_DIAMETERS },
+    { gauge: 'HEAVY', diameters: HEAVY_GAUGE_DIAMETERS },
+  ];
 
   return (
     <Shell user={user} module="stock" nav={NAV.stock} current="/stock" alerts={alerts.length}>
-      <PageHeader
-        title="Stock"
-        blurb={caresApplies ? 'Tap a product to see its batches and certificates.' : 'Tap a product to see its batches.'}
-        actions={
-          <>
-            {!caresApplies && (
-              <>
-                <Link href="/stock/coils/stock" className="btn-secondary">Coil Stock</Link>
-                <Link href="/stock/coils" className="btn-secondary">Add Coils</Link>
-              </>
-            )}
-            {can(user, 'stock.adjust') && (
-              <Link href="/stock/new" className="btn-secondary"><Plus size={16} /> Add product</Link>
-            )}
-            {can(user, 'stock.goodsIn') && (
-              <Link href="/stock/goods-in" className="btn-primary"><Plus size={16} /> {caresApplies ? 'Book steel in' : 'Book stock in'}</Link>
-            )}
-          </>
-        }
-      />
+      <PageHeader title="Stock" blurb="Light gauge coils and heavy gauge bundles. Open a section to see every coil or bundle by cast number, or to add more." />
 
       <StatRow>
-        <Stat value={products.length} label="Stock items" />
-        <Stat value={liveBatches} label="Live batches" />
-        <Stat value={lowStock} label="Low stock" tone={lowStock ? 'warn' : 'default'} />
-        {caresApplies ? (
-          <Stat value={missingCerts} label="Missing certificates" tone={missingCerts ? 'bad' : 'default'} />
-        ) : (
-          <Stat value={quarantinedCount} label="Quarantined" tone={quarantinedCount ? 'warn' : 'default'} />
-        )}
+        <Stat value={countOf('LIGHT')} label="Light gauge coils" />
+        <Stat value={tonnes(weightOf('LIGHT'))} label="Light gauge weight" />
+        <Stat value={countOf('HEAVY')} label="Heavy gauge bundles" />
+        <Stat value={tonnes(weightOf('HEAVY'))} label="Heavy gauge weight" />
       </StatRow>
 
-      <nav className="flex flex-wrap gap-2 mb-4" aria-label="Filter by depot">
-        <Link href="/stock" className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${!depot ? 'bg-brand text-white border-brand' : 'bg-white border-hairline hover:bg-canvas'}`}>
-          Both depots
-        </Link>
-        {locations.map((l) => (
-          <Link key={l.id} href={`/stock?depot=${encodeURIComponent(l.name)}`}
-            className={`rounded-pill px-4 py-2 text-sm font-medium border transition-colors ${depot === l.name ? 'bg-brand text-white border-brand' : 'bg-white border-hairline hover:bg-canvas'}`}>
-            {l.name}
-          </Link>
-        ))}
-      </nav>
-
-      <form className="mb-4 flex flex-wrap items-center justify-end gap-3">
-        {searchParams.category && <input type="hidden" name="category" value={searchParams.category} />}
-        {depot && <input type="hidden" name="depot" value={depot} />}
-        <label className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border border-hairline bg-white cursor-pointer">
-          <input type="checkbox" name="inactive" value="1" defaultChecked={showInactive} className="h-4 w-4 accent-brand" />
-          Show inactive
-        </label>
-        <SortSelect
-          value={searchParams.sort}
-          label="Sort within category"
-          options={[{ value: 'name', label: 'Name A-Z' }, { value: 'qty', label: 'Available qty, low first' }]}
-        />
-        <button className="btn-secondary">Apply</button>
-      </form>
-
-      <section className="card overflow-hidden">
-        {Object.entries(byCategory).map(([category, items]) => (
-          <div key={category}>
-            <h2 className="bg-canvas px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{category}</h2>
-            {items.map((p) => {
-              const available = availableOf(p);
-              const quarantined = p.batches.filter((b) => b.status === 'Quarantined').length;
-              const low = Number(p.reorderAt) > 0 && available <= Number(p.reorderAt);
+      <div className="grid gap-4 md:grid-cols-2">
+        {sections.map(({ gauge, diameters }) => (
+          <Link key={gauge} href={GAUGE_PATH[gauge]} className="card overflow-hidden hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
+              <h2 className="text-lg font-bold">{GAUGE_LABEL[gauge]}</h2>
+              <ChevronRight size={18} className="text-ink-faint" aria-hidden />
+            </div>
+            {diameters.map((dia) => {
+              const n = countOf(gauge, dia);
               return (
-                <Link key={p.id} href={`/stock/${p.id}`} className="flex items-center gap-4 px-4 py-2.5 border-t border-hairline hover:bg-canvas transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{p.name}</p>
-                    <p className="text-xs text-ink-faint">{p.code}{p.standard && ` · ${p.standard}`}{productSpec(p) && ` · ${productSpec(p)}`}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {quarantined > 0 && <Pill tone="warn">{quarantined} quarantined</Pill>}
-                    {low && <Pill tone="bad">Low</Pill>}
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold tabular-nums">{fmtQty(available, p.unit)}</p>
-                    <p className="text-xs text-ink-faint">{p.batches.length} {p.batches.length === 1 ? 'batch' : 'batches'}</p>
-                  </div>
-                  <ChevronRight size={18} className="text-ink-faint" aria-hidden />
-                </Link>
+                <div key={dia} className="flex items-center justify-between px-4 py-2.5 border-t border-hairline first:border-t-0">
+                  <span className="font-semibold">{dia}mm</span>
+                  <span className="text-sm text-ink-muted tabular-nums">
+                    {n} {n === 1 ? GAUGE_ITEM[gauge] : `${GAUGE_ITEM[gauge]}s`} · {tonnes(weightOf(gauge, dia))}
+                  </span>
+                </div>
               );
             })}
-          </div>
+          </Link>
         ))}
-      </section>
+      </div>
     </Shell>
   );
 }

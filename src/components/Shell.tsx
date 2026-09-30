@@ -212,14 +212,13 @@ export const NAV: Record<string, NavItem[]> = {
     { label: 'Coil Stock', href: '/stock/coils/stock', company: 'BS_SUPPLIES' },
     { label: 'Stock Lengths', href: '/stock/lengths', company: 'BS_SUPPLIES' },
     { label: 'Add Coils', href: '/stock/coils', company: 'BS_SUPPLIES' },
-    // BCS's day-to-day stock is coils — these still work for BCS (goods-in
-    // and movements are already BCS-aware) but stay off their own menu so
-    // it doesn't compete with the two things they actually use; still
-    // reachable from the Stock page itself for whoever needs them.
-    { label: 'All stock', href: '/stock', company: 'FENDER' },
-    { label: 'Stock groups', href: '/stock/groups', company: 'FENDER' },
-    { label: 'Goods in', href: '/stock/goods-in', perm: 'stock.goodsIn', company: 'FENDER' },
-    { label: 'Movements', href: '/stock/movements', company: 'FENDER' },
+    // Fender's stock was restarted as two sections, light gauge coils and
+    // heavy gauge bundles, each tracked under its own cast number. The old
+    // product and batch pages still exist for orders and compliance, but
+    // they're off the menu.
+    { label: 'Overview', href: '/stock', company: 'FENDER' },
+    { label: 'Light gauge', href: '/stock/light-gauge', company: 'FENDER' },
+    { label: 'Heavy gauge', href: '/stock/heavy-gauge', company: 'FENDER' },
     { label: 'Bar counter', href: '/stock/bar-counter', perm: 'barCounter.view', company: 'FENDER' },
   ],
   assets: [

@@ -106,6 +106,7 @@ model User {
   outreachEmailsApproved      OutreachEmail[]          @relation("outreachApprovedBy")
   stockLengthsProduced        StockLength[]            @relation("stockLengthProducedBy")
   transactionsPosted          Transaction[]
+  steelStockAdded             SteelStockItem[]         @relation("steelStockAddedBy")
 }
 
 // ------------------------------------------------------------- customers
@@ -424,6 +425,36 @@ model StockLength {
 
   @@index([company])
   @@index([company, lengthFt, lengthIn, thicknessMm])
+}
+
+// ------------------------------------------------------- Fender steel stock
+// Fender's reinforcing steel, tracked the way BCS tracks its coils: one row
+// per physical coil (light gauge) or bundle of straight bar (heavy gauge),
+// identified by the cast number typed in when it's added, so every piece
+// traces back to its cast for CARES. The sizes allowed are fixed lists in
+// src/lib/steelStock.ts.
+
+enum SteelGauge {
+  LIGHT // coils
+  HEAVY // bundles of straight bar
+}
+
+model SteelStockItem {
+  id         String     @id @default(cuid())
+  company    Company    @default(FENDER)
+  gauge      SteelGauge
+  castNumber String
+  diameterMm Int
+  lengthM    Int? // heavy gauge only: 12 or 6
+  weightKg   Decimal    @db.Decimal(10, 2)
+  note       String     @default("")
+  addedAt    DateTime   @default(now())
+  addedById  String?
+
+  addedBy User? @relation("steelStockAddedBy", fields: [addedById], references: [id])
+
+  @@index([company, gauge, diameterMm])
+  @@index([castNumber])
 }
 
 // ------------------------------------------------------------- ordering
