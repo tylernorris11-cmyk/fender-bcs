@@ -67,7 +67,23 @@ export default async function ManageTrainingPage({ searchParams }: { searchParam
           </div>
           <div className="sm:col-span-2">
             <label className="label" htmlFor="content">Content — one point per line</label>
-            <textarea id="content" name="content" rows={8} className="input" defaultValue={editing?.content.join('\n')} />
+            <textarea id="content" name="content" rows={editing && editing.content.length > 20 ? 24 : 8} className="input font-mono text-[13px]" defaultValue={editing?.content.join('\n')} />
+            <details className="hint">
+              <summary className="cursor-pointer">Laying out a longer document in sections</summary>
+              <p className="mt-2">Each line is a bullet point unless it starts with one of these:</p>
+              <ul className="mt-1 space-y-0.5 font-mono">
+                <li>## Section title | subtitle</li>
+                <li>### Group heading</li>
+                <li>! Warning title | warning text</li>
+                <li>+ A short tag, e.g. a piece of PPE</li>
+                <li>x Something you must never do</li>
+                <li>1. A numbered rule</li>
+                <li>= Label | value (left blank, it shows &quot;Ask your supervisor&quot;)</li>
+                <li>[] A declaration point they must tick to complete it</li>
+                <li>&gt; A plain paragraph</li>
+                <li>* Small print</li>
+              </ul>
+            </details>
           </div>
           {editing && (
             <label className="flex items-center gap-2 text-sm">

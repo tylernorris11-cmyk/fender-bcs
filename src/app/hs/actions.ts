@@ -6,6 +6,7 @@ import type { Company, HseDocumentCategory, TrainingCategory } from '@prisma/cli
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { assertCompanyAccess } from '@/lib/company';
+import { declarationsIn } from '@/lib/trainingContent';
 
 const ALLOWED_DOC_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
 
@@ -149,6 +150,13 @@ export async function acknowledgeTraining(formData: FormData) {
   const user = await assertPermission('hs.view');
   const moduleId = String(formData.get('moduleId') ?? '');
   if (!moduleId) throw new Error('Missing module.');
+
+  // A module with a declaration (the yard induction) can only be completed
+  // with every point of it ticked.
+  const trainingModule = await db.trainingModule.findUniqueOrThrow({ where: { id: moduleId }, select: { content: true } });
+  const points = declarationsIn(trainingModule.content).length;
+  const ticked = new Set(formData.getAll('declaration').map(String)).size;
+  if (points > 0 && ticked < points) throw new Error('Tick every point of the declaration to complete it.');
 
   await db.trainingCompletion.upsert({
     where: { userId_moduleId: { userId: user.id, moduleId } },
