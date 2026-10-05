@@ -13,7 +13,8 @@ import {
   ASSESSMENT_KIND, EXPIRY_WARNING_DAYS, REVIEW_WARNING_DAYS, actionStatus, daysFromToday, reviewStatus, ticketStatus,
 } from '@/lib/hs';
 import { NAV, Shell } from '@/components/Shell';
-import { DateBadge, IconStat } from './bits';
+import { IconStat } from '@/components/IconStat';
+import { DateBadge } from './bits';
 
 type Task = { key: string; date: Date; title: string; where: string; href: string };
 

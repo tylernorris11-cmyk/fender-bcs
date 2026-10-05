@@ -1,17 +1,18 @@
 import Link from 'next/link';
-import { Printer } from 'lucide-react';
+import { AlertTriangle, Factory, Printer, Scissors, Weight } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { getActiveCompany } from '@/lib/company';
-import { clock, shortDate, tonnes } from '@/lib/format';
+import { clock, isoDateUk, shortDate, tonnes, ukTimeToUtc } from '@/lib/format';
 import { isOutOfService } from '@/lib/assets';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, SortSelect, StagePill, Stat, StatRow, Table } from '@/components/ui';
 import { logProduction, startProductionJob } from './actions';
 import { produceStockLength } from '../stock/lengths/actions';
-import { CurrentJobView } from './CurrentJobView';
+import { FenderHome } from './FenderHome';
+import { IconStat } from '@/components/IconStat';
 
 const PROCESS_LABEL: Record<string, string> = { CUTTING: 'Cutting', BENDING: 'Bending', STEMA: 'Stema' };
 
@@ -33,6 +34,15 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
   });
 
   const openOtherWork = await db.otherWorkTask.count({ where: { company, status: 'Open' } });
+
+  // What the viewer has tallied since midnight (UK), finished jobs included.
+  const today = isFender
+    ? await db.productionJobRow.aggregate({
+        where: { job: { company, userId: user.id }, at: { gte: ukTimeToUtc(isoDateUk(), '00:00') } },
+        _sum: { tallyWeightKg: true },
+        _count: { _all: true },
+      })
+    : null;
 
   const finishedJobs = await db.productionJob.findMany({
     where: { company, finishedAt: { not: null } },
@@ -68,14 +78,22 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
 
   return (
     <Shell user={user} module="production" nav={NAV.production} current="/production" alerts={alerts.length}>
-      <OtherWorkCallout openCount={openOtherWork} />
       {isFender ? (
         <>
-          {activeJobs.map((job) => <CurrentJobView key={job.id} job={job} viewerId={user.id} />)}
-          <FenderView orders={orders} sort={searchParams.sort} user={user} />
+          <FenderHome
+            userName={user.name}
+            jobs={activeJobs}
+            tallyTodayKg={Number(today?._sum.tallyWeightKg ?? 0)}
+            rowsToday={today?._count._all ?? 0}
+            openOtherWork={openOtherWork}
+            canStart={can(user, 'production.progress')}
+            startAction={startProductionJob}
+          />
+          <FenderView orders={orders} sort={searchParams.sort} />
         </>
       ) : (
         <>
+          <OtherWorkCallout openCount={openOtherWork} />
           <OpenBcsJobs jobs={activeJobs} />
           <BcsView orders={orders} sort={searchParams.sort} user={user} company={company} />
         </>
@@ -220,7 +238,7 @@ function OtherWorkCallout({ openCount }: { openCount: number }) {
 
 // ------------------------------------------------------------ Fender Steel
 
-function FenderView({ orders, sort, user }: { orders: any[]; sort?: string; user: any }) {
+function FenderView({ orders, sort }: { orders: any[]; sort?: string }) {
   const cutBent = orders.filter((o) => o.barMarks.length > 0);
   const barsOutstanding = cutBent.reduce(
     (s, o) => s + o.barMarks.filter((b: any) => b.status === 'Scheduled').reduce((n: number, b: any) => n + b.bars, 0), 0);
@@ -229,35 +247,16 @@ function FenderView({ orders, sort, user }: { orders: any[]; sort?: string; user
 
   return (
     <>
-      <PageHeader title="Production" blurb="What is on the shear line and the benders, and what still needs checking." />
-
-      {can(user, 'production.progress') && (
-        <div className="card card-pad mb-6">
-          <h2 className="text-lg font-bold mb-3">Start a job</h2>
-          <form action={startProductionJob} className="flex flex-wrap items-end gap-3">
-            <div>
-              <label className="label" htmlFor="jobNumber">Job number</label>
-              <input id="jobNumber" name="jobNumber" required className="input w-40" placeholder="FS-26-05301" />
-            </div>
-            <div>
-              <label className="label" htmlFor="process">Process</label>
-              <select id="process" name="process" className="input w-36">
-                <option value="CUTTING">Cutting</option>
-                <option value="BENDING">Bending</option>
-                <option value="STEMA">Stema</option>
-              </select>
-            </div>
-            <button className="btn-primary">Start job</button>
-          </form>
-        </div>
-      )}
-
-      <StatRow>
-        <Stat value={cutBent.length} label="Cut & bent orders in the yard" />
-        <Stat value={barsOutstanding.toLocaleString('en-GB')} label="Bars still to cut" />
-        <Stat value={tonnes(tonnesOut)} label="Tonnage in progress" />
-        <Stat value={failed} label="Marks out of tolerance" tone={failed ? 'bad' : 'default'} href="/production/checks" />
-      </StatRow>
+      <h2 className="text-lg font-bold mt-8 mb-3">In the yard</h2>
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
+        <IconStat icon={Factory} tone="info" value={cutBent.length} label="Cut & bent orders" sub="In the yard now" />
+        <IconStat icon={Scissors} tone="violet" value={barsOutstanding.toLocaleString('en-GB')} label="Bars still to cut" sub="Across those orders" />
+        <IconStat icon={Weight} tone="good" value={tonnes(tonnesOut)} label="Tonnage in progress" sub="On those orders" />
+        <IconStat
+          icon={AlertTriangle} tone={failed ? 'bad' : 'good'} href="/production/checks"
+          value={failed} label="Marks out of tolerance" sub={failed ? 'Need an NCR' : 'All checks passing'}
+        />
+      </div>
 
       <SortForm sort={sort} />
 

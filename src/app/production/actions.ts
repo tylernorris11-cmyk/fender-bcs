@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { put } from '@vercel/blob';
 import type { ProductionProcess } from '@prisma/client';
 import { db } from '@/lib/db';
@@ -130,6 +131,9 @@ export async function startProductionJob(formData: FormData) {
 
   await logActivity('ProductionJob', job.id, 'Started job', `${jobNumber}${customerName ? ` — ${customerName}` : ''} · ${process}`, user.id);
   revalidatePath('/production');
+  // Fender's Production page lists open jobs rather than showing each one in
+  // full, so go straight into the new one to start tallying.
+  if (company === 'FENDER') redirect(`/production/jobs/${job.id}`);
 }
 
 export async function finishProductionJob(formData: FormData) {
@@ -145,6 +149,8 @@ export async function finishProductionJob(formData: FormData) {
   await db.productionJob.update({ where: { id: jobId }, data: { finishedAt: new Date() } });
   await logActivity('ProductionJob', jobId, 'Finished job', job.jobNumber, user.id);
   revalidatePath('/production');
+  // A Fender job is finished from its own page; back to the open jobs.
+  if (job.company === 'FENDER') redirect('/production');
 }
 
 /**
@@ -165,6 +171,7 @@ export async function partFinishProductionJob(formData: FormData) {
   await db.productionJob.update({ where: { id: jobId }, data: { lastPartFinishedAt: new Date() } });
   await logActivity('ProductionJob', jobId, 'Part-finished for the day', job.jobNumber, user.id);
   revalidatePath('/production');
+  revalidatePath(`/production/jobs/${jobId}`);
 }
 
 export async function addProductionJobRow(formData: FormData) {
@@ -204,6 +211,7 @@ export async function addProductionJobRow(formData: FormData) {
   });
 
   revalidatePath('/production');
+  revalidatePath(`/production/jobs/${jobId}`);
 }
 
 /**
