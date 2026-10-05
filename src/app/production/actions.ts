@@ -9,6 +9,7 @@ import { assertPermission, logActivity } from '@/lib/auth';
 import { withinTolerance } from '@/lib/bs8666';
 import { getActiveCompany, assertCompanyAccess } from '@/lib/company';
 import { isOutOfService } from '@/lib/assets';
+import { lookupCast, type CastLookup } from '@/lib/castLookup';
 
 export async function logProduction(formData: FormData) {
   const user = await assertPermission('production.progress');
@@ -220,14 +221,9 @@ export async function addProductionJobRow(formData: FormData) {
  * action in this codebase invoked as a plain function rather than a form
  * action, which Next.js supports as long as the file has 'use server'.
  */
-export async function checkCastNumber(castNumber: string): Promise<boolean> {
+export async function checkCastNumber(castNumber: string): Promise<CastLookup> {
   const user = await assertPermission('production.progress');
-  const company = getActiveCompany(user);
-  const value = castNumber.trim();
-  if (!value) return false;
-
-  const match = await db.batch.findFirst({ where: { company, heatNumber: { equals: value, mode: 'insensitive' } } });
-  return !!match;
+  return lookupCast(getActiveCompany(user), castNumber);
 }
 
 // -------------------------------------------------------------- other work

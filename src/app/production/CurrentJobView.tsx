@@ -3,15 +3,16 @@ import { BAR_SIZES } from '@/lib/bs8666';
 import { db } from '@/lib/db';
 import { clock, shortDate, tonnes } from '@/lib/format';
 import { Empty, PageHeader, Stat, StatRow, Table } from '@/components/ui';
+import { SubmitButton } from '@/components/SubmitButton';
 import { addProductionJobRow, finishProductionJob, partFinishProductionJob } from './actions';
 import { CastNumberField } from './CastNumberField';
 
 const PROCESS_LABEL: Record<string, string> = { CUTTING: 'Cutting', BENDING: 'Bending', STEMA: 'Stema' };
 
-// The full add-rows/finish view for one job — used both inline on the
-// Fender home page (each user's own open job or jobs) and as the whole
-// body of a BCS job's own page, since BCS jobs are shared and there can be
-// too many open at once to show every one of them in full on one page.
+// The full add-rows/finish view for one job — the whole body of a job's own
+// page, reached from the Production page's list of open jobs. Every button
+// here locks while it saves, so a double tap on a phone can't log the same
+// row twice.
 export async function CurrentJobView({ job, viewerId }: { job: any; viewerId: string }) {
   const isFenderJob = job.company === 'FENDER';
   const startedByOther = !isFenderJob && job.userId !== viewerId;
@@ -48,11 +49,11 @@ export async function CurrentJobView({ job, viewerId }: { job: any; viewerId: st
             <a href={`/production/jobs/${job.id}/print`} className="btn-secondary btn-sm">Print</a>
             <form action={partFinishProductionJob}>
               <input type="hidden" name="jobId" value={job.id} />
-              <button className="btn-secondary btn-sm" title="Not done yet — just counts today's tally and keeps the job open for next time">Finish for today</button>
+              <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…" title="Not done yet — just counts today's tally and keeps the job open for next time">Finish for today</SubmitButton>
             </form>
             <form action={finishProductionJob}>
               <input type="hidden" name="jobId" value={job.id} />
-              <button className="btn-primary btn-sm">Finish job</button>
+              <SubmitButton className="btn-primary btn-sm" pendingLabel="Finishing…">Finish job</SubmitButton>
             </form>
           </>
         )}
@@ -132,7 +133,7 @@ export async function CurrentJobView({ job, viewerId }: { job: any; viewerId: st
               </div>
             </>
           )}
-          <button className="btn-primary">Add row</button>
+          <SubmitButton pendingLabel="Adding…">Add row</SubmitButton>
         </form>
       </div>
 
