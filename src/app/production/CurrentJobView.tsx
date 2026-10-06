@@ -19,6 +19,11 @@ export async function CurrentJobView({ job, viewerId }: { job: any; viewerId: st
   const totalWeight = job.rows.reduce((s: number, r: any) => s + Number(r.tallyWeightKg), 0);
   const lastRow = job.rows.length > 0 ? job.rows[job.rows.length - 1] : null;
   const lastCastNumber = lastRow?.castNumber ?? '';
+  // Bending works from bars that have already been cut, and the cutting
+  // sheet carries their cast numbers, so a bending tally doesn't ask for the
+  // cast or mill again. Any older bending rows that recorded one still show it.
+  const asksForCast = isFenderJob && job.process !== 'BENDING';
+  const showCastColumns = asksForCast || job.rows.some((r: any) => r.castNumber || r.mill);
   const lastSteelGrade = lastRow?.steelGrade ?? '';
   // diaMm is stored as a fixed-scale Decimal (always one decimal place, e.g.
   // "16.0"), which would mismatch Fender's plain-number <option value>s and
@@ -87,13 +92,17 @@ export async function CurrentJobView({ job, viewerId }: { job: any; viewerId: st
                 <label className="label text-xs" htmlFor="barMark">Bar mark</label>
                 <input id="barMark" name="barMark" className="input w-24" placeholder="B01" />
               </div>
-              <div className="w-40">
-                <CastNumberField defaultValue={lastCastNumber} />
-              </div>
-              <div>
-                <label className="label text-xs" htmlFor="mill">Mill</label>
-                <input id="mill" name="mill" className="input w-32" />
-              </div>
+              {asksForCast && (
+                <>
+                  <div className="w-40">
+                    <CastNumberField defaultValue={lastCastNumber} />
+                  </div>
+                  <div>
+                    <label className="label text-xs" htmlFor="mill">Mill</label>
+                    <input id="mill" name="mill" className="input w-32" />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="label text-xs" htmlFor="tallyWeightKg">Tally weight (kg)</label>
                 <input id="tallyWeightKg" name="tallyWeightKg" type="number" step="0.1" min="0" className="input w-28" />
@@ -139,15 +148,15 @@ export async function CurrentJobView({ job, viewerId }: { job: any; viewerId: st
 
       {job.rows.length === 0 ? <Empty title="No rows logged yet." /> : isFenderJob ? (
         <Table head={<>
-          <th className="th">Dia</th><th className="th">Bar mark</th><th className="th">Cast number</th>
-          <th className="th">Mill</th><th className="th">Weight</th><th className="th">Comments</th>
+          <th className="th">Dia</th><th className="th">Bar mark</th>
+          {showCastColumns && <><th className="th">Cast number</th><th className="th">Mill</th></>}
+          <th className="th">Weight</th><th className="th">Comments</th>
         </>}>
           {job.rows.map((r: any) => (
             <tr key={r.id} className="row">
               <td className="td">{r.diaMm ? `${Number(r.diaMm)} mm` : '—'}</td>
               <td className="td">{r.barMark || '—'}</td>
-              <td className="td">{r.castNumber || '—'}</td>
-              <td className="td">{r.mill || '—'}</td>
+              {showCastColumns && <><td className="td">{r.castNumber || '—'}</td><td className="td">{r.mill || '—'}</td></>}
               <td className="td">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
               <td className="td text-ink-muted">{r.comments || '—'}</td>
             </tr>

@@ -23,6 +23,9 @@ export default async function ProductionJobPrint({ params }: { params: { id: str
 
   const isFender = job.company === 'FENDER';
   const totalWeight = job.rows.reduce((s, r) => s + Number(r.tallyWeightKg), 0);
+  // Bending tallies don't record cast or mill (the cutting sheet has them),
+  // unless an older bending row did.
+  const showCastColumns = isFender && (job.process !== 'BENDING' || job.rows.some((r) => r.castNumber || r.mill));
 
   return (
     <div className="bg-white min-h-screen">
@@ -58,8 +61,9 @@ export default async function ProductionJobPrint({ params }: { params: { id: str
           <tr className="border-y border-black/20 text-left text-[11px] uppercase tracking-wide">
             {isFender ? (
               <>
-                <th className="py-2">Dia</th><th className="py-2">Bar mark</th><th className="py-2">Cast number</th>
-                <th className="py-2">Mill</th><th className="py-2 text-right">Weight</th><th className="py-2">Comments</th>
+                <th className="py-2">Dia</th><th className="py-2">Bar mark</th>
+                {showCastColumns && <><th className="py-2">Cast number</th><th className="py-2">Mill</th></>}
+                <th className="py-2 text-right">Weight</th><th className="py-2">Comments</th>
               </>
             ) : (
               <>
@@ -76,8 +80,7 @@ export default async function ProductionJobPrint({ params }: { params: { id: str
                 <>
                   <td className="py-2">{r.diaMm ? `${Number(r.diaMm)} mm` : '—'}</td>
                   <td className="py-2">{r.barMark || '—'}</td>
-                  <td className="py-2">{r.castNumber || '—'}</td>
-                  <td className="py-2">{r.mill || '—'}</td>
+                  {showCastColumns && <><td className="py-2">{r.castNumber || '—'}</td><td className="py-2">{r.mill || '—'}</td></>}
                   <td className="py-2 text-right">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
                   <td className="py-2">{r.comments || '—'}</td>
                 </>
