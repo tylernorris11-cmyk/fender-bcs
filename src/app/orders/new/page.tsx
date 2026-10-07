@@ -8,6 +8,11 @@ import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
 import { NewOrderForm } from './NewOrderForm';
 
+// Reading an uploaded bar schedule (schedule-actions.ts) runs from this page
+// and can take a while: the pages are read in parallel, but give it the full
+// minute the other long-running jobs here get.
+export const maxDuration = 60;
+
 export default async function NewOrderPage() {
   const user = await requirePermission('orders.create');
   const alerts = await getAlerts(user);

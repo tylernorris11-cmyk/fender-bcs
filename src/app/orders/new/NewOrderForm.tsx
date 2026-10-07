@@ -4,12 +4,13 @@ import { useMemo, useRef, useState } from 'react';
 import { Info, Plus, Trash2 } from 'lucide-react';
 import { SHAPE_CODES, BAR_SIZES, MASS_PER_M } from '@/lib/bs8666';
 import { createOrder } from '../actions';
+import { ScheduleImport } from './ScheduleImport';
 
 type Customer = { id: string; name: string; address: string; town: string; creditLimit: string; used: number };
 type Product = { id: string; name: string; code: string; category: string; unit: string; kgPerUnit: string; price: number };
 
 type Line = { key: number; productId: string; qty: string; unitPrice: string };
-type Bar = { key: number; mark: string; diaMm: string; grade: string; shapeCode: string; lengthMm: string; bars: string; a: string; b: string; c: string; d: string; ef: string; unitPrice: string };
+type Bar = { key: number; mark: string; diaMm: string; grade: string; shapeCode: string; lengthMm: string; bars: string; a: string; b: string; c: string; d: string; ef: string; radiusMm: string; unitPrice: string };
 type Fence = { key: number; lengthFt: string; lengthIn: string; thicknessMm: string; qty: string; unitPrice: string };
 
 const VAT = 0.2;
@@ -27,7 +28,7 @@ export function NewOrderForm({
   const seqRef = useRef(0);
   const nextKey = () => seqRef.current++;
   const newLine = (): Line => ({ key: nextKey(), productId: '', qty: '', unitPrice: '' });
-  const newBar = (): Bar => ({ key: nextKey(), mark: '', diaMm: '12', grade: 'H', shapeCode: '21', lengthMm: '', bars: '', a: '', b: '', c: '', d: '', ef: '', unitPrice: '' });
+  const newBar = (): Bar => ({ key: nextKey(), mark: '', diaMm: '12', grade: 'H', shapeCode: '21', lengthMm: '', bars: '', a: '', b: '', c: '', d: '', ef: '', radiusMm: '', unitPrice: '' });
   const newFence = (): Fence => ({ key: nextKey(), lengthFt: '', lengthIn: '', thicknessMm: '', qty: '', unitPrice: '' });
 
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
@@ -68,6 +69,17 @@ export function NewOrderForm({
     const c = customers.find((x) => x.id === id);
     setAddress(c?.address ?? '');
     setTown(c?.town ?? '');
+  }
+
+  /** Bar marks read off an uploaded schedule go in after any already entered (replacing a blank starter row), priced at the usual cut & bent rate. */
+  function importSchedule(result: { bars: { mark: string; grade: string; diaMm: number; bars: number; lengthMm: number; shapeCode: string; a: number | null; b: number | null; c: number | null; d: number | null; e: number | null; r: number | null }[] }) {
+    const str = (n: number | null) => (n == null ? '' : String(n));
+    const imported: Bar[] = result.bars.map((b) => ({
+      key: nextKey(), mark: b.mark, diaMm: String(b.diaMm), grade: b.grade, shapeCode: b.shapeCode,
+      lengthMm: String(b.lengthMm), bars: String(b.bars), a: str(b.a), b: str(b.b), c: str(b.c), d: str(b.d),
+      ef: str(b.e), radiusMm: str(b.r), unitPrice: String(cutBentPrice || ''),
+    }));
+    setBars((prev) => [...prev.filter((b) => b.mark.trim() || b.bars), ...imported]);
   }
 
   /** Drop the selling price in automatically so nobody has to look it up. */
@@ -171,6 +183,8 @@ export function NewOrderForm({
           Enter the total cutting length exactly as the customer scheduled it.
         </p>
 
+        <ScheduleImport onImport={importSchedule} />
+
         {bars.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-sm">
@@ -196,6 +210,7 @@ export function NewOrderForm({
                       <select name={`bar[${i}][diaMm]`} value={bar.diaMm} className="input w-20 px-2 py-1.5"
                               onChange={(e) => setBars((p) => p.map((b) => b.key === bar.key ? { ...b, diaMm: e.target.value } : b))}>
                         {BAR_SIZES.map((s) => <option key={s} value={s}>{s} mm</option>)}
+                        {!BAR_SIZES.includes(Number(bar.diaMm)) && <option value={bar.diaMm}>{bar.diaMm} mm (from schedule)</option>}
                       </select>
                     </td>
                     <td className="py-2 pr-2">
@@ -206,7 +221,9 @@ export function NewOrderForm({
                       <select name={`bar[${i}][shapeCode]`} value={bar.shapeCode} className="input w-56 px-2 py-1.5"
                               onChange={(e) => setBars((p) => p.map((b) => b.key === bar.key ? { ...b, shapeCode: e.target.value } : b))}>
                         {SHAPE_CODES.map((s) => <option key={s.code} value={s.code}>{s.code} — {s.name}</option>)}
+                        {!SHAPE_CODES.some((s) => s.code === bar.shapeCode) && <option value={bar.shapeCode}>{bar.shapeCode} — from schedule</option>}
                       </select>
+                      <input type="hidden" name={`bar[${i}][radiusMm]`} value={bar.radiusMm} />
                     </td>
                     {(['lengthMm', 'bars', 'a', 'b', 'c', 'd', 'ef', 'unitPrice'] as const).map((field) => (
                       <td key={field} className="py-2 pr-2">

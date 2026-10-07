@@ -108,6 +108,7 @@ export async function createOrder(formData: FormData) {
             c: r.c ? Number(r.c) : null,
             d: r.d ? Number(r.d) : null,
             ef: r.ef ? Number(r.ef) : null,
+            radiusMm: r.radiusMm ? Number(r.radiusMm) : null,
             weightKg,
             unitPrice,
             lineTotal: +(bars * unitPrice).toFixed(2),
