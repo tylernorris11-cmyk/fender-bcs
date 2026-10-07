@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { Printer } from 'lucide-react';
+import { Pencil, Printer } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { getActiveCompany } from '@/lib/company';
+import { can } from '@/lib/rbac';
 import { shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, SortTh, Stat, StatRow, Table } from '@/components/ui';
@@ -17,6 +18,8 @@ export default async function ProductionHistoryPage({
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
   const isFender = company === 'FENDER';
+  // Correcting a finished job is BCS-only, for whoever's been given it in People.
+  const canEdit = !isFender && can(user, 'production.editHistory');
 
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
   const orderBy =
@@ -105,7 +108,12 @@ export default async function ProductionHistoryPage({
                   <td className="td text-ink-muted whitespace-nowrap">{shortDate(j.startedAt)}</td>
                   <td className="td text-ink-muted whitespace-nowrap">{shortDate(j.finishedAt!)}</td>
                   <td className="td text-ink-muted">{j.user?.name ?? '—'}</td>
-                  <td className="td text-right">
+                  <td className="td text-right whitespace-nowrap">
+                    {canEdit && (
+                      <Link href={`/production/jobs/${j.id}/edit`} className="btn-secondary btn-sm mr-2">
+                        <Pencil size={14} /> Edit
+                      </Link>
+                    )}
                     <a href={`/production/jobs/${j.id}/print`} className="btn-secondary btn-sm">
                       <Printer size={14} /> Print
                     </a>

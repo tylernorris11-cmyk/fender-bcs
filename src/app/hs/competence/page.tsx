@@ -15,7 +15,7 @@ import { Avatar, Empty, PageHeader } from '@/components/ui';
 import { SubmitButton } from '@/components/SubmitButton';
 import { UrlModal } from '@/components/UrlModal';
 import { AutoSubmitForm } from '../AutoSubmitForm';
-import { ConfirmDeleteForm } from '../ConfirmDeleteForm';
+import { ConfirmDeleteForm } from '@/components/ConfirmDeleteForm';
 import { Chip, TabLinks, dayLabel } from '../bits';
 import { deleteTrainingRecord, saveTrainingRecord } from './actions';
 

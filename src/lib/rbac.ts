@@ -32,6 +32,7 @@ export type Permission =
   | 'production.progress'
   | 'production.qc'
   | 'production.assign' // post an "other work" task for someone else — Master Admin/Admin only
+  | 'production.editHistory' // correct a BCS tally job after the fact — job number, customer, rows; grantable to one person via extraPermissions
   // Compliance
   | 'compliance.view'
   | 'compliance.edit' // certificates, suppliers, returns
@@ -90,7 +91,7 @@ const ALL: Permission[] = [
   'orders.archive', 'orders.markPaid', 'orders.export',
   'customers.view', 'customers.edit', 'customers.credit',
   'stock.view', 'stock.goodsIn', 'stock.pick', 'stock.adjust', 'barCounter.view',
-  'production.view', 'production.progress', 'production.qc', 'production.assign',
+  'production.view', 'production.progress', 'production.qc', 'production.assign', 'production.editHistory',
   'compliance.view', 'compliance.edit', 'compliance.ncr', 'compliance.fcpCosh',
   'assets.view', 'assets.edit',
   'purchaseOrders.view', 'purchaseOrders.create', 'purchaseOrders.edit',
@@ -281,6 +282,7 @@ export const MODULES = [
 export const GRANTABLE_EXTRA_PERMISSIONS = [
   { key: 'compliance.fcpCosh' as Permission, label: 'Upload FCP Data & Cosh sheets' },
   { key: 'planning.edit' as Permission, label: 'Add deliveries and assign drivers' },
+  { key: 'production.editHistory' as Permission, label: 'Edit finished BCS production jobs' },
 ] as const;
 
 /** Every module a Master Administrator can hide for someone in Set Up — everything except Set Up itself. */
