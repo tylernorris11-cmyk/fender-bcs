@@ -11,6 +11,18 @@
  */
 export const TALLY = { width: 166, height: 76.2 };
 
+/**
+ * Where the Epson tally printer actually puts the page on the paper, found
+ * from the first test print with the box-corner crosses (7 Oct 2026): every
+ * cross landed 17.2mm right of its corner and about 1.9mm high, the same on
+ * both tickets, so the stock's widths and the page length were right and
+ * only the start point was off. The printer starts its page that far into
+ * the paper, and the old tally system relies on the paper sitting where it
+ * does, so this is undone here rather than by moving the paper. The nudge
+ * buttons adjust from here.
+ */
+export const PRINTER_OFFSET = { x: -17.2, y: 1.9 };
+
 const ROW = [3.3, 13.8, 25.5, 38.0, 50.7]; // top of the customer row, then each line down
 
 /** The stock's own printed lines, drawn on screen only, so the preview looks like the real ticket. */
@@ -35,9 +47,10 @@ export type TallyField =
   | 'a' | 'b' | 'c' | 'd' | 'er' | 'shapeCode' | 'destination' | 'weight';
 
 /** Each box: its label as printed on the stock, and its left/right edges and top. Values go in its lower part, under the label. */
-export const TALLY_BOXES: Record<TallyField, { label: string; x0: number; x1: number; top: number }> = {
-  customer: { label: 'CUSTOMER', x0: 17.7, x1: 111.1, top: ROW[0] },
-  jobNo: { label: 'JOB No.', x0: 111.1, x1: 152.0, top: ROW[0] },
+export const TALLY_BOXES: Record<TallyField, { label: string; x0: number; x1: number; top: number; insetY?: number }> = {
+  // The customer row has no line above it, so its value sits a little higher to clear the line below.
+  customer: { label: 'CUSTOMER', x0: 17.7, x1: 111.1, top: ROW[0], insetY: 3.8 },
+  jobNo: { label: 'JOB No.', x0: 111.1, x1: 152.0, top: ROW[0], insetY: 3.8 },
   bmk: { label: 'BMK', x0: 17.7, x1: 51.8, top: ROW[1] },
   quantity: { label: 'QUANTITY', x0: 51.8, x1: 85.3, top: ROW[1] },
   length: { label: 'LENGTH', x0: 85.3, x1: 119.3, top: ROW[1] },
@@ -52,8 +65,8 @@ export const TALLY_BOXES: Record<TallyField, { label: string; x0: number; x1: nu
   weight: { label: 'WEIGHT', x0: 120.2, x1: 154.7, top: ROW[3] },
 };
 
-/** Where a value sits in its box: a little in from the left, below the printed label. */
-export const VALUE_INSET = { x: 2.5, y: 5.0 };
+/** Where a value sits in its box: in from the left (clear of the printer's own left limit once the offset's applied), below the printed label. */
+export const VALUE_INSET = { x: 3.5, y: 5.0 };
 
 /** Where the stock's box corners are — printed as small crosses when lining up, so they should land on the corners. */
 export const TALLY_CORNERS: { x: number; y: number }[] = [

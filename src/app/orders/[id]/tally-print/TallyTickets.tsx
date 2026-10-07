@@ -1,4 +1,4 @@
-import { TALLY, TALLY_BOXES, TALLY_CORNERS, TALLY_LINES, VALUE_INSET, type TallyField } from '@/lib/tallyLayout';
+import { PRINTER_OFFSET, TALLY, TALLY_BOXES, TALLY_CORNERS, TALLY_LINES, VALUE_INSET, type TallyField } from '@/lib/tallyLayout';
 
 const FIELDS = Object.keys(TALLY_BOXES) as TallyField[];
 
@@ -6,13 +6,15 @@ const FIELDS = Object.keys(TALLY_BOXES) as TallyField[];
 // each page break lands on the stock's own perforation. Values print in a
 // heavy bold face: a dot-matrix printer drawing text through Windows makes
 // thin lettering look faint. The stock's own lines and labels are drawn on
-// screen only, as a preview; the nudge (--tally-dx/dy) and the lining-up
-// crosses come from TallyControls.
+// screen only, as a preview. What's printed is shifted by the printer's
+// measured offset plus any nudge (--tally-dx/dy) from TallyControls, which
+// also switches the lining-up crosses on.
 export const TALLY_CSS = `
 @page { size: ${TALLY.width}mm ${TALLY.height}mm; margin: 0; }
 .tally-ticket { position: relative; width: ${TALLY.width}mm; height: ${TALLY.height}mm; overflow: hidden; background: #fff; margin: 0 auto 8mm; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 .tally-stock { position: absolute; inset: 0; width: 100%; height: 100%; }
-.tally-layer { position: absolute; inset: 0; transform: translate(var(--tally-dx, 0mm), var(--tally-dy, 0mm)); }
+.tally-layer { position: absolute; inset: 0; }
+@media print { .tally-layer { transform: translate(calc(${PRINTER_OFFSET.x}mm + var(--tally-dx, 0mm)), calc(${PRINTER_OFFSET.y}mm + var(--tally-dy, 0mm))); } }
 .tally-value { position: absolute; font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 12pt; line-height: 1; color: #000; white-space: nowrap; overflow: hidden; }
 .tally-cross { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
 html.tally-corners .tally-cross { display: block; }
@@ -48,7 +50,7 @@ export function TallyTickets({ tickets }: { tickets: { id: string; values: Recor
                 <div
                   key={f}
                   className="tally-value"
-                  style={{ left: `${box.x0 + VALUE_INSET.x}mm`, top: `${box.top + VALUE_INSET.y}mm`, width: `${box.x1 - box.x0 - VALUE_INSET.x - 1}mm` }}
+                  style={{ left: `${box.x0 + VALUE_INSET.x}mm`, top: `${box.top + (box.insetY ?? VALUE_INSET.y)}mm`, width: `${box.x1 - box.x0 - VALUE_INSET.x - 1}mm` }}
                 >
                   {values[f]}
                 </div>
