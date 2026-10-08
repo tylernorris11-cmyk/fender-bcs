@@ -10,13 +10,16 @@ import { TALLY_CSS, TallyTickets } from './TallyTickets';
  * Tally tickets for an order's bending schedule, one per bar mark, laid out
  * on the real FenderBcs Group stock (see lib/tallyLayout.ts for where every
  * box is). Printed from the browser onto the Epson tally printer like any
- * other page; the one-off printer settings are listed on the page.
+ * other page; the one-off printer settings are listed on the page. The
+ * tickets come out by diameter then length, not in schedule order.
  */
 export default async function TallyPrintPage({ params }: { params: { id: string } }) {
   await requirePermission('production.view');
   const order = await db.order.findUnique({
     where: { id: params.id },
-    include: { customer: true, barMarks: { orderBy: { sortOrder: 'asc' } } },
+    // Smallest bar first, shortest to longest within each size — the order the yard cuts them in.
+    // Bar marks the same size and length stay in schedule order.
+    include: { customer: true, barMarks: { orderBy: [{ diaMm: 'asc' }, { lengthMm: 'asc' }, { sortOrder: 'asc' }] } },
   });
   if (!order) notFound();
   const count = order.barMarks.length;
@@ -29,7 +32,7 @@ export default async function TallyPrintPage({ params }: { params: { id: string 
         <Link href={`/orders/${order.id}`} className="text-sm font-semibold text-brand-700 hover:underline">← Back to order</Link>
         <div>
           <h1 className="text-2xl font-bold">Tally tickets · {order.number}</h1>
-          <p className="text-ink-muted">{order.customer.name} · {count} {count === 1 ? 'ticket' : 'tickets'}, one per bar mark</p>
+          <p className="text-ink-muted">{order.customer.name} · {count} {count === 1 ? 'ticket' : 'tickets'}, one per bar mark, smallest diameter first and shortest to longest within each</p>
         </div>
         {count > 0 && <TallyControls />}
         <details className="rounded-xl border border-hairline bg-white p-4 text-sm">
