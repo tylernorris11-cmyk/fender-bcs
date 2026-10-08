@@ -40,7 +40,10 @@ const dim = (v: number | null) => (v ? String(v) : '');
 /** Grade H (and the other high-yield grades) is high tensile; R or M is mild steel. */
 const steelKind = (grade: string) => (/^[RM]$/i.test(grade.trim()) ? 'MILD STEEL' : 'HIGH TENSILE');
 
-/** Everything the rebar delivery note prints, from the order: steel summarised per size, bar marks in schedule order. */
+/**
+ * Everything the rebar delivery note prints, from the order: steel summarised per size, then the bar marks
+ * smallest diameter first and shortest to longest within each — the same order the tally tickets print in.
+ */
 export function deliveryNoteData(order: OrderForNote): DeliveryNoteData {
   const groups = new Map<string, { dia: number; label: string; kg: number; bars: number }>();
   for (const b of order.barMarks) {
@@ -84,7 +87,8 @@ export function deliveryNoteData(order: OrderForNote): DeliveryNoteData {
     totalTonnes: totalKg / 1000,
     totalBars: order.barMarks.reduce((s, b) => s + b.bars, 0),
     maxBentLengthMm: bent.length ? Math.max(...bent.map((b) => b.lengthMm)) : null,
-    barMarks: order.barMarks.map((b) => ({
+    // A stable sort, so bar marks the same size and length keep their schedule order.
+    barMarks: [...order.barMarks].sort((x, y) => x.diaMm - y.diaMm || x.lengthMm - y.lengthMm).map((b) => ({
       mark: b.mark, size: `${b.grade}${b.diaMm}`, bars: b.bars, lengthMm: b.lengthMm, shape: b.shapeCode,
       a: dim(b.a), b: dim(b.b), c: dim(b.c), d: dim(b.d),
       // One E/R column, as on a BS 8666 schedule: E, or the bend radius marked R when the shape has one instead.

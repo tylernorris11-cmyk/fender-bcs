@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 /**
  * Fender Steel's rebar delivery note. Same content and order as the
  * Exchequer note it replaces — page 1 summarises the steel per size with the
- * signature box, the pages after it list every bar mark — in the app's own
+ * signature box, the pages after it list every bar mark (by diameter, then
+ * shortest to longest, matching the tally tickets) — in the app's own
  * look. Each page is a sheet of A4 with the same header, so it prints
  * exactly one page per sheet.
  */
