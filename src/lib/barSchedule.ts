@@ -47,8 +47,17 @@ export type ScheduleBar = {
   timesFound: number;
 };
 
+/**
+ * Sizes Fender doesn't stock, and what's cut instead. Applied as a schedule
+ * is read, before duplicates are added together, so the weight and any
+ * matching 10mm line come out right.
+ */
+export const DIAMETER_SWAPS: Record<number, number> = { 8: 10 };
+
 export type ScheduleMerge = {
   bars: ScheduleBar[];
+  /** Marks whose size was changed under DIAMETER_SWAPS, e.g. 8mm made 10mm. */
+  swapped: { mark: string; from: number; to: number }[];
   /** Marks that appeared more than once with the same bar, now one line. */
   duplicates: { mark: string; times: number; bars: number }[];
   /** Marks that appear with different bars: kept apart, needs checking against the drawing. */
@@ -76,6 +85,7 @@ export function mergeSchedule(readings: ScheduleReading[]): ScheduleMerge {
   const byBar = new Map<string, ScheduleBar>();
   const barsByMark = new Map<string, Set<string>>();
   const totalMismatches = new Set<string>();
+  const swapped = new Map<string, { mark: string; from: number; to: number }>();
 
   for (const r of readings) {
     const mark = r.mark.trim();
@@ -85,9 +95,12 @@ export function mergeSchedule(readings: ScheduleReading[]): ScheduleMerge {
     const members = r.members > 0 ? r.members : 1;
     if (r.total > 0 && r.each > 0 && members * r.each !== r.total) totalMismatches.add(mark);
 
+    const diaMm = DIAMETER_SWAPS[r.dia] ?? r.dia;
+    if (diaMm !== r.dia) swapped.set(`${markKey(mark)}|${r.dia}`, { mark, from: r.dia, to: diaMm });
+
     const bar = {
       grade: (r.grade.trim() || 'H').toUpperCase(),
-      diaMm: r.dia,
+      diaMm,
       lengthMm: r.length,
       shapeCode: normaliseShape(r.shape) || '99',
       a: r.a, b: r.b, c: r.c, d: r.d, e: r.e, r: r.r,
@@ -113,6 +126,7 @@ export function mergeSchedule(readings: ScheduleReading[]): ScheduleMerge {
   const merged = [...byBar.values()].sort((x, y) => markOrder.indexOf(markKey(x.mark)) - markOrder.indexOf(markKey(y.mark)));
   return {
     bars: merged,
+    swapped: [...swapped.values()],
     duplicates: merged.filter((b) => b.timesFound > 1).map((b) => ({ mark: b.mark, times: b.timesFound, bars: b.bars })),
     conflicts: [...barsByMark.entries()].filter(([, specs]) => specs.size > 1).map(([k]) => merged.find((b) => markKey(b.mark) === k)!.mark),
     totalMismatches: [...totalMismatches],

@@ -89,6 +89,12 @@ export function ScheduleImport({ onImport }: { onImport: (result: Success) => vo
               {list(result.duplicates.map((d) => `${d.mark} (found ${d.times} times, ${d.bars} bars in all)`))}.
             </p>
           )}
+          {result.swapped.length > 0 && (
+            <p className="text-ink-muted">
+              <strong className="text-ink">Sizes changed:</strong>{' '}
+              {list(result.swapped.map((w) => `${w.mark} (${w.from}mm → ${w.to}mm)`))}. 8mm isn&apos;t stocked, so it&apos;s cut from 10mm.
+            </p>
+          )}
           {result.conflicts.length > 0 && (
             <p className="banner-warn">
               <AlertTriangle size={16} className="shrink-0 mt-0.5" />
