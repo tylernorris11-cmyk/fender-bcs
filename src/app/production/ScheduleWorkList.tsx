@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import type { ProductionProcess } from '@prisma/client';
 import { AlertTriangle, CheckCircle2, Plus, Undo2, X } from 'lucide-react';
 import { SubmitButton } from '@/components/SubmitButton';
-import { MACHINE, recordsCast } from '@/lib/productionSplit';
+import { bmk, MACHINE, recordsCast } from '@/lib/productionSplit';
 import { checkCastNumber, completeBarMark, undoBarMark } from './actions';
 
 export type WorkMark = {
@@ -178,11 +178,11 @@ function SizeGroup({
         {shown.map((m) => (
           <li key={m.id} className={`px-4 py-3 flex items-center gap-3 ${m.done ? 'bg-brand-50/50' : ''}`}>
             <div className="min-w-0 flex-1">
-              <p className="font-bold">
-                {m.mark} <span className="text-sm font-normal text-ink-muted">· shape {m.shapeCode}</span>
+              <p className="text-sm">
+                {bmk(m.mark)} <span className="text-ink-muted">· shape {m.shapeCode}</span>
               </p>
-              <p className="text-sm tabular-nums">
-                {m.bars.toLocaleString('en-GB')} × {m.lengthMm.toLocaleString('en-GB')} mm <span className="text-ink-muted">· {m.kg.toLocaleString('en-GB', { maximumFractionDigits: 1 })} kg</span>
+              <p className="tabular-nums">
+                <span className="text-lg font-bold">{m.bars.toLocaleString('en-GB')}</span> × {m.lengthMm.toLocaleString('en-GB')} mm <span className="text-sm text-ink-muted">· {m.kg.toLocaleString('en-GB', { maximumFractionDigits: 1 })} kg</span>
               </p>
               {m.done ? (
                 <p className="text-xs text-forest font-medium mt-0.5">

@@ -6,6 +6,7 @@ import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { toleranceFor } from '@/lib/bs8666';
 import { getActiveCompany } from '@/lib/company';
+import { bmk } from '@/lib/productionSplit';
 import { BAR_MARK_ORDER } from '@/lib/orders';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
@@ -56,9 +57,9 @@ export default async function ChecksPage({ searchParams }: { searchParams: { ord
               return (
                 <div key={b.id} className="border border-hairline rounded-xl p-4">
                   <div className="flex flex-wrap items-center gap-3 mb-2">
-                    <span className="font-bold">{b.mark}</span>
+                    <span>{bmk(b.mark)}</span>
                     <span className="text-sm text-ink-muted">
-                      {b.diaMm} mm · shape {b.shapeCode} · {b.bars} bars · scheduled {b.lengthMm} mm
+                      {b.diaMm} mm · shape {b.shapeCode} · <strong className="text-base font-bold text-ink">{b.bars} bars</strong> · scheduled {b.lengthMm} mm
                     </span>
                     <Pill tone={failed ? 'bad' : b.qcChecks.length ? 'good' : 'neutral'}>
                       {failed ? 'Out of tolerance' : b.qcChecks.length ? `${b.qcChecks.length} checks` : 'Not checked'}
@@ -116,7 +117,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: { ord
             <tr key={c.id} className="row">
               <td className="td text-ink-muted whitespace-nowrap">{shortDate(c.at)} {clock(c.at)}</td>
               <td className="td"><Link href={`/orders/${c.barMark.order.id}`} className="text-brand-700 hover:underline">{c.barMark.order.number}</Link></td>
-              <td className="td font-semibold">{c.barMark.mark}</td>
+              <td className="td">{bmk(c.barMark.mark)}</td>
               <td className="td">{c.dimension}</td>
               <td className="td text-right tabular-nums">{c.nominalMm} mm</td>
               <td className="td text-right tabular-nums">{c.measuredMm} mm</td>

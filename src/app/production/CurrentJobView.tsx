@@ -1,5 +1,6 @@
 import { isOutOfService } from '@/lib/assets';
 import { BAR_SIZES } from '@/lib/bs8666';
+import { bmk } from '@/lib/productionSplit';
 import { db } from '@/lib/db';
 import { clock, shortDate, tonnes } from '@/lib/format';
 import { Empty, PageHeader, Stat, StatRow, Table } from '@/components/ui';
@@ -199,7 +200,7 @@ export function FenderRowsTable({ rows, showCastColumns }: { rows: any[]; showCa
       {rows.map((r: any) => (
         <tr key={r.id} className="row">
           <td className="td">{r.diaMm ? `${Number(r.diaMm)} mm` : '—'}</td>
-          <td className="td">{r.barMark || '—'}</td>
+          <td className="td whitespace-nowrap">{bmk(r.barMark) || '—'}</td>
           {showCastColumns && <><td className="td">{r.castNumber || '—'}</td><td className="td">{r.mill || '—'}</td></>}
           <td className="td">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
           <td className="td text-ink-muted">{r.comments || '—'}</td>

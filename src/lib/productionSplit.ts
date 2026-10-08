@@ -30,5 +30,11 @@ export function machinesFor(b: Mark): ProductionProcess[] {
   return isStraight(b) ? ['CUTTING'] : ['CUTTING', 'BENDING'];
 }
 
+/** "BMK 131" — how the yard writes a bar mark. Left alone if it was typed with the BMK already on. */
+export function bmk(mark: string) {
+  const m = mark.trim();
+  return !m ? '' : /^bmk/i.test(m) ? m : `BMK ${m}`;
+}
+
 /** The Cutter and the Stema start from new steel, so they record its cast number and mill. */
 export const recordsCast = (p: ProductionProcess) => p !== 'BENDING';

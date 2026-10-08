@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { clock, shortDate, tonnes } from '@/lib/format';
 import { PrintActions } from '@/components/PrintActions';
+import { bmk } from '@/lib/productionSplit';
 
 const PROCESS_LABEL: Record<string, string> = { CUTTING: 'Cutting', BENDING: 'Bending', STEMA: 'Stema' };
 
@@ -79,7 +80,7 @@ export default async function ProductionJobPrint({ params }: { params: { id: str
               {isFender ? (
                 <>
                   <td className="py-2">{r.diaMm ? `${Number(r.diaMm)} mm` : '—'}</td>
-                  <td className="py-2">{r.barMark || '—'}</td>
+                  <td className="py-2 whitespace-nowrap">{bmk(r.barMark) || '—'}</td>
                   {showCastColumns && <><td className="py-2">{r.castNumber || '—'}</td><td className="py-2">{r.mill || '—'}</td></>}
                   <td className="py-2 text-right">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
                   <td className="py-2">{r.comments || '—'}</td>

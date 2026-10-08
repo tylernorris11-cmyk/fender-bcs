@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { minRadiusMm, minStraightBetweenBends, toleranceFor } from '@/lib/bs8666';
 import { getActiveCompany } from '@/lib/company';
+import { bmk } from '@/lib/productionSplit';
 import { BAR_MARK_ORDER } from '@/lib/orders';
 import { shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
@@ -50,11 +51,11 @@ export default async function SchedulesPage() {
               const failed = b.qcChecks.some((c) => !c.pass);
               return (
                 <tr key={b.id} className="row">
-                  <td className="td font-semibold">{b.mark}</td>
+                  <td className="td whitespace-nowrap">{bmk(b.mark)}</td>
                   <td className="td">{b.diaMm} mm</td>
                   <td className="td">{b.shapeCode} — {b.shapeName}</td>
                   <td className="td text-right tabular-nums">{b.lengthMm} mm</td>
-                  <td className="td text-right tabular-nums">{b.bars}</td>
+                  <td className="td text-right tabular-nums font-bold">{b.bars}</td>
                   <td className="td tabular-nums text-ink-muted">{[b.a, b.b, b.c, b.d, b.ef].map((v) => v ?? 0).join(' / ')}</td>
                   <td className="td tabular-nums">{b.radiusMm ?? minRadiusMm(b.diaMm)} mm</td>
                   <td className="td tabular-nums text-ink-muted">{minStraightBetweenBends(b.diaMm)} mm</td>
