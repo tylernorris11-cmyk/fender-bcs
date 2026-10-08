@@ -3,9 +3,10 @@ import { PRINTER_OFFSET, TALLY, TALLY_BOXES, TALLY_CORNERS, TALLY_LINES, VALUE_I
 const FIELDS = Object.keys(TALLY_BOXES) as TallyField[];
 
 // One tally per printed page, the exact size of one ticket on the stock, so
-// each page break lands on the stock's own perforation. Values print in a
-// heavy bold face: a dot-matrix printer drawing text through Windows makes
-// thin lettering look faint. The stock's own lines and labels are drawn on
+// each page break lands on the stock's own perforation. Values print in
+// Segoe UI Semibold (on the Windows PC by the printer): full bold was too
+// heavy, and regular weight risks the faint look a dot-matrix printer gives
+// thin lettering drawn through Windows. The stock's own lines and labels are drawn on
 // screen only, as a preview. What's printed is shifted by the printer's
 // measured offset plus any nudge (--tally-dx/dy) from TallyControls, which
 // also switches the lining-up crosses on.
@@ -15,7 +16,7 @@ export const TALLY_CSS = `
 .tally-stock { position: absolute; inset: 0; width: 100%; height: 100%; }
 .tally-layer { position: absolute; inset: 0; }
 @media print { .tally-layer { transform: translate(calc(${PRINTER_OFFSET.x}mm + var(--tally-dx, 0mm)), calc(${PRINTER_OFFSET.y}mm + var(--tally-dy, 0mm))); } }
-.tally-value { position: absolute; font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 12pt; line-height: 1; color: #000; white-space: nowrap; overflow: hidden; }
+.tally-value { position: absolute; font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-weight: 600; font-size: 12pt; line-height: 1; color: #000; white-space: nowrap; overflow: hidden; }
 .tally-cross { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
 html.tally-corners .tally-cross { display: block; }
 @media print {
