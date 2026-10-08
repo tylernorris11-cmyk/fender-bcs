@@ -6,6 +6,7 @@ import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
 import { toleranceFor } from '@/lib/bs8666';
 import { getActiveCompany } from '@/lib/company';
+import { BAR_MARK_ORDER } from '@/lib/orders';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, Table } from '@/components/ui';
@@ -27,7 +28,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: { ord
         company, archived: false, barMarks: { some: {} }, stage: { notIn: ['COMPLETED', 'CANCELLED', 'DRAFT'] },
         ...(searchParams.order ? { id: searchParams.order } : {}),
       },
-      include: { customer: true, barMarks: { orderBy: { sortOrder: 'asc' }, include: { qcChecks: { include: { checkedBy: true }, orderBy: { at: 'desc' } } } } },
+      include: { customer: true, barMarks: { orderBy: BAR_MARK_ORDER, include: { qcChecks: { include: { checkedBy: true }, orderBy: { at: 'desc' } } } } },
       orderBy: { deliveryDate: 'asc' },
     }),
     db.qcCheck.findMany({ where: { barMark: { order: { company } } }, include: { checkedBy: true, barMark: { include: { order: true } } }, orderBy: { at: 'desc' }, take: 25 }),

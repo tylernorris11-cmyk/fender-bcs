@@ -7,8 +7,8 @@ import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { suggestAccountCode } from '@/lib/accountCodes';
-import { TICKET_COLOURS } from '@/lib/ticketColours';
-import { applyChecklistTemplate, creditCheck, nextOrderNumber, NEXT_STAGE, pickOldestFirst } from '@/lib/orders';
+import { tidyTicketColour } from '@/lib/ticketColours';
+import { applyChecklistTemplate, creditCheck, nextOrderNumber, NEXT_STAGE, pickOldestFirst, ticketColourOptions } from '@/lib/orders';
 import { barWeightKg, shapeName } from '@/lib/bs8666';
 import { feetInches } from '@/lib/format';
 
@@ -23,10 +23,10 @@ function rows(formData: FormData, prefix: string): Record<string, string>[] {
   return Object.keys(out).sort((a, b) => Number(a) - Number(b)).map((k) => out[k]);
 }
 
-/** One of the ticket stock colours, or blank. */
-function ticketColourFrom(formData: FormData) {
-  const colour = String(formData.get('ticketColour') ?? '');
-  return TICKET_COLOURS.includes(colour) ? colour : '';
+/** The ticket colour picked or typed in, tidied to match one used before when it's the same colour; blank for none. */
+async function ticketColourFrom(formData: FormData) {
+  const typed = String(formData.get('ticketColour') ?? '');
+  return typed.trim() ? tidyTicketColour(typed, await ticketColourOptions()) : '';
 }
 
 /** The job number typed on the form, or the next automatic one when it's left blank. */
@@ -58,6 +58,7 @@ export async function createOrder(formData: FormData) {
 
   const deliveryDateRaw = String(formData.get('deliveryDate') ?? '');
   const number = await orderNumberFor(formData);
+  const ticketColour = await ticketColourFrom(formData);
   const invoiceAddress = String(formData.get('invoiceAddress') ?? '').trim();
 
   const productRows = rows(formData, 'product').filter((r) => r.productId && Number(r.qty) > 0);
@@ -113,7 +114,7 @@ export async function createOrder(formData: FormData) {
         town: String(formData.get('town') ?? ''),
         address: String(formData.get('address') ?? ''),
         poNumber: String(formData.get('poNumber') ?? ''),
-        ticketColour: ticketColourFrom(formData),
+        ticketColour,
         yardNotes: String(formData.get('yardNotes') ?? ''),
         raisedById: user.id,
         lines: {
@@ -328,7 +329,7 @@ export async function setTicketColour(formData: FormData) {
   const orderId = String(formData.get('orderId'));
   const order = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: { company: true, ticketColour: true } });
   assertCompanyAccess(user, order.company);
-  const ticketColour = ticketColourFrom(formData);
+  const ticketColour = await ticketColourFrom(formData);
   if (ticketColour === order.ticketColour) return;
   await db.order.update({ where: { id: orderId }, data: { ticketColour } });
   await logActivity('Order', orderId, 'Ticket colour', `${order.ticketColour || 'none'} → ${ticketColour || 'none'}`, user.id);

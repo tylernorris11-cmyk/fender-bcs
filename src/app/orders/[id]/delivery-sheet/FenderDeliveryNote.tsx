@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ticketSwatch } from '@/lib/ticketColours';
 
 /**
  * Fender Steel's rebar delivery note. Same content and order as the
@@ -28,10 +29,6 @@ export type DeliveryNoteData = {
 const BAR_ROWS_PER_PAGE = 18;
 const UK = { timeZone: 'Europe/London' } as const;
 
-const SWATCH: Record<string, string> = {
-  Red: '#DC2626', Blue: '#2563EB', Pink: '#EC4899', Orange: '#F97316', Green: '#16A34A', Yellow: '#EAB308', White: '#FFFFFF',
-};
-
 /** 9 Oct 2026 */
 const longDay = (d: Date | null) => (d ? d.toLocaleDateString('en-GB', { ...UK, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 /** FRI;9.10.26 — the day of delivery, as the old notes printed it beside every bar mark. */
@@ -55,7 +52,7 @@ export const DELIVERY_NOTE_CSS = `
 `;
 
 function Header({ data, page, pages }: { data: DeliveryNoteData; page: number; pages: number }) {
-  const swatch = SWATCH[data.ticketColour];
+  const swatch = ticketSwatch(data.ticketColour);
   return (
     <header>
       <div className="flex items-start justify-between gap-6">

@@ -1,9 +1,17 @@
 import 'server-only';
-import type { Company, OrderStage } from '@prisma/client';
+import type { Company, OrderStage, Prisma } from '@prisma/client';
 import { db } from './db';
 import { creditBalances } from './alerts';
+import { TICKET_COLOURS } from './ticketColours';
 
 export const VAT_RATE = 0.2;
+
+/**
+ * How an order's bar marks are listed everywhere — smallest diameter first,
+ * shortest to longest within each, the order the yard cuts them in. Bar marks
+ * the same size and length keep their schedule order.
+ */
+export const BAR_MARK_ORDER: Prisma.BarMarkOrderByWithRelationInput[] = [{ diaMm: 'asc' }, { lengthMm: 'asc' }, { sortOrder: 'asc' }];
 
 type LineLike = { lineTotal: unknown; weightKg?: unknown };
 
@@ -15,6 +23,20 @@ export function orderTotals(order: { lines: LineLike[]; barMarks: LineLike[] }) 
     order.lines.reduce((s, l) => s + Number(l.weightKg ?? 0), 0) +
     order.barMarks.reduce((s, b) => s + Number(b.weightKg ?? 0), 0);
   return { net, vat: net * VAT_RATE, gross: net * (1 + VAT_RATE), weightKg };
+}
+
+/**
+ * Every tally ticket colour to suggest: the usual stock colours first, then
+ * any other colour typed in on an order before, A–Z.
+ */
+export async function ticketColourOptions(): Promise<string[]> {
+  const used = await db.order.findMany({
+    where: { company: 'FENDER', ticketColour: { not: '' } }, distinct: ['ticketColour'], select: { ticketColour: true },
+  });
+  const extra = [...new Set(used.map((o) => o.ticketColour))]
+    .filter((c) => !TICKET_COLOURS.some((k) => k.toLowerCase() === c.toLowerCase()))
+    .sort((a, b) => a.localeCompare(b));
+  return [...TICKET_COLOURS, ...extra];
 }
 
 /** FS-26-05301 — FS, financial year, sequence. */

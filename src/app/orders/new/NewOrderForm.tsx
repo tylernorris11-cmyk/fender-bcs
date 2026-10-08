@@ -5,7 +5,7 @@ import { Info, Plus, Trash2 } from 'lucide-react';
 import { SHAPE_CODES, BAR_SIZES, MASS_PER_M } from '@/lib/bs8666';
 import { createOrder } from '../actions';
 import { ScheduleImport } from './ScheduleImport';
-import { TICKET_COLOURS } from '@/lib/ticketColours';
+import { TICKET_COLOUR_MAX } from '@/lib/ticketColours';
 import { CustomerPicker } from '@/components/CustomerPicker';
 
 type Customer = { id: string; name: string; code: string; address: string; town: string; postcode: string; creditLimit: string; used: number };
@@ -23,8 +23,11 @@ const accountAddress = (c?: { address: string; town: string; postcode: string })
 const gbp = (n: number) => n.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 });
 
 export function NewOrderForm({
-  customers, products, towns, locations, cutBentPrice, isFender, nextNumber,
-}: { customers: Customer[]; products: Product[]; towns: string[]; locations: string[]; cutBentPrice: number; isFender: boolean; nextNumber: string }) {
+  customers, products, towns, locations, cutBentPrice, isFender, nextNumber, ticketColours,
+}: {
+  customers: Customer[]; products: Product[]; towns: string[]; locations: string[]; cutBentPrice: number; isFender: boolean; nextNumber: string;
+  ticketColours: string[];
+}) {
   // Per-instance, not module-level: a shared `let seq` counter drifts between
   // the server (a long-lived process that keeps counting across requests)
   // and a freshly-loaded client bundle (starting back at 0), producing
@@ -90,7 +93,11 @@ export function NewOrderForm({
     setTown(c?.town ?? '');
   }
 
-  /** Bar marks read off an uploaded schedule go in after any already entered (replacing a blank starter row), priced at the usual cut & bent rate. */
+  /**
+   * Bar marks read off an uploaded schedule join any already entered (replacing a blank starter row), priced at the usual
+   * cut & bent rate, then the lot is put smallest diameter first and shortest to longest — the order the order page,
+   * tally tickets and delivery note list them in. The sort is stable, so equal ones keep their schedule order.
+   */
   function importSchedule(result: { bars: { mark: string; grade: string; diaMm: number; bars: number; lengthMm: number; shapeCode: string; a: number | null; b: number | null; c: number | null; d: number | null; e: number | null; r: number | null }[] }) {
     const str = (n: number | null) => (n == null ? '' : String(n));
     const imported: Bar[] = result.bars.map((b) => ({
@@ -98,7 +105,8 @@ export function NewOrderForm({
       lengthMm: String(b.lengthMm), bars: String(b.bars), a: str(b.a), b: str(b.b), c: str(b.c), d: str(b.d),
       ef: str(b.e), radiusMm: str(b.r), unitPrice: String(cutBentPrice || ''),
     }));
-    setBars((prev) => [...prev.filter((b) => b.mark.trim() || b.bars), ...imported]);
+    setBars((prev) => [...prev.filter((b) => b.mark.trim() || b.bars), ...imported]
+      .sort((x, y) => Number(x.diaMm) - Number(y.diaMm) || Number(x.lengthMm) - Number(y.lengthMm)));
   }
 
   /** Drop the selling price in automatically so nobody has to look it up. */
@@ -403,11 +411,12 @@ export function NewOrderForm({
             {isFender && (
               <div>
                 <label className="label" htmlFor="ticketColour">Ticket colour</label>
-                <select id="ticketColour" name="ticketColour" defaultValue="" className="input">
-                  <option value="">—</option>
-                  {TICKET_COLOURS.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <p className="hint">The tally ticket stock this job&apos;s on. Printed on the delivery note.</p>
+                <input id="ticketColour" name="ticketColour" list="ticket-colours" maxLength={TICKET_COLOUR_MAX}
+                       placeholder="Pick or type a colour" autoComplete="off" className="input" />
+                <datalist id="ticket-colours">
+                  {ticketColours.map((c) => <option key={c} value={c} />)}
+                </datalist>
+                <p className="hint">The tally ticket stock this job&apos;s on: pick one, or type a new colour. Printed on the delivery note.</p>
               </div>
             )}
             <div>

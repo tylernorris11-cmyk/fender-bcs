@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { tallyValues } from '@/lib/tallyLayout';
+import { BAR_MARK_ORDER } from '@/lib/orders';
 import { TallyControls } from './TallyControls';
 import { TALLY_CSS, TallyTickets } from './TallyTickets';
 
@@ -17,9 +18,7 @@ export default async function TallyPrintPage({ params }: { params: { id: string 
   await requirePermission('production.view');
   const order = await db.order.findUnique({
     where: { id: params.id },
-    // Smallest bar first, shortest to longest within each size — the order the yard cuts them in.
-    // Bar marks the same size and length stay in schedule order.
-    include: { customer: true, barMarks: { orderBy: [{ diaMm: 'asc' }, { lengthMm: 'asc' }, { sortOrder: 'asc' }] } },
+    include: { customer: true, barMarks: { orderBy: BAR_MARK_ORDER } },
   });
   if (!order) notFound();
   const count = order.barMarks.length;

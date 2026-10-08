@@ -3,7 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { creditBalances, getAlerts } from '@/lib/alerts';
-import { nextOrderNumber } from '@/lib/orders';
+import { nextOrderNumber, ticketColourOptions } from '@/lib/orders';
 import { getActiveCompany } from '@/lib/company';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
@@ -19,7 +19,7 @@ export default async function NewOrderPage() {
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
 
-  const [customers, products, towns, locations, balances, nextNumber] = await Promise.all([
+  const [customers, products, towns, locations, balances, nextNumber, ticketColours] = await Promise.all([
     db.customer.findMany({ where: { company, status: { not: 'Closed' } }, orderBy: { name: 'asc' } }),
     db.product.findMany({
       where: { company, active: true },
@@ -30,6 +30,7 @@ export default async function NewOrderPage() {
     db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     creditBalances(company),
     nextOrderNumber(),
+    company === 'FENDER' ? ticketColourOptions() : [],
   ]);
 
   const cutBent = products.find((p) => p.code === 'CB-SERVICE');
@@ -56,6 +57,7 @@ export default async function NewOrderPage() {
         cutBentPrice={0}
         isFender={company === 'FENDER'}
         nextNumber={nextNumber}
+        ticketColours={ticketColours}
       />
     </Shell>
   );

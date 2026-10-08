@@ -4,7 +4,7 @@ import { Archive, ArrowLeft, Banknote, Printer, Trash2 } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
-import { creditCheck, NEXT_STAGE, orderTotals } from '@/lib/orders';
+import { BAR_MARK_ORDER, creditCheck, NEXT_STAGE, orderTotals, ticketColourOptions } from '@/lib/orders';
 import { can } from '@/lib/rbac';
 import { clock, money, qty, shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
@@ -12,7 +12,7 @@ import { Avatar, PageHeader, Pill, STAGE_FLOW, STAGE_LABEL, StagePill, Table } f
 import {
   addChecklistItem, advanceStage, archiveOrder, markPaid, removeChecklistItem, setTicketColour, toggleChecklistItem,
 } from '../actions';
-import { TICKET_COLOURS } from '@/lib/ticketColours';
+import { TICKET_COLOUR_MAX, ticketSwatch } from '@/lib/ticketColours';
 import { deliveryNoteNo } from '@/lib/deliveryNote';
 import { SubmitButton } from '@/components/SubmitButton';
 
@@ -26,7 +26,7 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
       customer: { include: { accountManager: true } },
       raisedBy: true,
       lines: { orderBy: { sortOrder: 'asc' }, include: { picks: { include: { batch: true } }, product: true } },
-      barMarks: { orderBy: { sortOrder: 'asc' }, include: { qcChecks: true } },
+      barMarks: { orderBy: BAR_MARK_ORDER, include: { qcChecks: true } },
       checklist: { orderBy: { sortOrder: 'asc' }, include: { doneBy: true } },
       ncrs: true,
     },
@@ -34,10 +34,12 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
   if (!order) notFound();
   if (!user.companies.includes(order.company)) notFound();
 
-  const [history, credit] = await Promise.all([
+  const [history, credit, ticketColours] = await Promise.all([
     db.activityLog.findMany({ where: { entity: 'Order', entityId: order.id }, include: { user: true }, orderBy: { at: 'desc' }, take: 40 }),
     creditCheck(order.customerId),
+    order.company === 'FENDER' ? ticketColourOptions() : [],
   ]);
+  const swatch = ticketSwatch(order.ticketColour);
 
   const { net, weightKg } = orderTotals(order);
   const step = NEXT_STAGE[order.stage];
@@ -320,15 +322,23 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
                 <dt className="text-ink-muted">Ticket colour</dt>
                 <dd>
                   {can(user, 'orders.edit') ? (
+                    // Pick one of the suggestions or type a new colour; a new one is suggested on later orders.
                     <form key={order.ticketColour} action={setTicketColour} className="flex items-center gap-2">
                       <input type="hidden" name="orderId" value={order.id} />
-                      <select name="ticketColour" defaultValue={order.ticketColour} className="input py-1 w-auto" aria-label="Ticket colour">
-                        <option value="">—</option>
-                        {TICKET_COLOURS.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
+                      {swatch && <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/20" style={{ background: swatch }} aria-hidden />}
+                      <input name="ticketColour" list="ticket-colours" defaultValue={order.ticketColour} maxLength={TICKET_COLOUR_MAX}
+                             placeholder="Pick or type a colour" autoComplete="off" className="input py-1 w-44" aria-label="Ticket colour" />
+                      <datalist id="ticket-colours">
+                        {ticketColours.map((c) => <option key={c} value={c} />)}
+                      </datalist>
                       <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">Save</SubmitButton>
                     </form>
-                  ) : <span className="font-semibold">{order.ticketColour || '—'}</span>}
+                  ) : (
+                    <span className="font-semibold inline-flex items-center gap-1.5">
+                      {swatch && <span className="h-3 w-3 rounded-full border border-black/20" style={{ background: swatch }} aria-hidden />}
+                      {order.ticketColour || '—'}
+                    </span>
+                  )}
                 </dd>
               </div>
             )}

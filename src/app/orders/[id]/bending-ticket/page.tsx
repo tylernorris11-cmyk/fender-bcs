@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { minRadiusMm, toleranceFor } from '@/lib/bs8666';
 import { shortDate, tonnes } from '@/lib/format';
+import { BAR_MARK_ORDER } from '@/lib/orders';
 
 /**
  * The ticket the bender works from, and the one the auditor asks to see against
@@ -13,7 +14,7 @@ export default async function BendingTicket({ params }: { params: { id: string }
   await requirePermission('production.view');
   const order = await db.order.findUnique({
     where: { id: params.id },
-    include: { customer: true, barMarks: { orderBy: { sortOrder: 'asc' }, include: { qcChecks: true } } },
+    include: { customer: true, barMarks: { orderBy: BAR_MARK_ORDER, include: { qcChecks: true } } },
   });
   if (!order) notFound();
 
