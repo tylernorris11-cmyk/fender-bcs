@@ -356,7 +356,7 @@ export function NewOrderForm({
             </div>
             <div>
               <label className="label" htmlFor="depot">Dispatching depot</label>
-              <select id="depot" name="depot" defaultValue={locations[0] ?? 'Scunthorpe'} className="input">
+              <select id="depot" name="depot" defaultValue={locations.includes('Scunthorpe') ? 'Scunthorpe' : locations[0]} className="input">
                 {locations.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
               <p className="hint">Which yard raises, produces and loads this order.</p>

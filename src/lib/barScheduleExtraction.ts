@@ -4,11 +4,10 @@ import { PDFDocument } from 'pdf-lib';
 import type { ScheduleReading } from './barSchedule';
 
 /**
- * Reads the bar mark rows off a customer's bar schedule with Claude. A PDF is
- * split into single pages and each page read in parallel, so a long
- * schedule still comes back well inside the server's time limit; a photo is
- * read in one go. Adding duplicates together happens afterwards, in
- * lib/barSchedule.ts, not here.
+ * Reads the bar mark rows off customers' bar schedules with Claude. A PDF is
+ * split into single pages and the pages read in parallel, so long schedules
+ * still come back well inside the server's time limit; a photo is one page.
+ * Adding duplicates together happens afterwards, in lib/barSchedule.ts.
  */
 
 // Sonnet rather than Opus to keep the cost down: reading a schedule is
@@ -63,13 +62,16 @@ For each row:
 
 Leave out column headings, title blocks, weight summaries, notes, revision tables, and anything crossed out or marked as deleted. If a value on a row can't be read, give your best reading and name that bar mark in "unreadable" (otherwise leave it as an empty string). If the page has no bar schedule rows, return an empty list.`;
 
-type PageResult = { page: number; rows: ScheduleReading[]; unreadable: string; error?: string };
+type PageResult = { page: number; label: string; rows: ScheduleReading[]; unreadable: string; error?: string };
+type PageJob = { page: number; label: string; data: string; mediaType: string; isPdf: boolean };
 
-async function readPage(client: Anthropic, page: number, source: { media_type: string; data: string }, isPdf: boolean): Promise<PageResult> {
+async function readPage(client: Anthropic, job: PageJob): Promise<PageResult> {
+  const { page, label } = job;
+  const failed = (error: string): PageResult => ({ page, label, rows: [], unreadable: '', error: `${label}: ${error}` });
   try {
-    const document = isPdf
-      ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: source.data } }
-      : { type: 'image' as const, source: { type: 'base64' as const, media_type: source.media_type as 'image/jpeg' | 'image/png' | 'image/webp', data: source.data } };
+    const document = job.isPdf
+      ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: job.data } }
+      : { type: 'image' as const, source: { type: 'base64' as const, media_type: job.mediaType as 'image/jpeg' | 'image/png' | 'image/webp', data: job.data } };
 
     const response = await client.beta.messages.create({
       model: MODEL,
@@ -82,16 +84,16 @@ async function readPage(client: Anthropic, page: number, source: { media_type: s
       messages: [{ role: 'user', content: [document, { type: 'text', text: PROMPT }] }],
     });
 
-    if (response.stop_reason === 'refusal') return { page, rows: [], unreadable: '', error: `page ${page} could not be read` };
-    if (response.stop_reason === 'max_tokens') return { page, rows: [], unreadable: '', error: `page ${page} has more rows than can be read in one go` };
+    if (response.stop_reason === 'refusal') return failed('could not be read');
+    if (response.stop_reason === 'max_tokens') return failed('has more rows than can be read in one go');
 
     const text = response.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
     const parsed = JSON.parse(text) as { rows: Omit<ScheduleReading, 'page'>[]; unreadable: string };
-    return { page, rows: parsed.rows.map((r) => ({ ...r, page })), unreadable: parsed.unreadable.trim() };
+    return { page, label, rows: parsed.rows.map((r) => ({ ...r, page })), unreadable: parsed.unreadable.trim() };
   } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) return { page, rows: [], unreadable: '', error: `page ${page}: too many requests at once, try again in a minute` };
-    if (err instanceof Anthropic.APIError) return { page, rows: [], unreadable: '', error: `page ${page}: ${err.message}` };
-    return { page, rows: [], unreadable: '', error: `page ${page}: ${err instanceof Error ? err.message : 'could not be read'}` };
+    if (err instanceof Anthropic.RateLimitError) return failed('too many requests at once, try again in a minute');
+    if (err instanceof Anthropic.APIError) return failed(err.message);
+    return failed(err instanceof Error ? err.message : 'could not be read');
   }
 }
 
@@ -100,7 +102,6 @@ async function splitPdf(bytes: Uint8Array): Promise<string[]> {
   try {
     const source = await PDFDocument.load(bytes);
     const count = source.getPageCount();
-    if (count > MAX_PAGES) throw new Error(`That schedule has ${count} pages; split it into files of ${MAX_PAGES} pages or fewer.`);
     if (count <= 1) return [Buffer.from(bytes).toString('base64')];
     const pages: string[] = [];
     for (let i = 0; i < count; i++) {
@@ -110,28 +111,43 @@ async function splitPdf(bytes: Uint8Array): Promise<string[]> {
       pages.push(Buffer.from(await doc.save()).toString('base64'));
     }
     return pages;
-  } catch (err) {
-    if (err instanceof Error && err.message.startsWith('That schedule has')) throw err;
+  } catch {
     return [Buffer.from(bytes).toString('base64')];
   }
 }
 
-export async function readBarSchedulePages({ bytes, mimeType }: { bytes: Uint8Array; mimeType: string }) {
+/**
+ * Reads one or more uploaded schedules. Every page of every file goes into
+ * one list read eight at a time, so several files take about as long as one
+ * long one. Pages are numbered across all the files for adding up; messages
+ * name the file when there's more than one.
+ */
+export async function readBarScheduleFiles(files: { name: string; bytes: Uint8Array; mimeType: string }[]) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('Reading schedules is not set up yet: ANTHROPIC_API_KEY is missing.');
   const client = new Anthropic();
-  const isPdf = mimeType === 'application/pdf';
-  const sources = isPdf ? await splitPdf(bytes) : [Buffer.from(bytes).toString('base64')];
+  const several = files.length > 1;
+
+  const jobs: PageJob[] = [];
+  for (const f of files) {
+    const isPdf = f.mimeType === 'application/pdf';
+    const pages = isPdf ? await splitPdf(f.bytes) : [Buffer.from(f.bytes).toString('base64')];
+    pages.forEach((data, i) => {
+      const where = pages.length > 1 ? `page ${i + 1}` : '';
+      const label = several ? [f.name, where].filter(Boolean).join(' ') : where || 'the schedule';
+      jobs.push({ page: jobs.length + 1, label, data, mediaType: f.mimeType, isPdf });
+    });
+  }
+  if (jobs.length > MAX_PAGES) throw new Error(`That's ${jobs.length} pages in all; upload ${MAX_PAGES} pages or fewer at a time.`);
 
   const results: PageResult[] = [];
-  for (let i = 0; i < sources.length; i += PARALLEL) {
-    const batch = sources.slice(i, i + PARALLEL).map((data, j) => readPage(client, i + j + 1, { media_type: mimeType, data }, isPdf));
-    results.push(...(await Promise.all(batch)));
+  for (let i = 0; i < jobs.length; i += PARALLEL) {
+    results.push(...(await Promise.all(jobs.slice(i, i + PARALLEL).map((job) => readPage(client, job)))));
   }
 
   return {
-    pages: sources.length,
+    pages: jobs.length,
     readings: results.flatMap((r) => r.rows),
-    unreadable: results.filter((r) => r.unreadable).map((r) => `page ${r.page}: ${r.unreadable}`),
+    unreadable: results.filter((r) => r.unreadable).map((r) => `${r.label}: ${r.unreadable}`),
     errors: results.filter((r) => r.error).map((r) => r.error!),
   };
 }

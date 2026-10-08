@@ -6,23 +6,30 @@ import { readBarSchedule, type ScheduleImport as Result } from './schedule-actio
 
 type Success = Extract<Result, { ok: true }>;
 
+// Vercel turns away any request to a server function over 4.5MB, whatever
+// next.config.mjs allows, so that's the real ceiling for one upload. Kept
+// just under it for the form's own overhead.
+const MAX_UPLOAD_BYTES = 4.4 * 1024 * 1024;
+
 /**
- * Upload a customer's bar schedule and have its bar marks put into the rows
- * below, duplicates added together. Lives inside the order form, so the file
- * input has no name and the button isn't a submit — the schedule itself is
- * never saved, only the lines read from it once the order is.
+ * Upload one or more of a customer's bar schedules and have their bar marks
+ * put into the rows below, duplicates added together across all of them.
+ * Lives inside the order form, so the file input has no name and the button
+ * isn't a submit — the schedules themselves are never saved, only the lines
+ * read from them once the order is.
  */
 export function ScheduleImport({ onImport }: { onImport: (result: Success) => void }) {
   const input = useRef<HTMLInputElement>(null);
-  const [chosen, setChosen] = useState('');
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [tooBig, setTooBig] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [pending, start] = useTransition();
 
   function read() {
-    const file = input.current?.files?.[0];
-    if (!file) return;
+    const files = [...(input.current?.files ?? [])];
+    if (files.length === 0 || tooBig) return;
     const fd = new FormData();
-    fd.append('schedule', file);
+    for (const f of files) fd.append('schedule', f);
     setResult(null);
     start(async () => {
       const r = await readBarSchedule(fd);
@@ -30,7 +37,7 @@ export function ScheduleImport({ onImport }: { onImport: (result: Success) => vo
       if (r.ok) {
         onImport(r);
         if (input.current) input.current.value = '';
-        setChosen('');
+        setChosen([]);
       }
     });
   }
@@ -39,16 +46,29 @@ export function ScheduleImport({ onImport }: { onImport: (result: Success) => vo
 
   return (
     <div className="rounded-xl border border-dashed border-hairline p-4 mb-4">
-      <p className="font-semibold text-sm mb-1">Upload the customer&apos;s bar schedule</p>
-      <p className="text-xs text-ink-muted mb-3">A PDF or a photo. Its bar marks go into the rows below, with any duplicates added together, ready to check and price.</p>
+      <p className="font-semibold text-sm mb-1">Upload the customer&apos;s bar schedules</p>
+      <p className="text-xs text-ink-muted mb-3">
+        One or more PDFs or photos — choose several at once if the schedule comes in parts. Their bar marks go into the rows
+        below, with duplicates added together across all of them, ready to check and price.
+      </p>
       <div className="flex flex-wrap items-center gap-3">
-        <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="input w-auto max-w-full py-2"
-          onChange={(e) => { setChosen(e.target.files?.[0]?.name ?? ''); setResult(null); }} aria-label="Bar schedule file" />
-        <button type="button" onClick={read} disabled={!chosen || pending} className="btn-primary">
-          {pending ? <><Loader2 size={16} className="animate-spin" /> Reading the schedule…</> : <><FileUp size={16} /> Read schedule</>}
+        <input ref={input} type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp" className="input w-auto max-w-full py-2"
+          aria-label="Bar schedule files"
+          onChange={(e) => {
+            const files = [...(e.target.files ?? [])];
+            setChosen(files.map((f) => f.name));
+            setTooBig(files.reduce((s, f) => s + f.size, 0) > MAX_UPLOAD_BYTES);
+            setResult(null);
+          }} />
+        <button type="button" onClick={read} disabled={chosen.length === 0 || tooBig || pending} className="btn-primary">
+          {pending
+            ? <><Loader2 size={16} className="animate-spin" /> Reading {chosen.length > 1 ? `${chosen.length} schedules` : 'the schedule'}…</>
+            : <><FileUp size={16} /> {chosen.length > 1 ? `Read ${chosen.length} schedules` : 'Read schedule'}</>}
         </button>
       </div>
-      {pending && <p className="text-xs text-ink-muted mt-2">This can take up to a minute for a long schedule.</p>}
+      {chosen.length > 1 && !pending && <p className="text-xs text-ink-muted mt-2">{chosen.join(', ')}</p>}
+      {tooBig && <p className="text-xs text-signal mt-2">Those files come to more than 4.5 MB together, the most one upload can carry. Read them in a few goes: each go adds to the rows below.</p>}
+      {pending && <p className="text-xs text-ink-muted mt-2">This can take up to a minute for long schedules.</p>}
 
       {result && !result.ok && (
         <p className="banner-bad mt-3"><AlertTriangle size={16} className="shrink-0 mt-0.5" /> {result.error}</p>
@@ -59,7 +79,7 @@ export function ScheduleImport({ onImport }: { onImport: (result: Success) => vo
           <p className="banner-ok">
             <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
             <span>
-              Read {result.rowsRead} {result.rowsRead === 1 ? 'row' : 'rows'} from {result.pages} {result.pages === 1 ? 'page' : 'pages'} of {result.fileName},
+              Read {result.rowsRead} {result.rowsRead === 1 ? 'row' : 'rows'} from {result.pages} {result.pages === 1 ? 'page' : 'pages'} of {list(result.fileNames)},
               {' '}giving {result.bars.length} bar {result.bars.length === 1 ? 'mark' : 'marks'}, added below. Check every line against the schedule before saving.
             </span>
           </p>
