@@ -58,6 +58,7 @@ export async function createOrder(formData: FormData) {
 
   const deliveryDateRaw = String(formData.get('deliveryDate') ?? '');
   const number = await orderNumberFor(formData);
+  const invoiceAddress = String(formData.get('invoiceAddress') ?? '').trim();
 
   const productRows = rows(formData, 'product').filter((r) => r.productId && Number(r.qty) > 0);
   const barRows = rows(formData, 'bar').filter((r) => r.mark && Number(r.bars) > 0);
@@ -84,22 +85,28 @@ export async function createOrder(formData: FormData) {
     };
   });
 
-  const { order, customer } = await db.$transaction(async (tx) => {
+  const save = () => db.$transaction(async (tx) => {
     const customer = existing ?? await tx.customer.create({
       data: {
         company,
         name: newCustomerName,
         code: await suggestAccountCode(newCustomerName, async (code) => !!(await tx.customer.findFirst({ where: { company, code }, select: { id: true } }))),
-        address: String(formData.get('address') ?? ''),
-        town: String(formData.get('town') ?? ''),
+        // A new account's address is the invoice address it was opened with.
+        address: invoiceAddress,
         notes: `Opened with order ${number}.`,
       },
     });
+    // Fender's own delivery note numbers (FS0001…), one per order, in order of saving.
+    const deliveryNoteSeq = customer.company === 'FENDER'
+      ? ((await tx.order.aggregate({ where: { company: 'FENDER' }, _max: { deliveryNoteSeq: true } }))._max.deliveryNoteSeq ?? 0) + 1
+      : null;
     const order = await tx.order.create({
       data: {
         number,
         company: customer.company,
         customerId: customer.id,
+        deliveryNoteSeq,
+        invoiceAddress,
         stage: 'DRAFT',
         deliveryDate: deliveryDateRaw ? new Date(deliveryDateRaw) : null,
         depot: String(formData.get('depot') ?? 'Scunthorpe'),
@@ -159,11 +166,22 @@ export async function createOrder(formData: FormData) {
       },
     });
     return { order, customer };
-  }).catch((err) => {
-    // Two people saving the same job number at once: the database's own check catches the second.
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') throw new Error(`Job number ${number} has just been used by another order. Choose another.`);
-    throw err;
   });
+
+  // Two orders saved at the same moment can reach for the same delivery note
+  // number; the database refuses the second, which just tries the next one.
+  // The same refusal on the job number means someone else has just used it.
+  let saved: Awaited<ReturnType<typeof save>> | undefined;
+  for (let attempt = 1; !saved; attempt++) {
+    try {
+      saved = await save();
+    } catch (err) {
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002')) throw err;
+      if (String(err.meta?.target ?? '').includes('deliveryNoteSeq') && attempt < 5) continue;
+      throw new Error(`Job number ${number} has just been used by another order. Choose another.`);
+    }
+  }
+  const { order, customer } = saved;
 
   if (!existing) await logActivity('Customer', customer.id, 'Account opened', `${customer.code} ${customer.name}, with order ${number}`, user.id);
   await applyChecklistTemplate(order.id, customer.company);

@@ -1,7 +1,12 @@
 import type { DeliveryNoteData } from '@/app/orders/[id]/delivery-sheet/FenderDeliveryNote';
 
+/** FS0001 — Fender's own delivery note numbers, four digits until they need more. */
+export const deliveryNoteNo = (seq: number | null | undefined) => (seq == null ? '' : `FS${String(seq).padStart(4, '0')}`);
+
 type OrderForNote = {
   number: string;
+  deliveryNoteSeq: number | null;
+  invoiceAddress: string;
   poNumber: string;
   ticketColour: string;
   deliveryDate: Date | null;
@@ -9,7 +14,10 @@ type OrderForNote = {
   town: string;
   customer: { name: string; address: string; town: string; postcode: string };
   lines: { description: string; qty: unknown; unit: string; weightKg: unknown; picks: { batch: { heatNumber: string } }[] }[];
-  barMarks: { mark: string; grade: string; diaMm: number; bars: number; lengthMm: number; shapeCode: string; weightKg: unknown }[];
+  barMarks: {
+    mark: string; grade: string; diaMm: number; bars: number; lengthMm: number; shapeCode: string; weightKg: unknown;
+    a: number | null; b: number | null; c: number | null; d: number | null; ef: number | null; radiusMm: number | null;
+  }[];
 };
 
 /** An address typed over several lines keeps its lines; one typed on a single line splits at ", ". */
@@ -25,6 +33,9 @@ function addressLines(first: string[], address: string, ...extra: string[]) {
   for (const e of extra) if (e.trim() && !all.includes(e.trim().toUpperCase())) lines.push(e.trim());
   return lines;
 }
+
+/** A bend dimension as the schedule gives it; blank when the shape doesn't use it. */
+const dim = (v: number | null) => (v ? String(v) : '');
 
 /** Grade H (and the other high-yield grades) is high tensile; R or M is mild steel. */
 const steelKind = (grade: string) => (/^[RM]$/i.test(grade.trim()) ? 'MILD STEEL' : 'HIGH TENSILE');
@@ -59,16 +70,25 @@ export function deliveryNoteData(order: OrderForNote): DeliveryNoteData {
   const totalKg = order.barMarks.reduce((s, b) => s + Number(b.weightKg), 0) + order.lines.reduce((s, l) => s + Number(l.weightKg), 0);
 
   return {
+    noteNo: deliveryNoteNo(order.deliveryNoteSeq),
     jobNo: order.number,
     poNumber: order.poNumber,
     ticketColour: order.ticketColour,
     deliveryDate: order.deliveryDate,
-    invoiceLines: addressLines([order.customer.name], order.customer.address, order.customer.town, order.customer.postcode),
+    // The invoice address asked for on the order, or the account's when it wasn't given.
+    invoiceLines: order.invoiceAddress.trim()
+      ? addressLines([order.customer.name], order.invoiceAddress)
+      : addressLines([order.customer.name], order.customer.address, order.customer.town, order.customer.postcode),
     deliveryLines: addressLines([], order.address, order.town),
     summary: [...barSummary, ...lineSummary],
     totalTonnes: totalKg / 1000,
     totalBars: order.barMarks.reduce((s, b) => s + b.bars, 0),
     maxBentLengthMm: bent.length ? Math.max(...bent.map((b) => b.lengthMm)) : null,
-    barMarks: order.barMarks.map((b) => ({ mark: b.mark, size: `${b.grade}${b.diaMm}`, bars: b.bars, lengthMm: b.lengthMm, shape: b.shapeCode })),
+    barMarks: order.barMarks.map((b) => ({
+      mark: b.mark, size: `${b.grade}${b.diaMm}`, bars: b.bars, lengthMm: b.lengthMm, shape: b.shapeCode,
+      a: dim(b.a), b: dim(b.b), c: dim(b.c), d: dim(b.d),
+      // One E/R column, as on a BS 8666 schedule: E, or the bend radius marked R when the shape has one instead.
+      er: [dim(b.ef), b.radiusMm ? `R${b.radiusMm}` : ''].filter(Boolean).join(' / '),
+    })),
   };
 }

@@ -486,29 +486,31 @@ enum PaymentStatus {
 }
 
 model Order {
-  id             String        @id @default(cuid())
-  company        Company       @default(FENDER)
-  number         String        @unique // FS-26-05301
-  customerId     String
-  stage          OrderStage    @default(DRAFT)
-  paymentStatus  PaymentStatus @default(UNPAID)
-  deliveryDate   DateTime?
-  town           String        @default("")
-  address        String        @default("")
-  poNumber       String        @default("")
-  ticketColour   String        @default("") // colour of the tally ticket stock used for this job — printed on the delivery note
-  yardNotes      String        @default("")
-  depot          String        @default("Scunthorpe") // which yard is raising and dispatching this order
-  raisedById     String?
-  archived       Boolean       @default(false)
-  overrideCredit Boolean       @default(false)
-  approvedAt     DateTime?
-  approvedBy     String        @default("")
-  deliveredAt    DateTime?
-  paidAt         DateTime?
-  completedAt    DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  company         Company       @default(FENDER)
+  number          String        @unique // FS-26-05301
+  customerId      String
+  stage           OrderStage    @default(DRAFT)
+  paymentStatus   PaymentStatus @default(UNPAID)
+  deliveryDate    DateTime?
+  town            String        @default("")
+  address         String        @default("")
+  poNumber        String        @default("")
+  ticketColour    String        @default("") // colour of the tally ticket stock used for this job — printed on the delivery note
+  invoiceAddress  String        @default("") // as asked for on the order; blank = the customer account's address
+  deliveryNoteSeq Int? // Fender's own delivery note number, shown as FS0001 — given when the order is created
+  yardNotes       String        @default("")
+  depot           String        @default("Scunthorpe") // which yard is raising and dispatching this order
+  raisedById      String?
+  archived        Boolean       @default(false)
+  overrideCredit  Boolean       @default(false)
+  approvedAt      DateTime?
+  approvedBy      String        @default("")
+  deliveredAt     DateTime?
+  paidAt          DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   customer       Customer          @relation(fields: [customerId], references: [id])
   raisedBy       User?             @relation("raisedBy", fields: [raisedById], references: [id])
@@ -521,6 +523,7 @@ model Order {
   productionJobs ProductionJob[]
   barCounts      BarCount[]
 
+  @@unique([company, deliveryNoteSeq])
   @@index([stage, deliveryDate])
   @@index([company])
 }

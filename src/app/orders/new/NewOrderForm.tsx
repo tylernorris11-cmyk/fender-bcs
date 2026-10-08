@@ -7,7 +7,7 @@ import { createOrder } from '../actions';
 import { ScheduleImport } from './ScheduleImport';
 import { TICKET_COLOURS } from '@/lib/ticketColours';
 
-type Customer = { id: string; name: string; address: string; town: string; creditLimit: string; used: number };
+type Customer = { id: string; name: string; address: string; town: string; postcode: string; creditLimit: string; used: number };
 type Product = { id: string; name: string; code: string; category: string; unit: string; kgPerUnit: string; price: number };
 
 type Line = { key: number; productId: string; qty: string; unitPrice: string };
@@ -15,6 +15,10 @@ type Bar = { key: number; mark: string; diaMm: string; grade: string; shapeCode:
 type Fence = { key: number; lengthFt: string; lengthIn: string; thicknessMm: string; qty: string; unitPrice: string };
 
 const VAT = 0.2;
+
+/** A customer account's address as it goes on an invoice: the address, then town and postcode on their own lines. */
+const accountAddress = (c?: { address: string; town: string; postcode: string }) =>
+  c ? [c.address.trim(), c.town.trim(), c.postcode.trim()].filter(Boolean).join('\n') : '';
 const gbp = (n: number) => n.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 });
 
 export function NewOrderForm({
@@ -42,6 +46,7 @@ export function NewOrderForm({
   const [bars, setBars] = useState<Bar[]>([]);
   const [fences, setFences] = useState<Fence[]>([]);
   const [address, setAddress] = useState(customers[0]?.address ?? '');
+  const [invoiceAddress, setInvoiceAddress] = useState(() => accountAddress(customers[0]));
   const [town, setTown] = useState(customers[0]?.town ?? '');
 
   const customer = newCustomer ? undefined : customers.find((c) => c.id === customerId);
@@ -71,6 +76,7 @@ export function NewOrderForm({
     setCustomerId(id);
     const c = customers.find((x) => x.id === id);
     setAddress(c?.address ?? '');
+    setInvoiceAddress(accountAddress(c));
     setTown(c?.town ?? '');
   }
 
@@ -122,7 +128,7 @@ export function NewOrderForm({
               </select>
               <p className="hint">
                 <button type="button" className="text-brand-700 font-medium hover:underline"
-                  onClick={() => { setNewCustomer(true); setAddress(''); setTown(''); }}>Customer not on the list?</button>
+                  onClick={() => { setNewCustomer(true); setAddress(''); setInvoiceAddress(''); setTown(''); }}>Customer not on the list?</button>
               </p>
             </div>
           )}
@@ -369,11 +375,17 @@ export function NewOrderForm({
               </select>
               <p className="hint">Used by Deliveries to group runs going the same way.</p>
             </div>
-            <div className="sm:col-span-2">
-              <label className="label" htmlFor="address">Full delivery address</label>
-              <textarea id="address" name="address" rows={2} value={address}
-                        onChange={(e) => setAddress(e.target.value)} className="input" />
-              <p className="hint">Prefilled from the customer&apos;s account — change it for site deliveries.</p>
+            <div>
+              <label className="label" htmlFor="invoiceAddress">Invoice address</label>
+              <textarea id="invoiceAddress" name="invoiceAddress" rows={4} required={isFender} value={invoiceAddress}
+                        onChange={(e) => setInvoiceAddress(e.target.value)} className="input" />
+              <p className="hint">Prefilled from the customer&apos;s account. Printed on the delivery note.</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="address">Delivery address</label>
+              <textarea id="address" name="address" rows={4} required={isFender} value={address}
+                        onChange={(e) => setAddress(e.target.value)} className="input" placeholder="Site name, road, town, contact and phone, postcode" />
+              <p className="hint">Prefilled from the account — change it for site deliveries.</p>
             </div>
             <div>
               <label className="label" htmlFor="poNumber">Customer PO number</label>

@@ -13,6 +13,7 @@ import {
   addChecklistItem, advanceStage, archiveOrder, markPaid, removeChecklistItem, setTicketColour, toggleChecklistItem,
 } from '../actions';
 import { TICKET_COLOURS } from '@/lib/ticketColours';
+import { deliveryNoteNo } from '@/lib/deliveryNote';
 import { SubmitButton } from '@/components/SubmitButton';
 
 export default async function OrderPage({ params }: { params: { id: string } }) {
@@ -43,6 +44,13 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
   const canAdvance = step && can(user, step.perm);
   const done = order.checklist.filter((c) => c.done).length;
   const hasSchedule = order.barMarks.length > 0;
+  // Cut & bent weight per bar size, smallest first.
+  const byDiameter = [...order.barMarks.reduce((m, b) => {
+    const d = m.get(b.diaMm) ?? { dia: b.diaMm, kg: 0, bars: 0 };
+    d.kg += Number(b.weightKg);
+    d.bars += b.bars;
+    return m.set(b.diaMm, d);
+  }, new Map<number, { dia: number; kg: number; bars: number }>()).values()].sort((a, b) => a.dia - b.dia);
 
   return (
     <Shell user={user} module="orders" nav={NAV.orders} current="/orders" alerts={alerts.length}>
@@ -202,6 +210,24 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
                 );
               })}
             </Table>
+
+            {/* For invoicing in Exchequer, which bills each diameter's weight as its own line. */}
+            <h3 className="text-base font-bold mt-8 mb-1">Weight by diameter</h3>
+            <p className="text-sm text-ink-muted mb-3">The cut &amp; bent weight of each size, for invoicing.</p>
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+              {byDiameter.map((d) => (
+                <div key={d.dia} className="rounded-xl border border-hairline px-4 py-3">
+                  <p className="text-sm text-ink-muted">{d.dia} mm · {d.bars.toLocaleString('en-GB')} bars</p>
+                  <p className="text-xl font-bold tabular-nums">{(d.kg / 1000).toFixed(3)} t</p>
+                  <p className="text-xs text-ink-faint tabular-nums">{d.kg.toLocaleString('en-GB', { maximumFractionDigits: 1 })} kg</p>
+                </div>
+              ))}
+              <div className="rounded-xl border border-forest/30 bg-brand-50 px-4 py-3">
+                <p className="text-sm text-ink-muted">All sizes · {order.barMarks.reduce((s, b) => s + b.bars, 0).toLocaleString('en-GB')} bars</p>
+                <p className="text-xl font-bold tabular-nums">{(byDiameter.reduce((s, d) => s + d.kg, 0) / 1000).toFixed(3)} t</p>
+                <p className="text-xs text-ink-faint">Cut &amp; bent total</p>
+              </div>
+            </div>
           </>
         )}
 
@@ -280,10 +306,14 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
         <section className="card card-pad">
           <h2 className="text-lg font-bold mb-3">Delivery</h2>
           <dl className="text-sm space-y-2">
+            {order.deliveryNoteSeq != null && (
+              <div className="flex justify-between gap-4"><dt className="text-ink-muted">Delivery note</dt><dd className="font-semibold">{deliveryNoteNo(order.deliveryNoteSeq)}</dd></div>
+            )}
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Date</dt><dd className="font-semibold">{shortDate(order.deliveryDate)}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Depot</dt><dd className="font-semibold">{order.depot}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Town</dt><dd className="font-semibold">{order.town || '—'}</dd></div>
-            <div><dt className="text-ink-muted">Address</dt><dd className="font-semibold mt-0.5">{order.address || '—'}</dd></div>
+            <div><dt className="text-ink-muted">Delivery address</dt><dd className="font-semibold mt-0.5 whitespace-pre-line">{order.address || '—'}</dd></div>
+            {order.invoiceAddress && <div><dt className="text-ink-muted">Invoice address</dt><dd className="font-semibold mt-0.5 whitespace-pre-line">{order.invoiceAddress}</dd></div>}
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Customer PO</dt><dd className="font-semibold">{order.poNumber || '—'}</dd></div>
             {order.company === 'FENDER' && (
               <div className="flex justify-between items-center gap-4">

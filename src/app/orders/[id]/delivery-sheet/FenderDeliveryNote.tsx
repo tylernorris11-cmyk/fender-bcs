@@ -9,6 +9,7 @@ import type { ReactNode } from 'react';
  */
 
 export type DeliveryNoteData = {
+  noteNo: string;
   jobNo: string;
   poNumber: string;
   ticketColour: string;
@@ -19,7 +20,7 @@ export type DeliveryNoteData = {
   totalTonnes: number;
   totalBars: number;
   maxBentLengthMm: number | null;
-  barMarks: { mark: string; size: string; bars: number; lengthMm: number; shape: string }[];
+  barMarks: { mark: string; size: string; bars: number; lengthMm: number; shape: string; a: string; b: string; c: string; d: string; er: string }[];
 };
 
 // Measured on the rendered page (a row is about 8mm): 18 leaves room on the last page for the totals row.
@@ -62,8 +63,18 @@ function Header({ data, page, pages }: { data: DeliveryNoteData; page: number; p
           <img src="/fender-logo.png" alt="Fender Steel" className="h-[19mm] w-auto" />
         </div>
         <div className="text-right">
-          <p className="dn-label !text-forest !text-[8pt]">Delivery note</p>
-          <p className="text-[21pt] font-extrabold leading-tight tracking-tight">{data.jobNo}</p>
+          <div className="flex items-start justify-end gap-8">
+            {data.noteNo && (
+              <div>
+                <p className="dn-label !text-forest !text-[8pt]">Delivery note no.</p>
+                <p className="text-[21pt] font-extrabold leading-tight tracking-tight">{data.noteNo}</p>
+              </div>
+            )}
+            <div>
+              <p className="dn-label !text-forest !text-[8pt]">Job number</p>
+              <p className="text-[21pt] font-extrabold leading-tight tracking-tight">{data.jobNo}</p>
+            </div>
+          </div>
           <p className="text-[8.5pt] text-[#6B7A76]">Page {page} of {pages}</p>
         </div>
       </div>
@@ -133,6 +144,11 @@ function Footer({ children }: { children?: ReactNode }) {
 
 const th = 'dn-label !text-[7pt] py-2 px-3 text-left';
 const td = 'py-[1.3mm] px-3 border-b border-[#E4E9E7]';
+// The bar marks table carries the bend dimensions too, so its columns sit a little closer.
+const bth = 'dn-label !text-[7pt] py-2 px-2 text-left';
+const btd = 'py-[1.3mm] px-2 border-b border-[#E4E9E7]';
+/** The bend dimensions, in BS 8666 schedule order. */
+const DIMS = [['a', 'A'], ['b', 'B'], ['c', 'C'], ['d', 'D'], ['er', 'E/R']] as const;
 
 export function FenderDeliveryNote({ data }: { data: DeliveryNoteData }) {
   const barPages: DeliveryNoteData['barMarks'][] = [];
@@ -221,7 +237,7 @@ export function FenderDeliveryNote({ data }: { data: DeliveryNoteData }) {
           <section key={i} className="dn-page">
             <Header data={data} page={i + 2} pages={pages} />
             <div className="flex items-baseline justify-between mt-6 mb-2">
-              <p className="text-[11pt] font-bold">Bar marks</p>
+              <p className="text-[11pt] font-bold">Bar marks <span className="ml-2 text-[8pt] font-normal text-[#6B7A76]">All measurements in mm</span></p>
               <p className="text-[8pt] text-[#6B7A76]">
                 {barPages.length > 1 ? `${i * BAR_ROWS_PER_PAGE + 1}–${i * BAR_ROWS_PER_PAGE + rows.length} of ` : ''}{data.barMarks.length} bar marks
               </p>
@@ -229,30 +245,36 @@ export function FenderDeliveryNote({ data }: { data: DeliveryNoteData }) {
             <table className="w-full border-collapse">
               <thead className="bg-[#F1F5F4]">
                 <tr>
-                  <th className={`${th} rounded-l-md`}>Location</th>
-                  <th className={th}>Bar mark</th>
-                  <th className={th}>Size</th>
-                  <th className={`${th} text-right`}>No. of bars</th>
-                  <th className={`${th} text-right`}>Length (mm)</th>
-                  <th className={`${th} text-right rounded-r-md`}>Shape</th>
+                  <th className={`${bth} rounded-l-md`}>Location</th>
+                  <th className={bth}>Bar mark</th>
+                  <th className={bth}>Size</th>
+                  <th className={`${bth} text-right`}>No. of bars</th>
+                  <th className={`${bth} text-right`}>Length</th>
+                  <th className={`${bth} text-right`}>Shape</th>
+                  {DIMS.map(([, label], k) => (
+                    <th key={label} className={`${bth} text-right ${k === DIMS.length - 1 ? 'rounded-r-md' : ''}`}>{label}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((b, j) => (
                   <tr key={j}>
-                    <td className={`${td} text-[#4A5A56]`}>{location}</td>
-                    <td className={`${td} font-bold`}>{b.mark}</td>
-                    <td className={td}>{b.size}</td>
-                    <td className={`${td} text-right tabular-nums`}>{b.bars}</td>
-                    <td className={`${td} text-right tabular-nums`}>{b.lengthMm}</td>
-                    <td className={`${td} text-right`}>{b.shape}</td>
+                    <td className={`${btd} text-[#4A5A56]`}>{location}</td>
+                    <td className={`${btd} font-bold`}>{b.mark}</td>
+                    <td className={btd}>{b.size}</td>
+                    <td className={`${btd} text-right tabular-nums`}>{b.bars}</td>
+                    <td className={`${btd} text-right tabular-nums`}>{b.lengthMm}</td>
+                    <td className={`${btd} text-right`}>{b.shape}</td>
+                    {DIMS.map(([key]) => (
+                      <td key={key} className={`${btd} text-right tabular-nums whitespace-nowrap`}>{b[key]}</td>
+                    ))}
                   </tr>
                 ))}
                 {last && (
                   <tr className="font-bold">
-                    <td className="py-2 px-3 border-t-2 border-forest" colSpan={3}>Total order weight {data.totalTonnes.toFixed(3)} t</td>
-                    <td className="py-2 px-3 border-t-2 border-forest text-right tabular-nums">{data.totalBars}</td>
-                    <td className="py-2 px-3 border-t-2 border-forest" colSpan={2} />
+                    <td className="py-2 px-2 border-t-2 border-forest whitespace-nowrap" colSpan={3}>Total order weight {data.totalTonnes.toFixed(3)} t</td>
+                    <td className="py-2 px-2 border-t-2 border-forest text-right tabular-nums">{data.totalBars}</td>
+                    <td className="py-2 px-2 border-t-2 border-forest" colSpan={2 + DIMS.length} />
                   </tr>
                 )}
               </tbody>

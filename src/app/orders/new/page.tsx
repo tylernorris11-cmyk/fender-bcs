@@ -44,7 +44,7 @@ export default async function NewOrderPage() {
 
       <NewOrderForm
         customers={customers.map((c) => ({
-          id: c.id, name: c.name, address: c.address, town: c.town,
+          id: c.id, name: c.name, address: c.address, town: c.town, postcode: c.postcode,
           creditLimit: String(c.creditLimit), used: balances.get(c.id) ?? 0,
         }))}
         products={products.map((p) => ({
