@@ -5,7 +5,9 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { getActiveCompany } from '@/lib/company';
 import { can } from '@/lib/rbac';
-import { shortDate, tonnes } from '@/lib/format';
+import { clock, shortDate, tonnes } from '@/lib/format';
+import { barMarkHistory, type MarkHistory } from '@/lib/productionHistory';
+import { bmk, MACHINE, MACHINES } from '@/lib/productionSplit';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, SortTh, Stat, StatRow, Table } from '@/components/ui';
 
@@ -13,13 +15,43 @@ const PROCESS_LABEL: Record<string, string> = { CUTTING: 'Cutting', BENDING: 'Be
 
 export default async function ProductionHistoryPage({
   searchParams,
-}: { searchParams: { q?: string; from?: string; to?: string; sort?: string; dir?: string } }) {
+}: { searchParams: { q?: string; from?: string; to?: string; sort?: string; dir?: string; view?: string } }) {
   const user = await requirePermission('production.view');
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
   const isFender = company === 'FENDER';
   // Correcting a finished job is BCS-only, for whoever's been given it in People.
   const canEdit = !isFender && can(user, 'production.editHistory');
+  // Fender opens on what happened to each bar mark; its tally sheets are the other tab.
+  const view = isFender && searchParams.view !== 'sheets' ? 'marks' : 'sheets';
+  const q = (searchParams.q ?? '').trim();
+  const tabHref = (v: string) => {
+    const p = new URLSearchParams({ view: v, ...(q ? { q } : {}), ...(searchParams.from ? { from: searchParams.from } : {}), ...(searchParams.to ? { to: searchParams.to } : {}) });
+    return `/production/history?${p}`;
+  };
+
+  if (view === 'marks') {
+    const { marks, capped } = await barMarkHistory({ q, from: searchParams.from, to: searchParams.to });
+    return (
+      <Shell user={user} module="production" nav={NAV.production} current="/production/history" alerts={alerts.length}>
+        <PageHeader title="Production history" blurb="Who cut, bent or ran each bar mark on the Stema, and when — on open sheets as well as finished ones." />
+        <HistoryTabs view={view} tabHref={tabHref} />
+        <HistoryFilters q={q} from={searchParams.from} to={searchParams.to} view={view} isMarks />
+        <section className="card card-pad">
+          {marks.length === 0 ? (
+            <Empty title="Nothing logged that matches." action={<Link href="/production/history" className="btn-secondary">Clear filters</Link>} />
+          ) : (
+            <>
+              <p className="text-sm text-ink-muted mb-3">
+                {marks.length.toLocaleString('en-GB')} bar mark{marks.length === 1 ? '' : 's'}, newest first{capped ? ' — the most recent 1,500 rows; narrow it down to see further back' : ''}.
+              </p>
+              <BarMarkTable marks={marks} />
+            </>
+          )}
+        </section>
+      </Shell>
+    );
+  }
 
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
   const orderBy =
@@ -34,8 +66,6 @@ export default async function ProductionHistoryPage({
     end.setHours(23, 59, 59, 999);
     finishedAtFilter.lte = end;
   }
-
-  const q = (searchParams.q ?? '').trim();
 
   const jobs = await db.productionJob.findMany({
     where: {
@@ -54,6 +84,7 @@ export default async function ProductionHistoryPage({
   return (
     <Shell user={user} module="production" nav={NAV.production} current="/production/history" alerts={alerts.length}>
       <PageHeader title="Production history" blurb="Every finished tally sheet — search, filter and print copies for the file." />
+      {isFender && <HistoryTabs view={view} tabHref={tabHref} />}
 
       <StatRow>
         <Stat value={jobs.length} label={jobs.length === 200 ? 'Jobs shown (200 max)' : 'Jobs'} />
@@ -61,22 +92,7 @@ export default async function ProductionHistoryPage({
         <Stat value={totalRows} label="Rows logged" />
       </StatRow>
 
-      <form className="mb-5 flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[200px]">
-          <label className="label text-xs" htmlFor="q">Job number or customer</label>
-          <input id="q" name="q" defaultValue={q} className="input" placeholder="Search job number or customer…" />
-        </div>
-        <div>
-          <label className="label text-xs" htmlFor="from">Finished from</label>
-          <input id="from" name="from" type="date" defaultValue={searchParams.from} className="input" />
-        </div>
-        <div>
-          <label className="label text-xs" htmlFor="to">Finished to</label>
-          <input id="to" name="to" type="date" defaultValue={searchParams.to} className="input" />
-        </div>
-        <button className="btn-secondary">Apply</button>
-        {(q || searchParams.from || searchParams.to) && <Link href="/production/history" className="btn-secondary">Clear</Link>}
-      </form>
+      <HistoryFilters q={q} from={searchParams.from} to={searchParams.to} view={isFender ? view : undefined} />
 
       <section className="card card-pad">
         {jobs.length === 0 ? (
@@ -125,5 +141,93 @@ export default async function ProductionHistoryPage({
         )}
       </section>
     </Shell>
+  );
+}
+
+function HistoryTabs({ view, tabHref }: { view: string; tabHref: (v: string) => string }) {
+  const tab = (v: string, label: string) => (
+    <Link
+      href={tabHref(v)}
+      className={`px-4 py-2 rounded-lg text-sm font-semibold ${view === v ? 'bg-white shadow-sm text-ink' : 'text-ink-muted hover:text-ink'}`}
+    >
+      {label}
+    </Link>
+  );
+  return (
+    <div className="inline-flex gap-1 rounded-xl bg-hairline/60 p-1 mb-5">
+      {tab('marks', 'Bar marks')}
+      {tab('sheets', 'Tally sheets')}
+    </div>
+  );
+}
+
+function HistoryFilters({ q, from, to, view, isMarks = false }: { q: string; from?: string; to?: string; view?: string; isMarks?: boolean }) {
+  return (
+    <form className="mb-5 flex flex-wrap items-end gap-3">
+      {view && <input type="hidden" name="view" value={view} />}
+      <div className="flex-1 min-w-[200px]">
+        <label className="label text-xs" htmlFor="q">{isMarks ? 'Job, customer or bar mark' : 'Job number or customer'}</label>
+        <input id="q" name="q" defaultValue={q} className="input" placeholder={isMarks ? 'e.g. CN92812CN or BMK 131…' : 'Search job number or customer…'} />
+      </div>
+      <div>
+        <label className="label text-xs" htmlFor="from">{isMarks ? 'From' : 'Finished from'}</label>
+        <input id="from" name="from" type="date" defaultValue={from} className="input" />
+      </div>
+      <div>
+        <label className="label text-xs" htmlFor="to">{isMarks ? 'To' : 'Finished to'}</label>
+        <input id="to" name="to" type="date" defaultValue={to} className="input" />
+      </div>
+      <button className="btn-secondary">Apply</button>
+      {(q || from || to) && <Link href={view ? `/production/history?view=${view}` : '/production/history'} className="btn-secondary">Clear</Link>}
+    </form>
+  );
+}
+
+/** One line per bar mark: each machine it's been through, who by and when, and the cast it went down against. */
+function BarMarkTable({ marks }: { marks: MarkHistory[] }) {
+  return (
+    <Table
+      head={
+        <>
+          <th className="th">Job</th>
+          <th className="th">Bar mark</th>
+          {MACHINES.map((p) => <th key={p} className="th">{MACHINE[p].name}</th>)}
+          <th className="th">Cast</th>
+        </>
+      }
+    >
+      {marks.map((m) => {
+        const cast = m.steps.CUTTING ?? m.steps.STEMA ?? m.steps.BENDING;
+        return (
+          <tr key={m.key} className="row align-top">
+            <td className="td">
+              <span className="font-semibold">{m.jobNumber}</span>
+              {m.customerName && <span className="block text-xs text-ink-muted">{m.customerName}</span>}
+            </td>
+            <td className="td whitespace-nowrap">
+              {bmk(m.mark) || '—'}
+              {m.diaMm != null && <span className="block text-xs text-ink-muted">H{m.diaMm}</span>}
+            </td>
+            {MACHINES.map((p) => {
+              const step = m.steps[p];
+              return (
+                <td key={p} className="td whitespace-nowrap">
+                  {step ? (
+                    <>
+                      <span className="font-semibold">{step.by}</span>
+                      <span className="block text-xs text-ink-muted">{shortDate(step.at)} {clock(step.at)}</span>
+                    </>
+                  ) : <span className="text-ink-faint">—</span>}
+                </td>
+              );
+            })}
+            <td className="td">
+              {cast?.castNumber || '—'}
+              {cast?.mill && <span className="block text-xs text-ink-muted">{cast.mill}</span>}
+            </td>
+          </tr>
+        );
+      })}
+    </Table>
   );
 }

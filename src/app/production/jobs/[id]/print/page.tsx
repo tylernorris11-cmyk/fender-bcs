@@ -64,7 +64,7 @@ export default async function ProductionJobPrint({ params }: { params: { id: str
               <>
                 <th className="py-2">Dia</th><th className="py-2">Bar mark</th>
                 {showCastColumns && <><th className="py-2">Cast number</th><th className="py-2">Mill</th></>}
-                <th className="py-2 text-right">Weight</th><th className="py-2">Comments</th>
+                <th className="py-2 text-right">Weight</th><th className="py-2">When</th><th className="py-2">Comments</th>
               </>
             ) : (
               <>
@@ -83,6 +83,7 @@ export default async function ProductionJobPrint({ params }: { params: { id: str
                   <td className="py-2 whitespace-nowrap">{bmk(r.barMark) || '—'}</td>
                   {showCastColumns && <><td className="py-2">{r.castNumber || '—'}</td><td className="py-2">{r.mill || '—'}</td></>}
                   <td className="py-2 text-right">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
+                  <td className="py-2 whitespace-nowrap">{shortDate(r.at)} {clock(r.at)}</td>
                   <td className="py-2">{r.comments || '—'}</td>
                 </>
               ) : (

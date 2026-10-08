@@ -195,7 +195,7 @@ export function FenderRowsTable({ rows, showCastColumns }: { rows: any[]; showCa
     <Table head={<>
       <th className="th">Dia</th><th className="th">Bar mark</th>
       {showCastColumns && <><th className="th">Cast number</th><th className="th">Mill</th></>}
-      <th className="th">Weight</th><th className="th">Comments</th>
+      <th className="th">Weight</th><th className="th">When</th><th className="th">Comments</th>
     </>}>
       {rows.map((r: any) => (
         <tr key={r.id} className="row">
@@ -203,6 +203,7 @@ export function FenderRowsTable({ rows, showCastColumns }: { rows: any[]; showCa
           <td className="td whitespace-nowrap">{bmk(r.barMark) || '—'}</td>
           {showCastColumns && <><td className="td">{r.castNumber || '—'}</td><td className="td">{r.mill || '—'}</td></>}
           <td className="td">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
+          <td className="td text-ink-muted whitespace-nowrap">{shortDate(r.at)} {clock(r.at)}</td>
           <td className="td text-ink-muted">{r.comments || '—'}</td>
         </tr>
       ))}
