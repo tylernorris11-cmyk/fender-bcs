@@ -9,6 +9,7 @@ import { getActiveCompany } from '@/lib/company';
 import { shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader, Pill, SortSelect } from '@/components/ui';
+import { CustomerPicker } from '@/components/CustomerPicker';
 import { closeNcr, raiseNcr } from '../actions';
 
 const TYPE_LABEL = {
@@ -47,7 +48,7 @@ export default async function NcrPage({ searchParams }: { searchParams: { raise?
       orderBy: NCR_SORTS[searchParams.sort ?? 'open'] ?? NCR_SORTS.open,
     }),
     db.order.findMany({ where: { company, archived: false }, orderBy: { createdAt: 'desc' }, take: 60, select: { id: true, number: true } }),
-    db.customer.findMany({ where: { company }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    db.customer.findMany({ where: { company }, orderBy: { name: 'asc' }, select: { id: true, name: true, code: true, address: true, town: true, postcode: true } }),
     db.supplier.findMany({ where: { company }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
     db.batch.findMany({ where: { company, status: { in: ['Available', 'Quarantined'] } }, select: { id: true, heatNumber: true }, orderBy: { receivedAt: 'desc' } }),
   ]);
@@ -111,10 +112,7 @@ export default async function NcrPage({ searchParams }: { searchParams: { raise?
             </div>
             <div>
               <label className="label" htmlFor="customerId">Customer</label>
-              <select id="customerId" name="customerId" className="input">
-                <option value="">—</option>
-                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <CustomerPicker customers={customers} />
             </div>
             <div>
               <label className="label" htmlFor="supplierId">Supplier</label>

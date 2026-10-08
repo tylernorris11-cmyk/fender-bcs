@@ -6,8 +6,9 @@ import { SHAPE_CODES, BAR_SIZES, MASS_PER_M } from '@/lib/bs8666';
 import { createOrder } from '../actions';
 import { ScheduleImport } from './ScheduleImport';
 import { TICKET_COLOURS } from '@/lib/ticketColours';
+import { CustomerPicker } from '@/components/CustomerPicker';
 
-type Customer = { id: string; name: string; address: string; town: string; postcode: string; creditLimit: string; used: number };
+type Customer = { id: string; name: string; code: string; address: string; town: string; postcode: string; creditLimit: string; used: number };
 type Product = { id: string; name: string; code: string; category: string; unit: string; kgPerUnit: string; price: number };
 
 type Line = { key: number; productId: string; qty: string; unitPrice: string };
@@ -36,18 +37,20 @@ export function NewOrderForm({
   const newBar = (): Bar => ({ key: nextKey(), mark: '', diaMm: '12', grade: 'H', shapeCode: '21', lengthMm: '', bars: '', a: '', b: '', c: '', d: '', ef: '', radiusMm: '', unitPrice: '' });
   const newFence = (): Fence => ({ key: nextKey(), lengthFt: '', lengthIn: '', thicknessMm: '', qty: '', unitPrice: '' });
 
-  const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
+  // Nobody's picked to start with: with hundreds of accounts, a preselected first one is too easy to leave by mistake.
+  const [customerId, setCustomerId] = useState('');
   // Typing a customer who isn't on the list opens an account for them when the order's saved.
   const [newCustomer, setNewCustomer] = useState(customers.length === 0);
+  const [newCustomerName, setNewCustomerName] = useState('');
   // Lazy initializer — passing [newLine()] directly would call newLine() (and
   // so nextKey()) on every render, not just the first, since JS evaluates
   // the argument before useState ever sees it.
   const [lines, setLines] = useState<Line[]>(() => [newLine()]);
   const [bars, setBars] = useState<Bar[]>([]);
   const [fences, setFences] = useState<Fence[]>([]);
-  const [address, setAddress] = useState(customers[0]?.address ?? '');
-  const [invoiceAddress, setInvoiceAddress] = useState(() => accountAddress(customers[0]));
-  const [town, setTown] = useState(customers[0]?.town ?? '');
+  const [address, setAddress] = useState('');
+  const [invoiceAddress, setInvoiceAddress] = useState('');
+  const [town, setTown] = useState('');
 
   const customer = newCustomer ? undefined : customers.find((c) => c.id === customerId);
 
@@ -71,6 +74,13 @@ export function NewOrderForm({
   const limit = Number(customer?.creditLimit ?? 0);
   const used = customer?.used ?? 0;
   const wouldBreach = limit > 0 && used + totals.net > limit;
+
+  /** Switch to typing in a new customer, carrying over any name already typed into the search. */
+  function startNewCustomer(typed: string) {
+    setNewCustomerName(typed);
+    setNewCustomer(true);
+    setAddress(''); setInvoiceAddress(''); setTown('');
+  }
 
   function onCustomerChange(id: string) {
     setCustomerId(id);
@@ -110,25 +120,24 @@ export function NewOrderForm({
           {newCustomer ? (
             <div>
               <label className="label" htmlFor="newCustomerName">Customer name</label>
-              <input id="newCustomerName" name="newCustomerName" required className="input" placeholder="Who the order is for" />
+              <input id="newCustomerName" name="newCustomerName" required className="input" placeholder="Who the order is for"
+                     defaultValue={newCustomerName} autoFocus={!!newCustomerName} />
               <p className="hint">
                 A customer account is opened for them when the order&apos;s saved.
                 {customers.length > 0 && (
                   <> <button type="button" className="text-brand-700 font-medium hover:underline"
-                    onClick={() => { setNewCustomer(false); onCustomerChange(customerId || customers[0].id); }}>Pick from the list instead</button></>
+                    onClick={() => { setNewCustomer(false); onCustomerChange(customerId); }}>Pick from the list instead</button></>
                 )}
               </p>
             </div>
           ) : (
             <div>
               <label className="label" htmlFor="customerId">Customer</label>
-              <select id="customerId" name="customerId" required value={customerId}
-                      onChange={(e) => onCustomerChange(e.target.value)} className="input">
-                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <CustomerPicker customers={customers} defaultValue={customerId} required
+                              onChange={(c) => onCustomerChange(c?.id ?? '')} onNotListed={startNewCustomer} />
               <p className="hint">
                 <button type="button" className="text-brand-700 font-medium hover:underline"
-                  onClick={() => { setNewCustomer(true); setAddress(''); setInvoiceAddress(''); setTown(''); }}>Customer not on the list?</button>
+                  onClick={() => startNewCustomer('')}>Customer not on the list?</button>
               </p>
             </div>
           )}
