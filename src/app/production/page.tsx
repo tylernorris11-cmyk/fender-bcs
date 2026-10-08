@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AlertTriangle, Factory, Printer, Scissors, Weight } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
@@ -9,14 +9,15 @@ import { clock, isoDateUk, shortDate, tonnes, ukTimeToUtc } from '@/lib/format';
 import { isOutOfService } from '@/lib/assets';
 import { NAV, Shell } from '@/components/Shell';
 import { Empty, PageHeader, Pill, SortSelect, StagePill, Stat, StatRow, Table } from '@/components/ui';
+import { doneByMark } from '@/lib/orderProduction';
 import { logProduction, startProductionJob } from './actions';
 import { produceStockLength } from '../stock/lengths/actions';
-import { FenderHome } from './FenderHome';
-import { IconStat } from '@/components/IconStat';
+import { FenderHome, OffSystemJob } from './FenderHome';
+import { FenderBoard } from './FenderBoard';
 
 const PROCESS_LABEL: Record<string, string> = { CUTTING: 'Cutting', BENDING: 'Bending', STEMA: 'Stema' };
 
-export default async function ProductionPage({ searchParams }: { searchParams: { sort?: string } }) {
+export default async function ProductionPage({ searchParams }: { searchParams: { sort?: string; start?: string } }) {
   const user = await requirePermission('production.view');
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
@@ -66,15 +67,27 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
     where: { company, archived: false, stage: { in: ['APPROVED', 'IN_PRODUCTION', 'READY_FOR_DELIVERY'] } },
     include: {
       customer: true,
-      barMarks: isFender ? { include: { qcChecks: true } } : false,
+      barMarks: isFender
+        ? { select: { id: true, diaMm: true, shapeCode: true, bars: true, weightKg: true, status: true, qcChecks: { select: { pass: true } } } }
+        : false,
       lines: true,
       production: { include: { user: true }, orderBy: { at: 'desc' }, take: 1 },
+      productionJobs: isFender
+        ? { where: { finishedAt: null }, select: { process: true, userId: true, user: { select: { name: true } } } }
+        : false,
     },
     orderBy:
       searchParams.sort === 'number' ? [{ number: 'asc' }]
       : searchParams.sort === 'customer' ? [{ customer: { name: 'asc' } }]
       : [{ deliveryDate: 'asc' }],
   });
+
+  // Which machines each bar mark on those orders has been through, from the rows ticked off their schedules.
+  const done = isFender
+    ? doneByMark(await db.productionJobRow.findMany({
+        where: { scheduleMark: { orderId: { in: orders.map((o) => o.id) } } }, select: { barMarkId: true, process: true },
+      }))
+    : new Map();
 
   return (
     <Shell user={user} module="production" nav={NAV.production} current="/production" alerts={alerts.length}>
@@ -87,9 +100,17 @@ export default async function ProductionPage({ searchParams }: { searchParams: {
             rowsToday={today?._count._all ?? 0}
             openOtherWork={openOtherWork}
             canStart={can(user, 'production.progress')}
-            startAction={startProductionJob}
           />
-          <FenderView orders={orders} sort={searchParams.sort} />
+          <FenderBoard
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            orders={orders as any}
+            done={done}
+            viewerId={user.id}
+            canStart={can(user, 'production.progress')}
+            startId={searchParams.start}
+            sort={searchParams.sort}
+          />
+          {can(user, 'production.progress') && <OffSystemJob startAction={startProductionJob} />}
         </>
       ) : (
         <>
@@ -233,68 +254,6 @@ function OtherWorkCallout({ openCount }: { openCount: number }) {
         <Link href="/production/other-work" className="btn-secondary btn-sm">Other work</Link>
       </div>
     </div>
-  );
-}
-
-// ------------------------------------------------------------ Fender Steel
-
-function FenderView({ orders, sort }: { orders: any[]; sort?: string }) {
-  const cutBent = orders.filter((o) => o.barMarks.length > 0);
-  const barsOutstanding = cutBent.reduce(
-    (s, o) => s + o.barMarks.filter((b: any) => b.status === 'Scheduled').reduce((n: number, b: any) => n + b.bars, 0), 0);
-  const failed = cutBent.reduce((s, o) => s + o.barMarks.filter((b: any) => b.qcChecks.some((c: any) => !c.pass)).length, 0);
-  const tonnesOut = cutBent.reduce((s, o) => s + o.barMarks.reduce((n: number, b: any) => n + Number(b.weightKg), 0), 0);
-
-  return (
-    <>
-      <h2 className="text-lg font-bold mt-8 mb-3">In the yard</h2>
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
-        <IconStat icon={Factory} tone="info" value={cutBent.length} label="Cut & bent orders" sub="In the yard now" />
-        <IconStat icon={Scissors} tone="violet" value={barsOutstanding.toLocaleString('en-GB')} label="Bars still to cut" sub="Across those orders" />
-        <IconStat icon={Weight} tone="good" value={tonnes(tonnesOut)} label="Tonnage in progress" sub="On those orders" />
-        <IconStat
-          icon={AlertTriangle} tone={failed ? 'bad' : 'good'} href="/production/checks"
-          value={failed} label="Marks out of tolerance" sub={failed ? 'Need an NCR' : 'All checks passing'}
-        />
-      </div>
-
-      <SortForm sort={sort} />
-
-      {orders.length === 0 ? <Empty title="Nothing in production. Approve an order to start it." /> : (
-        <div className="space-y-3">
-          {orders.map((o) => {
-            const scheduled = o.barMarks.filter((b: any) => b.status === 'Scheduled').length;
-            const checked = o.barMarks.filter((b: any) => b.qcChecks.length > 0).length;
-            return (
-              <article key={o.id} className="card p-4 sm:p-5 flex flex-wrap items-center gap-5">
-                <div className="min-w-[200px]">
-                  <Link href={`/orders/${o.id}`} className="font-bold text-brand-700 hover:underline">{o.number}</Link>
-                  <p className="text-sm text-ink-muted">{o.customer.name} · {o.town}</p>
-                </div>
-                <StagePill stage={o.stage} />
-                <div className="text-sm">
-                  {o.barMarks.length > 0
-                    ? <>{o.barMarks.length} bar marks · {scheduled} still to run · {checked} checked</>
-                    : <span className="text-ink-muted">Standard products only — no bending</span>}
-                </div>
-                <div className="text-sm text-ink-muted">Delivery {shortDate(o.deliveryDate)}</div>
-                {o.production[0] && (
-                  <Pill tone="info">{o.production[0].action} · {o.production[0].station} · {o.production[0].user?.name}</Pill>
-                )}
-                <div className="ml-auto flex gap-2">
-                  {o.barMarks.length > 0 && (
-                    <>
-                      <a href={`/orders/${o.id}/bending-ticket`} className="btn-secondary btn-sm">Bending ticket</a>
-                      <Link href={`/production/checks?order=${o.id}`} className="btn-primary btn-sm">Record checks</Link>
-                    </>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </>
   );
 }
 

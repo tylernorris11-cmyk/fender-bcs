@@ -3,12 +3,14 @@ import { ArrowRight, ClipboardList, Hammer, Plus, Scale } from 'lucide-react';
 import { clock, longDate, shortDate, tonnes } from '@/lib/format';
 import { IconStat } from '@/components/IconStat';
 import { SubmitButton } from '@/components/SubmitButton';
+import { savedForTheDay } from './CurrentJobView';
 
 // The top of Fender's Production page, laid out like the H&S dashboard: a
-// greeting, tiles, the viewer's own open jobs, and starting a new one. A
-// Fender tally sheet is one person's own, so these are only the viewer's
-// jobs; anyone else's are under "In progress" further down. BCS keeps its
-// own layout in page.tsx.
+// greeting, tiles and the viewer's own open jobs. New work is started from
+// the approved jobs on the board below it (FenderBoard.tsx); OffSystemJob
+// is for anything that isn't an order on here. A Fender tally sheet is one
+// person's own, so these are only the viewer's jobs; anyone else's are under
+// "In progress" further down. BCS keeps its own layout in page.tsx.
 
 const PROCESS_LABEL: Record<string, string> = { CUTTING: 'Cutting', BENDING: 'Bending', STEMA: 'Stema' };
 const PROCESS_TONE: Record<string, string> = {
@@ -24,7 +26,7 @@ export function firstName(fullName: string) {
 }
 
 export function FenderHome({
-  userName, jobs, tallyTodayKg, rowsToday, openOtherWork, canStart, startAction,
+  userName, jobs, tallyTodayKg, rowsToday, openOtherWork, canStart,
 }: {
   userName: string;
   jobs: any[];
@@ -32,7 +34,6 @@ export function FenderHome({
   rowsToday: number;
   openOtherWork: number;
   canStart: boolean;
-  startAction: (fd: FormData) => Promise<void>;
 }) {
   const now = new Date();
   const rowsOpen = jobs.reduce((s, j) => s + j.rows.length, 0);
@@ -46,7 +47,7 @@ export function FenderHome({
         </div>
         <div className="flex items-center gap-4">
           <p className="text-xs text-ink-faint text-right leading-tight">Last updated {clock(now)}<br />{longDate(now)}</p>
-          {canStart && <a href="#start-job" className="btn-primary"><Plus size={16} /> Start a new job</a>}
+          {canStart && <a href="#jobs-for-production" className="btn-primary"><Plus size={16} /> Start a job</a>}
         </div>
       </div>
 
@@ -69,7 +70,7 @@ export function FenderHome({
         <section id="your-jobs" className="mb-6 scroll-mt-4">
           <h2 className="text-lg font-bold mb-3">Your open jobs</h2>
           {jobs.length === 0 ? (
-            <div className="card card-pad text-center text-ink-muted">No open jobs. Start one below.</div>
+            <div className="card card-pad text-center text-ink-muted">No open jobs. Pick an approved job below to start.</div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {jobs.map((j) => {
@@ -82,10 +83,16 @@ export function FenderHome({
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-xl font-bold truncate">{j.jobNumber}</p>
-                        {j.order && <p className="text-sm text-ink-muted truncate">Order {j.order.number}</p>}
+                        {j.order ? <p className="text-sm text-ink-muted truncate">{j.customerName || `Order ${j.order.number}`}</p>
+                          : <p className="text-sm text-ink-muted truncate">Not on the system</p>}
                       </div>
                       <span className={`pill ${PROCESS_TONE[j.process]}`}>{PROCESS_LABEL[j.process]}</span>
                     </div>
+                    {savedForTheDay(j) && (
+                      <p className="text-xs font-semibold text-amber-800 bg-amber-50 rounded-lg px-2.5 py-1.5">
+                        Finished for the day {shortDate(j.lastPartFinishedAt)} {clock(j.lastPartFinishedAt)} — carry on where you left off
+                      </p>
+                    )}
                     <div className="flex gap-6 text-sm">
                       <div><p className="font-semibold tabular-nums">{j.rows.length}</p><p className="text-ink-muted">{j.rows.length === 1 ? 'row' : 'rows'}</p></div>
                       <div><p className="font-semibold tabular-nums">{tonnes(weight)}</p><p className="text-ink-muted">so far</p></div>
@@ -104,30 +111,43 @@ export function FenderHome({
         </section>
       )}
 
-      {canStart && (
-        <section id="start-job" className="card card-pad mb-6 scroll-mt-4">
-          <h2 className="text-lg font-bold mb-1">Start a new job</h2>
-          <p className="text-sm text-ink-muted mb-4">If the job number matches an order, it&apos;s linked to it automatically.</p>
-          <form action={startAction} className="flex flex-wrap items-end gap-4">
-            <div>
-              <label className="label" htmlFor="jobNumber">Job number</label>
-              <input id="jobNumber" name="jobNumber" required className="input w-48 text-base" placeholder="FS-26-05301" />
-            </div>
-            <fieldset>
-              <legend className="label">Process</legend>
-              <div className="flex gap-2">
-                {(['CUTTING', 'BENDING', 'STEMA'] as const).map((p, i) => (
-                  <label key={p} className="cursor-pointer rounded-xl border-2 border-hairline px-4 py-2 text-sm font-semibold transition-colors has-[:checked]:border-brand has-[:checked]:bg-brand-50 has-[:checked]:text-forest">
-                    <input type="radio" name="process" value={p} defaultChecked={i === 0} className="sr-only" />
-                    {PROCESS_LABEL[p]}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <SubmitButton pendingLabel="Starting…">Start job</SubmitButton>
-          </form>
-        </section>
-      )}
     </>
+  );
+}
+
+/**
+ * Starting a tally sheet by typing the job number, for work that isn't an
+ * approved order on here. Tucked under the board, since approved jobs are
+ * started from their pop-up there.
+ */
+export function OffSystemJob({ startAction }: { startAction: (fd: FormData) => Promise<void> }) {
+  return (
+    <details id="start-job" className="card card-pad mt-6 scroll-mt-4 group">
+      <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
+        <span>
+          <span className="text-lg font-bold block">Job not on the system?</span>
+          <span className="text-sm text-ink-muted">Type the job number and pick the machine to keep a tally sheet by hand.</span>
+        </span>
+        <Plus size={20} className="text-ink-faint shrink-0 transition-transform group-open:rotate-45" />
+      </summary>
+      <form action={startAction} className="flex flex-wrap items-end gap-4 mt-4">
+        <div>
+          <label className="label" htmlFor="jobNumber">Job number</label>
+          <input id="jobNumber" name="jobNumber" required className="input w-48 text-base" placeholder="FS-26-05301" />
+        </div>
+        <fieldset>
+          <legend className="label">Process</legend>
+          <div className="flex gap-2">
+            {(['CUTTING', 'BENDING', 'STEMA'] as const).map((p, i) => (
+              <label key={p} className="cursor-pointer rounded-xl border-2 border-hairline px-4 py-2 text-sm font-semibold transition-colors has-[:checked]:border-brand has-[:checked]:bg-brand-50 has-[:checked]:text-forest">
+                <input type="radio" name="process" value={p} defaultChecked={i === 0} className="sr-only" />
+                {PROCESS_LABEL[p]}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <SubmitButton pendingLabel="Starting…">Start job</SubmitButton>
+      </form>
+    </details>
   );
 }

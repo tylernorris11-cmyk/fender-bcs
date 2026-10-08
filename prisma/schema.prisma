@@ -641,8 +641,9 @@ model BarMark {
   status    String  @default("Scheduled") // Scheduled | Cut | Bent | Checked | Tagged
   sortOrder Int     @default(0)
 
-  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  qcChecks QcCheck[]
+  order          Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  qcChecks       QcCheck[]
+  productionRows ProductionJobRow[]
 }
 
 model ChecklistItem {
@@ -739,21 +740,28 @@ model ProductionJob {
 
 // One tallied piece (or bundle) against a ProductionJob.
 model ProductionJobRow {
-  id            String   @id @default(cuid())
+  id            String             @id @default(cuid())
   jobId         String
-  diaMm         Decimal? @db.Decimal(5, 1) // Fender: bar diameter (always whole). BCS: fence post/wire diameter (can be e.g. 8.5mm).
-  barMark       String   @default("") // Fender only
-  castNumber    String   @default("") // Fender only
-  mill          String   @default("") // Fender only
-  machine       String   @default("") // BCS only — which machine cut this bundle
-  steelGrade    String   @default("") // BCS only — Carbon | Soft
-  tallyWeightKg Decimal  @default(0) @db.Decimal(12, 3) // Fender: tally weight. BCS: weight of bundle.
-  comments      String   @default("")
-  sortOrder     Int      @default(0)
-  at            DateTime @default(now())
+  diaMm         Decimal?           @db.Decimal(5, 1) // Fender: bar diameter (always whole). BCS: fence post/wire diameter (can be e.g. 8.5mm).
+  barMark       String             @default("") // Fender only
+  castNumber    String             @default("") // Fender only
+  mill          String             @default("") // Fender only
+  machine       String             @default("") // BCS only — which machine cut this bundle
+  steelGrade    String             @default("") // BCS only — Carbon | Soft
+  tallyWeightKg Decimal            @default(0) @db.Decimal(12, 3) // Fender: tally weight. BCS: weight of bundle.
+  comments      String             @default("")
+  sortOrder     Int                @default(0)
+  at            DateTime           @default(now())
+  // Fender rows ticked off an approved order's schedule: which bar mark, and
+  // the job's process copied on, so each mark is cut, bent or run on the Stema
+  // once only. Rows typed in by hand leave both blank.
+  barMarkId     String?
+  process       ProductionProcess?
 
-  job ProductionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job          ProductionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  scheduleMark BarMark?      @relation(fields: [barMarkId], references: [id], onDelete: SetNull)
 
+  @@unique([barMarkId, process])
   @@index([jobId])
 }
 

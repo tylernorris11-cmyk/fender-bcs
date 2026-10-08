@@ -3,13 +3,15 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { put } from '@vercel/blob';
-import type { ProductionProcess } from '@prisma/client';
+import { Prisma, type ProductionProcess } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
 import { withinTolerance } from '@/lib/bs8666';
 import { getActiveCompany, assertCompanyAccess } from '@/lib/company';
 import { isOutOfService } from '@/lib/assets';
 import { lookupCast, type CastLookup } from '@/lib/castLookup';
+import { allocateLineStock, settleAfterChange } from '@/lib/orderProduction';
+import { MACHINE, MACHINES, machinesFor } from '@/lib/productionSplit';
 
 export async function logProduction(formData: FormData) {
   const user = await assertPermission('production.progress');
@@ -213,6 +215,131 @@ export async function addProductionJobRow(formData: FormData) {
 
   revalidatePath('/production');
   revalidatePath(`/production/jobs/${jobId}`);
+}
+
+// ------------------------------------- production from an approved order
+
+/**
+ * Start (or carry on with) one machine's share of an approved order — picked
+ * from the order's pop-up on the Production page. Opens a tally sheet for
+ * the viewer on that machine and that order; the first one started moves the
+ * order into production and allocates its stock, as the order page's own
+ * "Start production" does.
+ */
+export async function startOrderProduction(formData: FormData) {
+  const user = await assertPermission('production.progress');
+  const orderId = String(formData.get('orderId'));
+  const process = String(formData.get('process')) as ProductionProcess;
+  if (!MACHINES.includes(process)) throw new Error('Choose the Cutter, Bending or the Stema.');
+
+  const order = await db.order.findUniqueOrThrow({
+    where: { id: orderId },
+    include: { customer: { select: { name: true } }, barMarks: { select: { diaMm: true, shapeCode: true } } },
+  });
+  assertCompanyAccess(user, order.company);
+  if (order.company !== 'FENDER') throw new Error('Only Fender orders are split by machine.');
+  if (order.stage !== 'APPROVED' && order.stage !== 'IN_PRODUCTION') {
+    throw new Error(`${order.number} isn't approved for production.`);
+  }
+  const machine = MACHINE[process];
+  if (!order.barMarks.some((b) => machinesFor(b).includes(process))) {
+    throw new Error(`Nothing on ${order.number} goes on the ${machine.name}.`);
+  }
+
+  const open = await db.productionJob.findFirst({ where: { userId: user.id, orderId, process, finishedAt: null } });
+  if (open) redirect(`/production/jobs/${open.id}`);
+
+  const job = await db.productionJob.create({
+    data: { company: order.company, jobNumber: order.number, customerName: order.customer.name, process, orderId, userId: user.id },
+  });
+  await logActivity('ProductionJob', job.id, 'Started job', `${order.number} — ${order.customer.name} · ${process}`, user.id);
+
+  // Only the first person to start moves the order on, however many start at once.
+  const moved = await db.order.updateMany({ where: { id: orderId, stage: 'APPROVED' }, data: { stage: 'IN_PRODUCTION' } });
+  if (moved.count) {
+    await allocateLineStock(orderId, order.number, user.id);
+    await logActivity('Order', orderId, 'Start production', `APPROVED → IN_PRODUCTION · ${user.name} on the ${machine.name}`, user.id);
+  }
+
+  revalidatePath('/production');
+  revalidatePath(`/orders/${orderId}`);
+  redirect(`/production/jobs/${job.id}`);
+}
+
+/**
+ * Tick a bar mark off the schedule on the viewer's own job: a tally row for
+ * the whole mark at its scheduled weight. The Cutter and the Stema record the
+ * cast number and mill typed in; bending takes them from the mark's cutting
+ * row, so a mark has to be cut before it can be bent. Each mark goes through
+ * each machine once — if two people tick the same one, the second is told
+ * who beat them to it.
+ */
+export async function completeBarMark(formData: FormData) {
+  const user = await assertPermission('production.progress');
+  const jobId = String(formData.get('jobId'));
+  const barMarkId = String(formData.get('barMarkId'));
+
+  const job = await db.productionJob.findUniqueOrThrow({ where: { id: jobId }, include: { _count: { select: { rows: true } } } });
+  assertCompanyAccess(user, job.company);
+  if (job.userId !== user.id) throw new Error('You can only tick off bar marks on your own job.');
+  if (job.finishedAt) throw new Error('This job has already finished.');
+
+  const mark = await db.barMark.findUniqueOrThrow({ where: { id: barMarkId } });
+  if (mark.orderId !== job.orderId) throw new Error("That bar mark isn't on this job.");
+  const machine = MACHINE[job.process];
+  if (!machinesFor(mark).includes(job.process)) throw new Error(`${mark.mark} doesn't go on the ${machine.name}.`);
+
+  let castNumber = String(formData.get('castNumber') ?? '').trim();
+  let mill = String(formData.get('mill') ?? '').trim();
+  if (job.process === 'BENDING') {
+    const cut = await db.productionJobRow.findUnique({ where: { barMarkId_process: { barMarkId, process: 'CUTTING' } } });
+    if (!cut) throw new Error(`${mark.mark} hasn't been cut yet — it needs cutting before it can be bent.`);
+    castNumber = cut.castNumber;
+    mill = cut.mill;
+  } else if (!castNumber || !mill) {
+    throw new Error('Enter the cast number and mill for this size first.');
+  }
+
+  try {
+    await db.productionJobRow.create({
+      data: {
+        jobId, diaMm: mark.diaMm, barMark: mark.mark, castNumber, mill, tallyWeightKg: mark.weightKg,
+        sortOrder: job._count.rows, barMarkId, process: job.process,
+      },
+    });
+  } catch (err) {
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002')) throw err;
+    const other = await db.productionJobRow.findUnique({
+      where: { barMarkId_process: { barMarkId, process: job.process } }, include: { job: { include: { user: true } } },
+    });
+    throw new Error(`${mark.mark} has already been ${machine.done} by ${other?.job.user.name ?? 'someone else'}.`);
+  }
+
+  await settleAfterChange(barMarkId, user.id);
+  revalidatePath(`/production/jobs/${jobId}`);
+  revalidatePath('/production');
+  revalidatePath(`/orders/${mark.orderId}`);
+}
+
+/** Take back a bar mark ticked off by mistake — your own, on a job that's still open, and not once it's been bent. */
+export async function undoBarMark(formData: FormData) {
+  const user = await assertPermission('production.progress');
+  const row = await db.productionJobRow.findUniqueOrThrow({ where: { id: String(formData.get('rowId')) }, include: { job: true } });
+  assertCompanyAccess(user, row.job.company);
+  if (row.job.userId !== user.id) throw new Error('You can only undo your own rows.');
+  if (row.job.finishedAt) throw new Error('This job has already finished.');
+  if (!row.barMarkId) throw new Error("That row isn't from the schedule.");
+
+  if (row.process === 'CUTTING') {
+    const bent = await db.productionJobRow.findUnique({ where: { barMarkId_process: { barMarkId: row.barMarkId, process: 'BENDING' } } });
+    if (bent) throw new Error(`${row.barMark} has already been bent — that needs undoing first.`);
+  }
+
+  await db.productionJobRow.delete({ where: { id: row.id } });
+  await settleAfterChange(row.barMarkId, user.id);
+  revalidatePath(`/production/jobs/${row.jobId}`);
+  revalidatePath('/production');
+  if (row.job.orderId) revalidatePath(`/orders/${row.job.orderId}`);
 }
 
 /**

@@ -49,26 +49,10 @@ export async function CurrentJobView({ job, viewerId }: { job: any; viewerId: st
             ? `${PROCESS_LABEL[job.process]}${job.order ? ` · linked to order ${job.order.number}` : ''}`
             : `${job.customerName ? `${job.customerName} · ` : ''}Fence post cutting${job.order ? ` · linked to order ${job.order.number}` : ''}${startedByOther ? ` · started by ${job.user?.name ?? 'someone else'} — anyone can add to it` : ''}`
         }
-        actions={(
-          <>
-            <a href={`/production/jobs/${job.id}/print`} className="btn-secondary btn-sm">Print</a>
-            <form action={partFinishProductionJob}>
-              <input type="hidden" name="jobId" value={job.id} />
-              <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…" title="Not done yet — just counts today's tally and keeps the job open for next time">Finish for today</SubmitButton>
-            </form>
-            <form action={finishProductionJob}>
-              <input type="hidden" name="jobId" value={job.id} />
-              <SubmitButton className="btn-primary btn-sm" pendingLabel="Finishing…">Finish job</SubmitButton>
-            </form>
-          </>
-        )}
+        actions={<JobActions job={job} />}
       />
 
-      {job.lastPartFinishedAt && (
-        <p className="banner-warn mb-6">
-          Marked finished for the day at {clock(job.lastPartFinishedAt)} on {shortDate(job.lastPartFinishedAt)} — today&apos;s tally is counted and visible to everyone on the &ldquo;In progress&rdquo; list, but the job&apos;s still open, ready to carry on.
-        </p>
-      )}
+      <PartFinishedBanner job={job} />
 
       <StatRow>
         <Stat value={job.rows.length} label="Rows logged" />
@@ -80,38 +64,7 @@ export async function CurrentJobView({ job, viewerId }: { job: any; viewerId: st
         <form action={addProductionJobRow} className="flex flex-wrap items-end gap-3">
           <input type="hidden" name="jobId" value={job.id} />
           {isFenderJob ? (
-            <>
-              <div>
-                <label className="label text-xs" htmlFor="diaMm">Diameter</label>
-                <select id="diaMm" name="diaMm" className="input w-24">
-                  <option value="">—</option>
-                  {BAR_SIZES.map((s) => <option key={s} value={s}>{s} mm</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="label text-xs" htmlFor="barMark">Bar mark</label>
-                <input id="barMark" name="barMark" className="input w-24" placeholder="B01" />
-              </div>
-              {asksForCast && (
-                <>
-                  <div className="w-40">
-                    <CastNumberField defaultValue={lastCastNumber} />
-                  </div>
-                  <div>
-                    <label className="label text-xs" htmlFor="mill">Mill</label>
-                    <input id="mill" name="mill" className="input w-32" />
-                  </div>
-                </>
-              )}
-              <div>
-                <label className="label text-xs" htmlFor="tallyWeightKg">Tally weight (kg)</label>
-                <input id="tallyWeightKg" name="tallyWeightKg" type="number" step="0.1" min="0" className="input w-28" />
-              </div>
-              <div className="flex-1 min-w-[160px]">
-                <label className="label text-xs" htmlFor="comments">Comments</label>
-                <input id="comments" name="comments" className="input" />
-              </div>
-            </>
+            <FenderRowFields asksForCast={asksForCast} lastCastNumber={lastCastNumber} />
           ) : (
             <>
               <div>
@@ -147,21 +100,7 @@ export async function CurrentJobView({ job, viewerId }: { job: any; viewerId: st
       </div>
 
       {job.rows.length === 0 ? <Empty title="No rows logged yet." /> : isFenderJob ? (
-        <Table head={<>
-          <th className="th">Dia</th><th className="th">Bar mark</th>
-          {showCastColumns && <><th className="th">Cast number</th><th className="th">Mill</th></>}
-          <th className="th">Weight</th><th className="th">Comments</th>
-        </>}>
-          {job.rows.map((r: any) => (
-            <tr key={r.id} className="row">
-              <td className="td">{r.diaMm ? `${Number(r.diaMm)} mm` : '—'}</td>
-              <td className="td">{r.barMark || '—'}</td>
-              {showCastColumns && <><td className="td">{r.castNumber || '—'}</td><td className="td">{r.mill || '—'}</td></>}
-              <td className="td">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
-              <td className="td text-ink-muted">{r.comments || '—'}</td>
-            </tr>
-          ))}
-        </Table>
+        <FenderRowsTable rows={job.rows} showCastColumns={showCastColumns} />
       ) : (
         <Table head={<>
           <th className="th">Machine used</th><th className="th">Carbon / Soft</th>
@@ -178,5 +117,94 @@ export async function CurrentJobView({ job, viewerId }: { job: any; viewerId: st
         </Table>
       )}
     </>
+  );
+}
+
+/** Print, finish for today and finish — the same on every kind of job page. */
+export function JobActions({ job }: { job: any }) {
+  return (
+    <>
+      <a href={`/production/jobs/${job.id}/print`} className="btn-secondary btn-sm">Print</a>
+      <form action={partFinishProductionJob}>
+        <input type="hidden" name="jobId" value={job.id} />
+        <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…" title="Not done yet — just counts today's tally and keeps the job open for next time">Finish for today</SubmitButton>
+      </form>
+      <form action={finishProductionJob}>
+        <input type="hidden" name="jobId" value={job.id} />
+        <SubmitButton className="btn-primary btn-sm" pendingLabel="Finishing…">Finish job</SubmitButton>
+      </form>
+    </>
+  );
+}
+
+/** A job finished for the day and not carried on since: true until a row goes on after it. */
+export const savedForTheDay = (job: { lastPartFinishedAt: Date | null; rows: { at: Date }[] }) =>
+  !!job.lastPartFinishedAt && !job.rows.some((r) => new Date(r.at) > new Date(job.lastPartFinishedAt!));
+
+export function PartFinishedBanner({ job }: { job: any }) {
+  // Fender's goes once the sheet's carried on; BCS keeps its banner as it always has.
+  if (job.company === 'FENDER' ? !savedForTheDay(job) : !job.lastPartFinishedAt) return null;
+  return (
+    <p className="banner-warn mb-6">
+      Marked finished for the day at {clock(job.lastPartFinishedAt)} on {shortDate(job.lastPartFinishedAt)} — today&apos;s tally is counted and visible to everyone on the &ldquo;In progress&rdquo; list, but the job&apos;s still open, ready to carry on.
+    </p>
+  );
+}
+
+/** The Fender fields of the "add a row" form: a tally row typed in by hand. */
+export function FenderRowFields({ asksForCast, lastCastNumber }: { asksForCast: boolean; lastCastNumber: string }) {
+  return (
+    <>
+      <div>
+        <label className="label text-xs" htmlFor="diaMm">Diameter</label>
+        <select id="diaMm" name="diaMm" className="input w-24">
+          <option value="">—</option>
+          {BAR_SIZES.map((s) => <option key={s} value={s}>{s} mm</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="label text-xs" htmlFor="barMark">Bar mark</label>
+        <input id="barMark" name="barMark" className="input w-24" placeholder="B01" />
+      </div>
+      {asksForCast && (
+        <>
+          <div className="w-40">
+            <CastNumberField defaultValue={lastCastNumber} />
+          </div>
+          <div>
+            <label className="label text-xs" htmlFor="mill">Mill</label>
+            <input id="mill" name="mill" className="input w-32" />
+          </div>
+        </>
+      )}
+      <div>
+        <label className="label text-xs" htmlFor="tallyWeightKg">Tally weight (kg)</label>
+        <input id="tallyWeightKg" name="tallyWeightKg" type="number" step="0.1" min="0" className="input w-28" />
+      </div>
+      <div className="flex-1 min-w-[160px]">
+        <label className="label text-xs" htmlFor="comments">Comments</label>
+        <input id="comments" name="comments" className="input" />
+      </div>
+    </>
+  );
+}
+
+export function FenderRowsTable({ rows, showCastColumns }: { rows: any[]; showCastColumns: boolean }) {
+  return (
+    <Table head={<>
+      <th className="th">Dia</th><th className="th">Bar mark</th>
+      {showCastColumns && <><th className="th">Cast number</th><th className="th">Mill</th></>}
+      <th className="th">Weight</th><th className="th">Comments</th>
+    </>}>
+      {rows.map((r: any) => (
+        <tr key={r.id} className="row">
+          <td className="td">{r.diaMm ? `${Number(r.diaMm)} mm` : '—'}</td>
+          <td className="td">{r.barMark || '—'}</td>
+          {showCastColumns && <><td className="td">{r.castNumber || '—'}</td><td className="td">{r.mill || '—'}</td></>}
+          <td className="td">{Number(r.tallyWeightKg).toLocaleString('en-GB')} kg</td>
+          <td className="td text-ink-muted">{r.comments || '—'}</td>
+        </tr>
+      ))}
+    </Table>
   );
 }

@@ -6,12 +6,14 @@ import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { NAV, Shell } from '@/components/Shell';
 import { CurrentJobView } from '../../CurrentJobView';
+import { OrderJobView } from '../../OrderJobView';
 
 /**
  * One job's own page — add rows, finish for today, finish the job. Reached
  * by clicking a job from /production rather than every open job showing in
  * full there, which on BCS (where a job is shared and everyone's open jobs
- * all show up) could mean a lot of jobs' worth of rows on one page.
+ * all show up) could mean a lot of jobs' worth of rows on one page. A Fender
+ * job on an order on here ticks its bar marks off the schedule instead.
  */
 export default async function ProductionJobPage({ params }: { params: { id: string } }) {
   const user = await requirePermission('production.view');
@@ -29,7 +31,9 @@ export default async function ProductionJobPage({ params }: { params: { id: stri
       <Link href="/production" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:underline mb-4">
         <ArrowLeft size={16} /> Back to production
       </Link>
-      <CurrentJobView job={job} viewerId={user.id} />
+      {job.company === 'FENDER' && job.orderId
+        ? <OrderJobView job={job} viewerId={user.id} />
+        : <CurrentJobView job={job} viewerId={user.id} />}
     </Shell>
   );
 }
