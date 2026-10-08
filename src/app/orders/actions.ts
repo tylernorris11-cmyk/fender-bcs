@@ -2,10 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import type { OrderStage } from '@prisma/client';
+import { Prisma, type OrderStage } from '@prisma/client';
 import { db } from '@/lib/db';
 import { assertPermission, logActivity } from '@/lib/auth';
-import { assertCompanyAccess } from '@/lib/company';
+import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
+import { suggestAccountCode } from '@/lib/accountCodes';
+import { TICKET_COLOURS } from '@/lib/ticketColours';
 import { applyChecklistTemplate, creditCheck, nextOrderNumber, NEXT_STAGE, pickOldestFirst } from '@/lib/orders';
 import { barWeightKg, shapeName } from '@/lib/bs8666';
 import { feetInches } from '@/lib/format';
@@ -21,15 +23,41 @@ function rows(formData: FormData, prefix: string): Record<string, string>[] {
   return Object.keys(out).sort((a, b) => Number(a) - Number(b)).map((k) => out[k]);
 }
 
+/** One of the ticket stock colours, or blank. */
+function ticketColourFrom(formData: FormData) {
+  const colour = String(formData.get('ticketColour') ?? '');
+  return TICKET_COLOURS.includes(colour) ? colour : '';
+}
+
+/** The job number typed on the form, or the next automatic one when it's left blank. */
+async function orderNumberFor(formData: FormData) {
+  const typed = String(formData.get('number') ?? '').trim();
+  if (!typed) return nextOrderNumber();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}$/.test(typed)) {
+    throw new Error('A job number can only use letters, numbers, spaces, dots, dashes and slashes, up to 40 characters.');
+  }
+  const taken = await db.order.findFirst({ where: { number: { equals: typed, mode: 'insensitive' } }, select: { number: true } });
+  if (taken) throw new Error(`Job number ${taken.number} is already used by another order.`);
+  return typed;
+}
+
 export async function createOrder(formData: FormData) {
   const user = await assertPermission('orders.create');
 
+  // Either an account picked from the list, or a name typed in for someone
+  // who isn't on it yet: that opens a basic account for them (on no credit
+  // limit, as any new account starts), unless an account of that name exists.
+  const newCustomerName = String(formData.get('newCustomerName') ?? '').trim();
   const customerId = String(formData.get('customerId') ?? '');
-  if (!customerId) throw new Error('Choose a customer before saving.');
-  const customer = await db.customer.findUniqueOrThrow({ where: { id: customerId } });
+  if (!newCustomerName && !customerId) throw new Error('Choose a customer, or type the name of one who is not on the list.');
+  const company = getActiveCompany(user);
+  const existing = newCustomerName
+    ? await db.customer.findFirst({ where: { company, name: { equals: newCustomerName, mode: 'insensitive' } } })
+    : await db.customer.findUniqueOrThrow({ where: { id: customerId } });
+  if (existing) assertCompanyAccess(user, existing.company);
 
   const deliveryDateRaw = String(formData.get('deliveryDate') ?? '');
-  const number = await nextOrderNumber();
+  const number = await orderNumberFor(formData);
 
   const productRows = rows(formData, 'product').filter((r) => r.productId && Number(r.qty) > 0);
   const barRows = rows(formData, 'bar').filter((r) => r.mark && Number(r.bars) > 0);
@@ -56,69 +84,88 @@ export async function createOrder(formData: FormData) {
     };
   });
 
-  const order = await db.order.create({
-    data: {
-      number,
-      company: customer.company,
-      customerId,
-      stage: 'DRAFT',
-      deliveryDate: deliveryDateRaw ? new Date(deliveryDateRaw) : null,
-      depot: String(formData.get('depot') ?? 'Scunthorpe'),
-      town: String(formData.get('town') ?? ''),
-      address: String(formData.get('address') ?? ''),
-      poNumber: String(formData.get('poNumber') ?? ''),
-      yardNotes: String(formData.get('yardNotes') ?? ''),
-      raisedById: user.id,
-      lines: {
-        create: [
-          ...productRows.map((r) => {
-            const product = products.find((p) => p.id === r.productId);
-            const qty = Number(r.qty);
+  const { order, customer } = await db.$transaction(async (tx) => {
+    const customer = existing ?? await tx.customer.create({
+      data: {
+        company,
+        name: newCustomerName,
+        code: await suggestAccountCode(newCustomerName, async (code) => !!(await tx.customer.findFirst({ where: { company, code }, select: { id: true } }))),
+        address: String(formData.get('address') ?? ''),
+        town: String(formData.get('town') ?? ''),
+        notes: `Opened with order ${number}.`,
+      },
+    });
+    const order = await tx.order.create({
+      data: {
+        number,
+        company: customer.company,
+        customerId: customer.id,
+        stage: 'DRAFT',
+        deliveryDate: deliveryDateRaw ? new Date(deliveryDateRaw) : null,
+        depot: String(formData.get('depot') ?? 'Scunthorpe'),
+        town: String(formData.get('town') ?? ''),
+        address: String(formData.get('address') ?? ''),
+        poNumber: String(formData.get('poNumber') ?? ''),
+        ticketColour: ticketColourFrom(formData),
+        yardNotes: String(formData.get('yardNotes') ?? ''),
+        raisedById: user.id,
+        lines: {
+          create: [
+            ...productRows.map((r) => {
+              const product = products.find((p) => p.id === r.productId);
+              const qty = Number(r.qty);
+              const unitPrice = Number(r.unitPrice || 0);
+              return {
+                productId: r.productId,
+                description: product?.name ?? 'Item',
+                qty,
+                unit: product?.unit ?? 'each',
+                unitPrice,
+                lineTotal: +(qty * unitPrice).toFixed(2),
+                weightKg: +(qty * Number(product?.kgPerUnit ?? 0)).toFixed(3),
+              };
+            }),
+            ...fenceLines,
+          ].map((line, i) => ({ ...line, sortOrder: i })),
+        },
+        barMarks: {
+          create: barRows.map((r, i) => {
+            const dia = Number(r.diaMm);
+            const lengthMm = Number(r.lengthMm);
+            const bars = Number(r.bars);
+            const weightKg = barWeightKg(dia, lengthMm, bars);
             const unitPrice = Number(r.unitPrice || 0);
             return {
-              productId: r.productId,
-              description: product?.name ?? 'Item',
-              qty,
-              unit: product?.unit ?? 'each',
+              mark: r.mark,
+              diaMm: dia,
+              grade: (r.grade || 'H').toUpperCase(),
+              shapeCode: r.shapeCode || '99',
+              shapeName: shapeName(r.shapeCode || '99'),
+              lengthMm,
+              bars,
+              a: r.a ? Number(r.a) : null,
+              b: r.b ? Number(r.b) : null,
+              c: r.c ? Number(r.c) : null,
+              d: r.d ? Number(r.d) : null,
+              ef: r.ef ? Number(r.ef) : null,
+              radiusMm: r.radiusMm ? Number(r.radiusMm) : null,
+              weightKg,
               unitPrice,
-              lineTotal: +(qty * unitPrice).toFixed(2),
-              weightKg: +(qty * Number(product?.kgPerUnit ?? 0)).toFixed(3),
+              lineTotal: +(bars * unitPrice).toFixed(2),
+              sortOrder: i,
             };
           }),
-          ...fenceLines,
-        ].map((line, i) => ({ ...line, sortOrder: i })),
+        },
       },
-      barMarks: {
-        create: barRows.map((r, i) => {
-          const dia = Number(r.diaMm);
-          const lengthMm = Number(r.lengthMm);
-          const bars = Number(r.bars);
-          const weightKg = barWeightKg(dia, lengthMm, bars);
-          const unitPrice = Number(r.unitPrice || 0);
-          return {
-            mark: r.mark,
-            diaMm: dia,
-            grade: (r.grade || 'H').toUpperCase(),
-            shapeCode: r.shapeCode || '99',
-            shapeName: shapeName(r.shapeCode || '99'),
-            lengthMm,
-            bars,
-            a: r.a ? Number(r.a) : null,
-            b: r.b ? Number(r.b) : null,
-            c: r.c ? Number(r.c) : null,
-            d: r.d ? Number(r.d) : null,
-            ef: r.ef ? Number(r.ef) : null,
-            radiusMm: r.radiusMm ? Number(r.radiusMm) : null,
-            weightKg,
-            unitPrice,
-            lineTotal: +(bars * unitPrice).toFixed(2),
-            sortOrder: i,
-          };
-        }),
-      },
-    },
+    });
+    return { order, customer };
+  }).catch((err) => {
+    // Two people saving the same job number at once: the database's own check catches the second.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') throw new Error(`Job number ${number} has just been used by another order. Choose another.`);
+    throw err;
   });
 
+  if (!existing) await logActivity('Customer', customer.id, 'Account opened', `${customer.code} ${customer.name}, with order ${number}`, user.id);
   await applyChecklistTemplate(order.id, customer.company);
   await logActivity('Order', order.id, 'Created', `Raised as ${number}`, user.id);
 
@@ -255,6 +302,18 @@ export async function archiveOrder(formData: FormData) {
   await db.order.update({ where: { id: orderId }, data: { archived: !order.archived } });
   await logActivity('Order', orderId, order.archived ? 'Restored' : 'Archived', '', user.id);
   revalidatePath('/orders');
+  revalidatePath(`/orders/${orderId}`);
+}
+
+export async function setTicketColour(formData: FormData) {
+  const user = await assertPermission('orders.edit');
+  const orderId = String(formData.get('orderId'));
+  const order = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: { company: true, ticketColour: true } });
+  assertCompanyAccess(user, order.company);
+  const ticketColour = ticketColourFrom(formData);
+  if (ticketColour === order.ticketColour) return;
+  await db.order.update({ where: { id: orderId }, data: { ticketColour } });
+  await logActivity('Order', orderId, 'Ticket colour', `${order.ticketColour || 'none'} → ${ticketColour || 'none'}`, user.id);
   revalidatePath(`/orders/${orderId}`);
 }
 

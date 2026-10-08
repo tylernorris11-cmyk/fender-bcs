@@ -4,11 +4,15 @@ import { db } from '@/lib/db';
 import { orderTotals } from '@/lib/orders';
 import { money, qty, shortDate, tonnes } from '@/lib/format';
 import { COMPANY_LABEL } from '@/lib/company';
+import { deliveryNoteData } from '@/lib/deliveryNote';
+import { PrintActions } from '@/components/PrintActions';
+import { FenderDeliveryNote } from './FenderDeliveryNote';
 
 /**
- * The paper that goes on the lorry. Every rebar line prints its cast/heat number
- * and mill certificate reference, because CARES requires reinforcement delivered
- * to site to be traceable to the cast, the supplier and the manufacturer.
+ * The paper that goes on the lorry. Fender's is the rebar delivery note laid
+ * out like the Exchequer one (FenderDeliveryNote); BCS keeps this simpler
+ * sheet. Stock items print their cast/heat numbers on both, because CARES
+ * requires reinforcement delivered to site to be traceable to the cast.
  */
 export default async function DeliverySheet({ params }: { params: { id: string } }) {
   const user = await requirePermission('orders.view');
@@ -23,6 +27,17 @@ export default async function DeliverySheet({ params }: { params: { id: string }
   if (!order) notFound();
   if (!user.companies.includes(order.company)) notFound();
   const isBsSupplies = order.company === 'BS_SUPPLIES';
+
+  if (!isBsSupplies) {
+    return (
+      <div className="bg-canvas min-h-screen pb-6 print:bg-white print:pb-0">
+        <PrintActions maxWidth={794} />
+        <div className="h-4 print:hidden" />
+        <FenderDeliveryNote data={deliveryNoteData(order)} />
+      </div>
+    );
+  }
+
   const { net, vat, gross, weightKg } = orderTotals(order);
 
   return (

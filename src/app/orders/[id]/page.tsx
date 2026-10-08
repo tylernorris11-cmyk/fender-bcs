@@ -10,8 +10,10 @@ import { clock, money, qty, shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, PageHeader, Pill, STAGE_FLOW, STAGE_LABEL, StagePill, Table } from '@/components/ui';
 import {
-  addChecklistItem, advanceStage, archiveOrder, markPaid, removeChecklistItem, toggleChecklistItem,
+  addChecklistItem, advanceStage, archiveOrder, markPaid, removeChecklistItem, setTicketColour, toggleChecklistItem,
 } from '../actions';
+import { TICKET_COLOURS } from '@/lib/ticketColours';
+import { SubmitButton } from '@/components/SubmitButton';
 
 export default async function OrderPage({ params }: { params: { id: string } }) {
   const user = await requirePermission('orders.view');
@@ -59,7 +61,7 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
                 <button className="btn-secondary"><Archive size={16} /> {order.archived ? 'Restore' : 'Archive'}</button>
               </form>
             )}
-            <a href={`/orders/${order.id}/delivery-sheet`} className="btn-secondary"><Printer size={16} /> Delivery sheet</a>
+            <a href={`/orders/${order.id}/delivery-sheet`} className="btn-secondary"><Printer size={16} /> {order.company === 'FENDER' ? 'Delivery note' : 'Delivery sheet'}</a>
             {hasSchedule && (
               <>
                 <a href={`/orders/${order.id}/bending-ticket`} className="btn-secondary"><Printer size={16} /> Bending ticket</a>
@@ -283,6 +285,23 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Town</dt><dd className="font-semibold">{order.town || '—'}</dd></div>
             <div><dt className="text-ink-muted">Address</dt><dd className="font-semibold mt-0.5">{order.address || '—'}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Customer PO</dt><dd className="font-semibold">{order.poNumber || '—'}</dd></div>
+            {order.company === 'FENDER' && (
+              <div className="flex justify-between items-center gap-4">
+                <dt className="text-ink-muted">Ticket colour</dt>
+                <dd>
+                  {can(user, 'orders.edit') ? (
+                    <form key={order.ticketColour} action={setTicketColour} className="flex items-center gap-2">
+                      <input type="hidden" name="orderId" value={order.id} />
+                      <select name="ticketColour" defaultValue={order.ticketColour} className="input py-1 w-auto" aria-label="Ticket colour">
+                        <option value="">—</option>
+                        {TICKET_COLOURS.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">Save</SubmitButton>
+                    </form>
+                  ) : <span className="font-semibold">{order.ticketColour || '—'}</span>}
+                </dd>
+              </div>
+            )}
             {order.yardNotes && <div><dt className="text-ink-muted">Notes for the yard</dt><dd className="mt-0.5">{order.yardNotes}</dd></div>}
           </dl>
         </section>

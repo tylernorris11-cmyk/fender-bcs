@@ -496,6 +496,7 @@ model Order {
   town           String        @default("")
   address        String        @default("")
   poNumber       String        @default("")
+  ticketColour   String        @default("") // colour of the tally ticket stock used for this job — printed on the delivery note
   yardNotes      String        @default("")
   depot          String        @default("Scunthorpe") // which yard is raising and dispatching this order
   raisedById     String?

@@ -5,6 +5,7 @@ import { Info, Plus, Trash2 } from 'lucide-react';
 import { SHAPE_CODES, BAR_SIZES, MASS_PER_M } from '@/lib/bs8666';
 import { createOrder } from '../actions';
 import { ScheduleImport } from './ScheduleImport';
+import { TICKET_COLOURS } from '@/lib/ticketColours';
 
 type Customer = { id: string; name: string; address: string; town: string; creditLimit: string; used: number };
 type Product = { id: string; name: string; code: string; category: string; unit: string; kgPerUnit: string; price: number };
@@ -17,8 +18,8 @@ const VAT = 0.2;
 const gbp = (n: number) => n.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 });
 
 export function NewOrderForm({
-  customers, products, towns, locations, cutBentPrice, isFender,
-}: { customers: Customer[]; products: Product[]; towns: string[]; locations: string[]; cutBentPrice: number; isFender: boolean }) {
+  customers, products, towns, locations, cutBentPrice, isFender, nextNumber,
+}: { customers: Customer[]; products: Product[]; towns: string[]; locations: string[]; cutBentPrice: number; isFender: boolean; nextNumber: string }) {
   // Per-instance, not module-level: a shared `let seq` counter drifts between
   // the server (a long-lived process that keeps counting across requests)
   // and a freshly-loaded client bundle (starting back at 0), producing
@@ -32,6 +33,8 @@ export function NewOrderForm({
   const newFence = (): Fence => ({ key: nextKey(), lengthFt: '', lengthIn: '', thicknessMm: '', qty: '', unitPrice: '' });
 
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '');
+  // Typing a customer who isn't on the list opens an account for them when the order's saved.
+  const [newCustomer, setNewCustomer] = useState(customers.length === 0);
   // Lazy initializer — passing [newLine()] directly would call newLine() (and
   // so nextKey()) on every render, not just the first, since JS evaluates
   // the argument before useState ever sees it.
@@ -41,7 +44,7 @@ export function NewOrderForm({
   const [address, setAddress] = useState(customers[0]?.address ?? '');
   const [town, setTown] = useState(customers[0]?.town ?? '');
 
-  const customer = customers.find((c) => c.id === customerId);
+  const customer = newCustomer ? undefined : customers.find((c) => c.id === customerId);
 
   const totals = useMemo(() => {
     const productNet = lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.unitPrice || 0), 0);
@@ -92,12 +95,37 @@ export function NewOrderForm({
     <form action={createOrder} className="space-y-6">
       {/* -------------------------------------------------------- customer */}
       <section className="card card-pad grid gap-6 lg:grid-cols-2">
-        <div>
-          <label className="label" htmlFor="customerId">Customer</label>
-          <select id="customerId" name="customerId" required value={customerId}
-                  onChange={(e) => onCustomerChange(e.target.value)} className="input">
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+        <div className="space-y-4">
+          <div>
+            <label className="label" htmlFor="number">Job number</label>
+            <input id="number" name="number" maxLength={40} className="input" placeholder={nextNumber} />
+            <p className="hint">Type your own, or leave it blank for the next number ({nextNumber}).</p>
+          </div>
+          {newCustomer ? (
+            <div>
+              <label className="label" htmlFor="newCustomerName">Customer name</label>
+              <input id="newCustomerName" name="newCustomerName" required className="input" placeholder="Who the order is for" />
+              <p className="hint">
+                A customer account is opened for them when the order&apos;s saved.
+                {customers.length > 0 && (
+                  <> <button type="button" className="text-brand-700 font-medium hover:underline"
+                    onClick={() => { setNewCustomer(false); onCustomerChange(customerId || customers[0].id); }}>Pick from the list instead</button></>
+                )}
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label className="label" htmlFor="customerId">Customer</label>
+              <select id="customerId" name="customerId" required value={customerId}
+                      onChange={(e) => onCustomerChange(e.target.value)} className="input">
+                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <p className="hint">
+                <button type="button" className="text-brand-700 font-medium hover:underline"
+                  onClick={() => { setNewCustomer(true); setAddress(''); setTown(''); }}>Customer not on the list?</button>
+              </p>
+            </div>
+          )}
         </div>
 
         {customer && (
@@ -351,6 +379,16 @@ export function NewOrderForm({
               <label className="label" htmlFor="poNumber">Customer PO number</label>
               <input id="poNumber" name="poNumber" className="input" placeholder="e.g. PO-12345" />
             </div>
+            {isFender && (
+              <div>
+                <label className="label" htmlFor="ticketColour">Ticket colour</label>
+                <select id="ticketColour" name="ticketColour" defaultValue="" className="input">
+                  <option value="">—</option>
+                  {TICKET_COLOURS.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <p className="hint">The tally ticket stock this job&apos;s on. Printed on the delivery note.</p>
+              </div>
+            )}
             <div>
               <label className="label" htmlFor="yardNotes">Notes for the yard</label>
               <input id="yardNotes" name="yardNotes" className="input" placeholder="Anything the loaders should know" />

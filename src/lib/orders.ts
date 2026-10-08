@@ -23,12 +23,11 @@ export async function nextOrderNumber(): Promise<string> {
   // UK financial year runs to 31 March, so April onwards belongs to the next one.
   const fy = (now.getMonth() >= 3 ? now.getFullYear() + 1 : now.getFullYear()) % 100;
   const prefix = `FS-${String(fy).padStart(2, '0')}-`;
-  const last = await db.order.findFirst({
-    where: { number: { startsWith: prefix } },
-    orderBy: { number: 'desc' },
-    select: { number: true },
-  });
-  const seq = last ? Number(last.number.slice(prefix.length)) + 1 : 5301;
+  // Only the automatic ones count: a job number typed in by hand that happens
+  // to start "FS-27-" but carries on with letters mustn't throw the sequence.
+  const taken = await db.order.findMany({ where: { number: { startsWith: prefix } }, select: { number: true } });
+  const seqs = taken.map((o) => o.number.slice(prefix.length)).filter((s) => /^\d+$/.test(s)).map(Number);
+  const seq = seqs.length ? Math.max(...seqs) + 1 : 5301;
   return `${prefix}${String(seq).padStart(5, '0')}`;
 }
 

@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { creditBalances, getAlerts } from '@/lib/alerts';
+import { nextOrderNumber } from '@/lib/orders';
 import { getActiveCompany } from '@/lib/company';
 import { NAV, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/ui';
@@ -18,7 +19,7 @@ export default async function NewOrderPage() {
   const alerts = await getAlerts(user);
   const company = getActiveCompany(user);
 
-  const [customers, products, towns, locations, balances] = await Promise.all([
+  const [customers, products, towns, locations, balances, nextNumber] = await Promise.all([
     db.customer.findMany({ where: { company, status: { not: 'Closed' } }, orderBy: { name: 'asc' } }),
     db.product.findMany({
       where: { company, active: true },
@@ -28,6 +29,7 @@ export default async function NewOrderPage() {
     db.town.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     db.location.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     creditBalances(company),
+    nextOrderNumber(),
   ]);
 
   const cutBent = products.find((p) => p.code === 'CB-SERVICE');
@@ -53,6 +55,7 @@ export default async function NewOrderPage() {
         locations={locations.map((l) => l.name)}
         cutBentPrice={0}
         isFender={company === 'FENDER'}
+        nextNumber={nextNumber}
       />
     </Shell>
   );
