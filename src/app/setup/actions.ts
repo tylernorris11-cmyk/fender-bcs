@@ -8,10 +8,16 @@ import { assertPermission, hashPassword, logActivity, notifyMasterAdmins, passwo
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { initialsOf, shortDate } from '@/lib/format';
 import { sendEmail } from '@/lib/email';
-import { GRANTABLE_EXTRA_PERMISSIONS, ROLE_LABELS, TOGGLEABLE_MODULES } from '@/lib/rbac';
+import { GRANTABLE_EXTRA_PERMISSIONS, PERMISSION_GROUPS, PERMISSIONS, ROLE_LABELS, TOGGLEABLE_MODULES, type Permission } from '@/lib/rbac';
 
-/** MASTER_ADMIN and ADMIN both carry the full permission set (ALL) — company scope is the only difference. */
-const isHighPrivilege = (role: Role) => role === 'MASTER_ADMIN' || role === 'ADMIN';
+/**
+ * Roles whose granting is emailed to every Master Administrator: the two
+ * that carry the full permission set (company scope is the only difference
+ * between them), and the accounts.
+ */
+const isHighPrivilege = (role: Role) => role === 'MASTER_ADMIN' || role === 'ADMIN' || role === 'ACCOUNTS_ADMIN';
+/** "an Administrator", "an Accounts administrator", "a Manager". */
+const withArticle = (label: string) => `${/^[AEIOU]/i.test(label) ? 'an' : 'a'} ${label}`;
 
 // ------------------------------------------------------------- pricing
 
@@ -127,9 +133,8 @@ export async function updateUserRole(formData: FormData) {
   await db.user.update({ where: { id: userId }, data: { role, companies } });
   await logActivity('User', userId, 'Role changed', role, admin.id);
   if (isHighPrivilege(role) && target.role !== role) {
-    const article = role === 'ADMIN' ? 'an' : 'a';
     await notifyMasterAdmins({
-      subject: `${target.name} was made ${article} ${ROLE_LABELS[role]}`,
+      subject: `${target.name} was made ${withArticle(ROLE_LABELS[role])}`,
       text: `${admin.name} changed ${target.name}'s role from ${ROLE_LABELS[target.role]} to ${ROLE_LABELS[role]}. If that wasn't expected, check Set Up → Users.`,
       path: '/setup/users',
     });
@@ -560,4 +565,71 @@ export async function rejectAccessRequest(formData: FormData) {
   });
 
   revalidatePath('/setup/access-requests');
+}
+
+// ------------------------------------------------------------------ roles
+
+const EDITABLE_PERMISSIONS = PERMISSION_GROUPS.flatMap((g) => g.perms.map((p) => p.key));
+
+/**
+ * Save what a role can do, from Set Up → Roles. Master Administrator only,
+ * and never the Master Administrator role itself. Ticking it back to exactly
+ * its defaults clears the change, so later changes to the defaults reach it.
+ * Applies on everyone's next page; logged, and emailed to the Master
+ * Administrators like any other change to who can do what.
+ */
+export async function saveRolePermissions(formData: FormData) {
+  const admin = await requireUser();
+  if (admin.role !== 'MASTER_ADMIN') throw new Error('Only a Master Administrator can change what a role can do.');
+  const role = String(formData.get('role')) as Role;
+  if (!(role in ROLE_LABELS) || role === 'MASTER_ADMIN') throw new Error("That role can't be changed.");
+
+  const ticked = new Set(formData.getAll('perm').map(String));
+  const permissions = EDITABLE_PERMISSIONS.filter((p) => ticked.has(p));
+  const saved = await db.rolePermissionSet.findUnique({ where: { role } });
+  const before = new Set<Permission>(saved ? (saved.permissions as Permission[]) : PERMISSIONS[role]);
+  const added = permissions.filter((p) => !before.has(p));
+  const removed = [...before].filter((p) => EDITABLE_PERMISSIONS.includes(p) && !permissions.includes(p));
+  if (added.length === 0 && removed.length === 0) return;
+
+  const defaults = new Set(PERMISSIONS[role]);
+  const isDefault = permissions.length === defaults.size && permissions.every((p) => defaults.has(p));
+  if (isDefault) await db.rolePermissionSet.deleteMany({ where: { role } });
+  else {
+    await db.rolePermissionSet.upsert({
+      where: { role }, create: { role, permissions, updatedBy: admin.name }, update: { permissions, updatedBy: admin.name },
+    });
+  }
+
+  const labelOf = (p: string) => PERMISSION_GROUPS.flatMap((g) => g.perms).find((x) => x.key === p)?.label ?? p;
+  const summary = [
+    ...(added.length ? [`now can: ${added.map(labelOf).join('; ')}`] : []),
+    ...(removed.length ? [`no longer: ${removed.map(labelOf).join('; ')}`] : []),
+  ].join('. ');
+  await logActivity('Role', role, 'Permissions changed', `${ROLE_LABELS[role]} — ${summary}`, admin.id);
+  await notifyMasterAdmins({
+    subject: `${ROLE_LABELS[role]} permissions changed`,
+    text: `${admin.name} changed what ${withArticle(ROLE_LABELS[role])} can do. ${summary}. If that wasn't expected, check Set Up → Roles.`,
+    path: `/setup/roles/${role}`,
+  });
+  revalidatePath('/setup/roles');
+  revalidatePath(`/setup/roles/${role}`);
+}
+
+/** Put a role back to its defaults. */
+export async function resetRolePermissions(formData: FormData) {
+  const admin = await requireUser();
+  if (admin.role !== 'MASTER_ADMIN') throw new Error('Only a Master Administrator can change what a role can do.');
+  const role = String(formData.get('role')) as Role;
+  if (!(role in ROLE_LABELS) || role === 'MASTER_ADMIN') throw new Error("That role can't be changed.");
+  const { count } = await db.rolePermissionSet.deleteMany({ where: { role } });
+  if (!count) return;
+  await logActivity('Role', role, 'Permissions reset', `${ROLE_LABELS[role]} back to its defaults`, admin.id);
+  await notifyMasterAdmins({
+    subject: `${ROLE_LABELS[role]} permissions reset`,
+    text: `${admin.name} put ${withArticle(ROLE_LABELS[role])} back to its default permissions. If that wasn't expected, check Set Up → Roles.`,
+    path: `/setup/roles/${role}`,
+  });
+  revalidatePath('/setup/roles');
+  revalidatePath(`/setup/roles/${role}`);
 }

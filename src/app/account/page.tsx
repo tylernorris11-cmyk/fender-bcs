@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
-import { PERMISSIONS, ROLE_BLURBS, ROLE_LABELS } from '@/lib/rbac';
+import { can, PERMISSION_GROUPS, ROLE_BLURBS, ROLE_LABELS } from '@/lib/rbac';
 import { clock, shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, PageHeader, Pill } from '@/components/ui';
@@ -37,7 +37,7 @@ export default async function AccountPage() {
           </dl>
           <p className="text-sm text-ink-muted mt-4">{ROLE_BLURBS[user.role]}</p>
           <div className="flex flex-wrap gap-1.5 mt-4">
-            {PERMISSIONS[user.role].map((p) => <Pill key={p}>{p}</Pill>)}
+            {PERMISSION_GROUPS.flatMap((g) => g.perms).filter((p) => can(user, p.key)).map((p) => <Pill key={p.key}>{p.label}</Pill>)}
           </div>
         </section>
 

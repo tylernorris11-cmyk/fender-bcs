@@ -3,7 +3,8 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import crypto from 'node:crypto';
 import { db } from './db';
-import { can, withCompanyGrants, type Permission, type SessionUser } from './rbac';
+import { can, rolePermissionsFrom, withCompanyGrants, type Permission, type SessionUser } from './rbac';
+import type { Role } from '@prisma/client';
 import { getActiveCompany } from './company';
 import { sendEmail } from './email';
 import { sendTelegramMessage, sendTelegramPhoto } from './telegram';
@@ -138,8 +139,16 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   // A year-long sign-in only counts while the account is still marked as a
   // shared screen — switching that off in People signs it out on its next page.
   if (!user.staysSignedIn && session.expires - Date.now() > MAX_AGE * 1000) return null;
-  const { active: _active, staysSignedIn, ...sessionUser } = user;
+  const { active: _active, staysSignedIn, ...rest } = user;
+  const sessionUser: SessionUser = { ...rest, permissions: await rolePermissions(rest.role) };
   return withCompanyGrants(sessionUser, getActiveCompany(sessionUser), staysSignedIn);
+}
+
+/** A role's permissions as they stand: as changed in Set Up → Roles, or its defaults. Read fresh, so a change applies on everyone's next page. */
+export async function rolePermissions(role: Role): Promise<Permission[]> {
+  if (role === 'MASTER_ADMIN') return rolePermissionsFrom(role);
+  const saved = await db.rolePermissionSet.findUnique({ where: { role } });
+  return rolePermissionsFrom(role, saved?.permissions);
 }
 
 /** Use at the top of every protected page. Sends people to sign in. */

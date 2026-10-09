@@ -4,7 +4,7 @@ import { UserPlus } from 'lucide-react';
 import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
-import { GRANTABLE_EXTRA_PERMISSIONS, PERMISSIONS, ROLE_BLURBS, ROLE_LABELS, TOGGLEABLE_MODULES } from '@/lib/rbac';
+import { GRANTABLE_EXTRA_PERMISSIONS, ROLE_BLURBS, ROLE_LABELS, TOGGLEABLE_MODULES, rolePermissionsFrom } from '@/lib/rbac';
 import { shortDate } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { COMPANY_LABEL } from '@/lib/company';
@@ -52,6 +52,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
   const ROLES = isMaster ? ALL_ROLES : ALL_ROLES.filter((r) => r !== 'MASTER_ADMIN');
   const grantableCompanies = isMaster ? COMPANIES : COMPANIES.filter((c) => user.companies.includes(c));
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc';
+  const savedRoles = await db.rolePermissionSet.findMany();
   const users = await db.user.findMany({
     where: isMaster ? undefined : { companies: { hasSome: user.companies } },
     orderBy:
@@ -107,12 +108,15 @@ export default async function UsersPage({ searchParams }: { searchParams: Search
             <li key={r}>
               <div className="flex items-center gap-2">
                 <strong>{ROLE_LABELS[r]}</strong>
-                <Pill tone={r === 'ADMIN' || r === 'MASTER_ADMIN' ? 'bad' : 'neutral'}>{PERMISSIONS[r].length} permissions</Pill>
+                <Pill tone={r === 'ADMIN' || r === 'MASTER_ADMIN' ? 'bad' : 'neutral'}>
+                  {rolePermissionsFrom(r, savedRoles.find((s) => s.role === r)?.permissions).length} permissions
+                </Pill>
               </div>
               <p className="text-ink-muted mt-0.5">{ROLE_BLURBS[r]}</p>
             </li>
           ))}
         </ul>
+        <Link href="/setup/roles" className="inline-block mt-4 text-sm font-semibold text-brand-700 hover:underline">See or change each role&apos;s permissions →</Link>
       </details>
 
       {searchParams.add && (

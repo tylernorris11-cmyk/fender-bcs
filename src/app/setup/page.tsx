@@ -50,7 +50,8 @@ export default async function SetupHomePage() {
       blurb: 'Accounts, roles, company access and holiday allowances.',
       badge: pendingAccess > 0 ? `${pendingAccess} waiting` : undefined,
       links: [
-        { label: 'Users & roles', href: '/setup/users' },
+        { label: 'Users', href: '/setup/users' },
+        { label: 'Roles', href: '/setup/roles' },
         { label: 'Access requests', href: '/setup/access-requests' },
       ],
     });

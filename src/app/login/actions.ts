@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import type { Company } from '@prisma/client';
 import { db } from '@/lib/db';
-import { setSessionCookie, verifyPassword } from '@/lib/auth';
+import { rolePermissions, setSessionCookie, verifyPassword } from '@/lib/auth';
 import { COMPANY_COOKIE } from '@/lib/company';
 import { can } from '@/lib/rbac';
 import { hasIncompleteRequiredTraining } from '@/lib/training';
@@ -65,7 +65,7 @@ export async function signIn(formData: FormData) {
   // Soft gate, not a hard block elsewhere in the app — same spirit as the
   // mustReset redirect above, just for mandatory H&S training instead of a
   // password. Skipped entirely if this person has the module hidden.
-  if (can(user!, 'hs.view') && await hasIncompleteRequiredTraining(user!)) redirect('/hs/training');
+  if (can({ ...user!, permissions: await rolePermissions(user!.role) }, 'hs.view') && await hasIncompleteRequiredTraining(user!)) redirect('/hs/training');
 
   // Only ever send people to a path inside this app.
   redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/');

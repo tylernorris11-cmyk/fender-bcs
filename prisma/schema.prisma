@@ -30,6 +30,7 @@ enum Company {
 enum Role {
   MASTER_ADMIN // Owns the whole system — every permission, both companies always.
   ADMIN // Same admin permissions as Master, but locked to a single company.
+  ACCOUNTS_ADMIN // The accounts — ledger, journals, VAT, credit control — without user management, stock or production.
   MANAGER // Runs the yard day to day. No cost prices.
   SALES // Orders, customers, pricing view
   OFFICE // General office admin — orders, accounts, assets and checks, no pricing
@@ -37,6 +38,16 @@ enum Role {
   YARD // Goods in, picking, production, delivery progress
   DRIVER // Their own runs and delivery sheets only
   VIEWER // Read only
+}
+
+// A role's permissions as changed in Set Up → Roles. No row means the role
+// still has its defaults from lib/rbac.ts. Master Administrator is never
+// stored here — it always has everything.
+model RolePermissionSet {
+  role        Role     @id
+  permissions String[]
+  updatedAt   DateTime @updatedAt
+  updatedBy   String   @default("") // name of the Master Administrator who last changed it
 }
 
 model User {

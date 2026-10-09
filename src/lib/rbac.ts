@@ -114,6 +114,18 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
   // The CEO and directors. Everything, including purchase cost and margin.
   // Locked to a single company (see setup/actions.ts) rather than both.
   ADMIN: ALL,
+  // Runs the accounts: the ledger, journals, VAT and periods, credit control
+  // and getting orders paid — with the purchase costs that takes. No user
+  // management, stock or production.
+  ACCOUNTS_ADMIN: [
+    'accounts.view', 'accounts.post', 'accounts.setup',
+    'finance.costs', 'finance.debtors',
+    'orders.view', 'orders.markPaid', 'orders.export',
+    'customers.view', 'customers.edit', 'customers.credit',
+    'purchaseOrders.view',
+    'holidays.view',
+    'hs.view',
+  ],
 
   // Runs the yard. Can do the whole job except set pay-grade pricing,
   // manage user accounts, or see what the steel cost to buy.
@@ -216,7 +228,21 @@ export const PERMISSIONS: Record<Role, Permission[]> = {
 export type SessionUser = {
   id: string; name: string; email: string; role: Role; jobTitle: string; initials: string; colour: string;
   companies: Company[]; hiddenModules: string[]; extraPermissions: string[]; onTimesheets: boolean;
+  /** The role's permissions as they stand — its defaults below, or as changed in Set Up → Roles. */
+  permissions?: Permission[];
 };
+
+/**
+ * What a role can do: everything for a Master Administrator, always — there
+ * has to be a way back in — otherwise what Set Up → Roles saved for it, or
+ * its defaults above when it's never been changed. Anything saved that's no
+ * longer a permission is dropped.
+ */
+export function rolePermissionsFrom(role: Role, saved?: string[] | null): Permission[] {
+  if (role === 'MASTER_ADMIN') return ALL;
+  if (!saved) return PERMISSIONS[role] ?? [];
+  return ALL.filter((p) => saved.includes(p));
+}
 
 /**
  * A permission's own module ("orders" out of "orders.view") doubles as the
@@ -225,11 +251,12 @@ export type SessionUser = {
  * module is gone from the page itself, not just the menu. Never applies to
  * a Master Administrator; there would be no way back in for the last one.
  */
-export function can(user: Pick<SessionUser, 'role' | 'hiddenModules' | 'extraPermissions' | 'onTimesheets'> | null | undefined, perm: Permission): boolean {
+export function can(user: Pick<SessionUser, 'role' | 'hiddenModules' | 'extraPermissions' | 'onTimesheets' | 'permissions'> | null | undefined, perm: Permission): boolean {
   if (!user) return false;
   if (user.role !== 'MASTER_ADMIN' && user.hiddenModules?.includes(perm.split('.')[0])) return false;
   if (perm === 'timesheets.view') return !!user.onTimesheets;
-  return (PERMISSIONS[user.role]?.includes(perm) ?? false) || (user.extraPermissions?.includes(perm) ?? false);
+  const granted = user.role === 'MASTER_ADMIN' ? ALL : (user.permissions ?? PERMISSIONS[user.role] ?? []);
+  return granted.includes(perm) || (user.extraPermissions?.includes(perm) ?? false);
 }
 
 /**
@@ -291,6 +318,7 @@ export const TOGGLEABLE_MODULES = MODULES.map((m) => ({ key: m.key, label: m.lab
 export const ROLE_LABELS: Record<Role, string> = {
   MASTER_ADMIN: 'Master Administrator',
   ADMIN: 'Administrator',
+  ACCOUNTS_ADMIN: 'Accounts administrator',
   MANAGER: 'Yard manager',
   SALES: 'Sales',
   OFFICE: 'Office',
@@ -303,6 +331,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const ROLE_BLURBS: Record<Role, string> = {
   MASTER_ADMIN: 'Everything, across both companies. Only role that can grant Master Administrator or multi-company access.',
   ADMIN: 'Everything, including purchase costs, pricing and user accounts — locked to a single company.',
+  ACCOUNTS_ADMIN: 'The accounts — ledger, journals, VAT and periods — plus credit control and marking orders paid. No user management, stock or production.',
   MANAGER: 'Runs the yard. No purchase costs, pricing or user management.',
   SALES: 'Orders and customers. Cannot approve over a credit limit.',
   OFFICE: 'General office admin — orders, accounts, stock, vehicles, checks and fuel. No pricing or cost data.',
@@ -311,3 +340,92 @@ export const ROLE_BLURBS: Record<Role, string> = {
   DRIVER: 'Their runs and delivery sheets.',
   VIEWER: 'Read only. Safe account to hand an auditor.',
 };
+
+/**
+ * Every permission a role can be given in Set Up → Roles, grouped the way
+ * the app is, with what it lets someone do. Timesheets aren't here: who
+ * fills one in is chosen per person, not by role.
+ */
+export const PERMISSION_GROUPS: { label: string; perms: { key: Permission; label: string }[] }[] = [
+  { label: 'Sales orders', perms: [
+    { key: 'orders.view', label: 'See orders' },
+    { key: 'orders.create', label: 'Create orders' },
+    { key: 'orders.edit', label: 'Edit orders' },
+    { key: 'orders.approve', label: 'Approve orders and override credit limits' },
+    { key: 'orders.progress', label: 'Move orders through production and delivery' },
+    { key: 'orders.archive', label: 'Archive orders' },
+    { key: 'orders.markPaid', label: 'Mark orders paid' },
+    { key: 'orders.export', label: 'Export orders' },
+  ] },
+  { label: 'Customers', perms: [
+    { key: 'customers.view', label: 'See customers' },
+    { key: 'customers.edit', label: 'Add and edit customers' },
+    { key: 'customers.credit', label: 'Set credit limits and payment terms' },
+  ] },
+  { label: 'Stock', perms: [
+    { key: 'stock.view', label: 'See stock' },
+    { key: 'stock.goodsIn', label: 'Book goods in' },
+    { key: 'stock.pick', label: 'Pick stock for orders' },
+    { key: 'stock.adjust', label: 'Write off and correct stock' },
+    { key: 'barCounter.view', label: 'Use the Bar Counter' },
+  ] },
+  { label: 'Production', perms: [
+    { key: 'production.view', label: 'See production' },
+    { key: 'production.progress', label: 'Start jobs and log tally sheets' },
+    { key: 'production.qc', label: 'Record dimensional checks' },
+    { key: 'production.assign', label: 'Post other work for people to do' },
+    { key: 'production.editHistory', label: 'Edit finished BCS production jobs' },
+  ] },
+  { label: 'Compliance', perms: [
+    { key: 'compliance.view', label: 'See compliance' },
+    { key: 'compliance.edit', label: 'Certificates, suppliers and returns' },
+    { key: 'compliance.ncr', label: 'Raise and close NCRs' },
+    { key: 'compliance.fcpCosh', label: 'Upload FCP data and COSHH sheets' },
+  ] },
+  { label: 'Purchase orders', perms: [
+    { key: 'purchaseOrders.view', label: 'See purchase orders' },
+    { key: 'purchaseOrders.create', label: 'Raise purchase orders' },
+    { key: 'purchaseOrders.edit', label: 'Edit purchase orders' },
+  ] },
+  { label: 'Deliveries', perms: [
+    { key: 'planning.view', label: 'See deliveries' },
+    { key: 'planning.edit', label: 'Add deliveries and assign drivers' },
+  ] },
+  { label: 'Vehicles and machines', perms: [
+    { key: 'assets.view', label: 'See assets' },
+    { key: 'assets.edit', label: 'Add and edit assets' },
+    { key: 'checks.view', label: 'See morning checks' },
+    { key: 'checks.create', label: 'Do morning checks' },
+    { key: 'fuel.view', label: 'See the fuel log' },
+    { key: 'fuel.create', label: 'Log fuel' },
+    { key: 'fuel.history', label: 'See fuel use month to month' },
+  ] },
+  { label: 'People', perms: [
+    { key: 'holidays.view', label: 'Request and see holidays' },
+    { key: 'timesheets.viewAll', label: "See everyone's timesheets" },
+  ] },
+  { label: 'Health & Safety', perms: [
+    { key: 'hs.view', label: 'See H&S and do training' },
+    { key: 'hs.edit', label: 'Upload and archive H&S documents' },
+    { key: 'hs.manageTraining', label: 'Write training and assign machine training' },
+  ] },
+  { label: 'Accounts', perms: [
+    { key: 'accounts.view', label: 'See the accounts — trial balance, journals, nominal' },
+    { key: 'accounts.post', label: 'Post and reverse journals' },
+    { key: 'accounts.setup', label: 'Chart of accounts, VAT codes, periods and numbering' },
+    { key: 'finance.costs', label: 'See purchase costs and margins' },
+    { key: 'finance.debtors', label: 'See debtors and credit used' },
+  ] },
+  { label: 'Sales outreach', perms: [
+    { key: 'outreach.view', label: 'See sales outreach' },
+    { key: 'outreach.manage', label: 'Approve outreach emails and send them' },
+  ] },
+  { label: 'Set Up', perms: [
+    { key: 'setup.view', label: 'Open Set Up' },
+    { key: 'setup.pricing', label: 'Set prices' },
+    { key: 'setup.users', label: 'Manage people and their access' },
+    { key: 'setup.lists', label: 'Edit lists — drivers, towns, locations, checklist' },
+    { key: 'setup.backups', label: 'Backups and system' },
+    { key: 'setup.bugs', label: 'Read bug reports' },
+  ] },
+];
