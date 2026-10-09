@@ -22,8 +22,8 @@ type Entry = {
   href?: string; town?: string; date: Date;
   delivered?: boolean;
   driver?: string;
-  // Only ever set on a stand-alone delivery (a PlanningEvent, not a real
-  // Order) — an order-derived delivery keeps the plain green board styling.
+  // A stand-alone delivery's colour, or the one picked on an order — an
+  // order without one keeps the plain green board styling.
   colour?: DeliveryColour;
   // A stand-alone delivery's typed weight, or an order's bar marks and lines added up.
   weightKg?: number;
@@ -104,17 +104,19 @@ export default async function PlanningPage({
   for (const o of orders) {
     // Both companies share this board because they share lorries, so everyone
     // sees who each delivery is for, how heavy and where it's going (the
-    // delivery location typed on the order) — shown like a stand-alone
-    // delivery. Opening the order itself stays with people who have access to
-    // that company's orders.
+    // delivery board postcode and location typed on the order), in the colour
+    // picked for it — shown like a stand-alone delivery. Opening the order
+    // itself stays with people who have access to that company's orders.
     const canOpen = user.companies.includes(o.company) && can(user, 'orders.view');
-    const kg = o.barMarks.reduce((n, b) => n + Number(b.weightKg), 0) + o.lines.reduce((n, l) => n + Number(l.weightKg), 0);
+    const kg = o.barMarks.reduce((n, b) => n + Number(b.weightKg), 0) + o.lines.reduce((n, l) => n + Number(l.weightKg), 0)
+      + Number(o.boardExtraKg);
     entries.push({
       id: `order-${o.id}`,
       date: o.deliveryDate!,
       time: clock(o.deliveryDate) === '00:00' ? '' : clock(o.deliveryDate),
       title: o.customer.name,
-      detail: o.town,
+      detail: [o.boardPostcode, o.town].filter(Boolean).join(' · '),
+      colour: o.boardColour ?? undefined,
       weightKg: kg > 0 ? kg : undefined,
       group: 'Deliveries',
       href: canOpen ? `/orders/${o.id}` : undefined,

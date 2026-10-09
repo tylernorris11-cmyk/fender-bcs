@@ -497,31 +497,34 @@ enum PaymentStatus {
 }
 
 model Order {
-  id              String        @id @default(cuid())
-  company         Company       @default(FENDER)
-  number          String        @unique // FS-26-05301
+  id              String          @id @default(cuid())
+  company         Company         @default(FENDER)
+  number          String          @unique // FS-26-05301
   customerId      String
-  stage           OrderStage    @default(DRAFT)
-  paymentStatus   PaymentStatus @default(UNPAID)
+  stage           OrderStage      @default(DRAFT)
+  paymentStatus   PaymentStatus   @default(UNPAID)
   deliveryDate    DateTime?
-  town            String        @default("")
-  address         String        @default("")
-  poNumber        String        @default("")
-  ticketColour    String        @default("") // colour of the tally ticket stock used for this job — printed on the delivery note
-  invoiceAddress  String        @default("") // as asked for on the order; blank = the customer account's address
+  town            String          @default("")
+  address         String          @default("")
+  poNumber        String          @default("")
+  ticketColour    String          @default("") // colour of the tally ticket stock used for this job — printed on the delivery note
+  invoiceAddress  String          @default("") // as asked for on the order; blank = the customer account's address
+  boardPostcode   String          @default("") // shown first on the delivery board, before the location (town)
+  boardColour     DeliveryColour? // the order's colour on the delivery board; none = the board's plain green
+  boardExtraKg    Decimal         @default(0) @db.Decimal(12, 3) // extra weight on the delivery board only — mesh and the like going with the bar
   deliveryNoteSeq Int? // Fender's own delivery note number, shown as FS0001 — given when the order is created
-  yardNotes       String        @default("")
-  depot           String        @default("Scunthorpe") // which yard is raising and dispatching this order
+  yardNotes       String          @default("")
+  depot           String          @default("Scunthorpe") // which yard is raising and dispatching this order
   raisedById      String?
-  archived        Boolean       @default(false)
-  overrideCredit  Boolean       @default(false)
+  archived        Boolean         @default(false)
+  overrideCredit  Boolean         @default(false)
   approvedAt      DateTime?
-  approvedBy      String        @default("")
+  approvedBy      String          @default("")
   deliveredAt     DateTime?
   paidAt          DateTime?
   completedAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   customer       Customer          @relation(fields: [customerId], references: [id])
   raisedBy       User?             @relation("raisedBy", fields: [raisedById], references: [id])

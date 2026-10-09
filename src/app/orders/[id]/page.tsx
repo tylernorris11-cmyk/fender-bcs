@@ -10,11 +10,13 @@ import { clock, money, qty, shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, PageHeader, Pill, STAGE_FLOW, STAGE_LABEL, StagePill, Table } from '@/components/ui';
 import {
-  addChecklistItem, advanceStage, archiveOrder, markPaid, removeChecklistItem, setDeliveryLocation, setTicketColour, toggleChecklistItem,
+  addChecklistItem, advanceStage, archiveOrder, markPaid, removeChecklistItem, setDeliveryBoard, setTicketColour, toggleChecklistItem,
 } from '../actions';
 import { TICKET_COLOUR_MAX, ticketSwatch } from '@/lib/ticketColours';
 import { deliveryNoteNo } from '@/lib/deliveryNote';
 import { SubmitButton } from '@/components/SubmitButton';
+import { BoardColourPicker } from '@/components/BoardColourPicker';
+import { DELIVERY_COLOUR_LABEL, DELIVERY_COLOUR_SWATCH } from '@/lib/deliveryColours';
 
 export default async function OrderPage({ params }: { params: { id: string } }) {
   const user = await requirePermission('orders.view');
@@ -313,18 +315,37 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
             )}
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Date</dt><dd className="font-semibold">{shortDate(order.deliveryDate)}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Depot</dt><dd className="font-semibold">{order.depot}</dd></div>
-            <div className="flex justify-between items-center gap-4">
-              <dt className="text-ink-muted">Delivery location</dt>
+            <div>
+              <dt className="text-ink-muted mb-1.5">Delivery board</dt>
               <dd>
                 {can(user, 'orders.edit') ? (
-                  // What the delivery board shows under the customer's name.
-                  <form key={order.town} action={setDeliveryLocation} className="flex items-center gap-2">
+                  // How this order shows on the delivery board: postcode first, then the location, in its colour.
+                  <form key={`${order.boardPostcode}-${order.town}-${order.boardColour}-${order.boardExtraKg}`} action={setDeliveryBoard} className="space-y-2">
                     <input type="hidden" name="orderId" value={order.id} />
-                    <input name="town" defaultValue={order.town} maxLength={60} autoComplete="off" placeholder="e.g. Ackworth"
-                           className="input py-1 w-44" aria-label="Delivery location" />
-                    <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">Save</SubmitButton>
+                    <div className="grid grid-cols-[7rem_1fr] gap-2">
+                      <input name="boardPostcode" defaultValue={order.boardPostcode} maxLength={10} autoComplete="off" placeholder="Postcode"
+                             className="input py-1 uppercase" aria-label="Delivery board postcode" />
+                      <input name="town" defaultValue={order.town} maxLength={60} autoComplete="off" placeholder="Location, e.g. Ackworth"
+                             className="input py-1" aria-label="Delivery board location" />
+                    </div>
+                    <label className="flex items-center gap-2 text-ink-muted">
+                      Extra weight
+                      <input name="boardExtraTonnes" type="number" step="0.001" min="0" inputMode="decimal" placeholder="0"
+                             defaultValue={Number(order.boardExtraKg) > 0 ? Number(order.boardExtraKg) / 1000 : ''} className="input py-1 w-24" />
+                      <span>t, e.g. mesh</span>
+                    </label>
+                    <div className="flex items-center justify-between gap-3">
+                      <BoardColourPicker small defaultValue={order.boardColour} />
+                      <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">Save</SubmitButton>
+                    </div>
                   </form>
-                ) : <span className="font-semibold">{order.town || '—'}</span>}
+                ) : (
+                  <span className="font-semibold inline-flex items-center gap-1.5">
+                    {order.boardColour && <span className="h-3 w-3 rounded-full" style={{ backgroundColor: DELIVERY_COLOUR_SWATCH[order.boardColour] }} aria-label={DELIVERY_COLOUR_LABEL[order.boardColour]} />}
+                    {[order.boardPostcode, order.town].filter(Boolean).join(' · ') || '—'}
+                    {Number(order.boardExtraKg) > 0 && <span className="font-normal text-ink-muted">+ {tonnes(order.boardExtraKg)} extra</span>}
+                  </span>
+                )}
               </dd>
             </div>
             <div><dt className="text-ink-muted">Delivery address</dt><dd className="font-semibold mt-0.5 whitespace-pre-line">{order.address || '—'}</dd></div>

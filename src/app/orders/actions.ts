@@ -8,6 +8,7 @@ import { assertPermission, logActivity } from '@/lib/auth';
 import { assertCompanyAccess, getActiveCompany } from '@/lib/company';
 import { suggestAccountCode } from '@/lib/accountCodes';
 import { tidyTicketColour } from '@/lib/ticketColours';
+import { DELIVERY_COLOUR_LABEL, isDeliveryColour, tidyPostcode } from '@/lib/deliveryColours';
 import { applyChecklistTemplate, creditCheck, nextOrderNumber, NEXT_STAGE, ticketColourOptions } from '@/lib/orders';
 import { allocateLineStock } from '@/lib/orderProduction';
 import { barWeightKg, shapeName } from '@/lib/bs8666';
@@ -113,6 +114,7 @@ export async function createOrder(formData: FormData) {
         deliveryDate: deliveryDateRaw ? new Date(deliveryDateRaw) : null,
         depot: String(formData.get('depot') ?? 'Scunthorpe'),
         town: String(formData.get('town') ?? '').trim().slice(0, 60),
+        ...boardFields(formData),
         address: String(formData.get('address') ?? ''),
         poNumber: String(formData.get('poNumber') ?? ''),
         ticketColour,
@@ -322,16 +324,48 @@ export async function setTicketColour(formData: FormData) {
   revalidatePath(`/orders/${orderId}`);
 }
 
-/** Where an order's going, as shown on the delivery board under the customer's name. */
-export async function setDeliveryLocation(formData: FormData) {
+/**
+ * The delivery board fields off a form: the postcode, the colour (none
+ * picked leaves the board's plain green) and any extra weight in tonnes —
+ * mesh and the like going with the bar, added to the order's weight on the
+ * board only.
+ */
+function boardFields(formData: FormData) {
+  const colour = String(formData.get('boardColour') ?? '');
+  const extraRaw = String(formData.get('boardExtraTonnes') ?? '').trim();
+  const extraKg = extraRaw ? Number(extraRaw) * 1000 : 0;
+  if (!Number.isFinite(extraKg) || extraKg < 0) throw new Error('Enter the extra weight in tonnes, e.g. 0.45, or leave it blank.');
+  return {
+    boardPostcode: tidyPostcode(String(formData.get('boardPostcode') ?? '')),
+    boardColour: isDeliveryColour(colour) ? colour : null,
+    boardExtraKg: Math.round(extraKg * 1000) / 1000,
+  };
+}
+
+/**
+ * How an order shows on the delivery board, changed from the order page:
+ * the postcode first, then the location under the customer's name, in the
+ * colour picked for its box, with any extra weight added to its weight.
+ */
+export async function setDeliveryBoard(formData: FormData) {
   const user = await assertPermission('orders.edit');
   const orderId = String(formData.get('orderId'));
-  const order = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: { company: true, town: true } });
+  const order = await db.order.findUniqueOrThrow({
+    where: { id: orderId }, select: { company: true, town: true, boardPostcode: true, boardColour: true, boardExtraKg: true },
+  });
   assertCompanyAccess(user, order.company);
   const town = String(formData.get('town') ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
-  if (town === order.town) return;
-  await db.order.update({ where: { id: orderId }, data: { town } });
-  await logActivity('Order', orderId, 'Delivery location', `${order.town || 'none'} → ${town || 'none'}`, user.id);
+  const { boardPostcode, boardColour, boardExtraKg } = boardFields(formData);
+  const extraBefore = Number(order.boardExtraKg);
+  const changes = [
+    ...(boardPostcode !== order.boardPostcode ? [`postcode ${order.boardPostcode || 'none'} → ${boardPostcode || 'none'}`] : []),
+    ...(town !== order.town ? [`location ${order.town || 'none'} → ${town || 'none'}`] : []),
+    ...(boardColour !== order.boardColour ? [`colour ${boardColour ? DELIVERY_COLOUR_LABEL[boardColour] : 'none'}`] : []),
+    ...(Math.abs(boardExtraKg - extraBefore) > 0.0005 ? [`extra weight ${extraBefore / 1000} t → ${boardExtraKg / 1000} t`] : []),
+  ];
+  if (changes.length === 0) return;
+  await db.order.update({ where: { id: orderId }, data: { town, boardPostcode, boardColour, boardExtraKg } });
+  await logActivity('Order', orderId, 'Delivery board', changes.join(', '), user.id);
   revalidatePath(`/orders/${orderId}`);
   revalidatePath('/planning');
 }

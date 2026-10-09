@@ -6,6 +6,8 @@ import { SHAPE_CODES, BAR_SIZES, MASS_PER_M } from '@/lib/bs8666';
 import { createOrder } from '../actions';
 import { ScheduleImport } from './ScheduleImport';
 import { TICKET_COLOUR_MAX } from '@/lib/ticketColours';
+import { postcodeIn } from '@/lib/deliveryColours';
+import { BoardColourPicker } from '@/components/BoardColourPicker';
 import { CustomerPicker } from '@/components/CustomerPicker';
 
 type Customer = { id: string; name: string; code: string; address: string; town: string; postcode: string; creditLimit: string; used: number };
@@ -54,6 +56,13 @@ export function NewOrderForm({
   const [address, setAddress] = useState('');
   const [invoiceAddress, setInvoiceAddress] = useState('');
   const [town, setTown] = useState('');
+  // Filled in from the delivery address until someone types their own.
+  const [boardPostcode, setBoardPostcode] = useState('');
+  const postcodeTyped = useRef(false);
+  const changeAddress = (value: string) => {
+    setAddress(value);
+    if (!postcodeTyped.current) setBoardPostcode(postcodeIn(value));
+  };
 
   const customer = newCustomer ? undefined : customers.find((c) => c.id === customerId);
 
@@ -82,13 +91,13 @@ export function NewOrderForm({
   function startNewCustomer(typed: string) {
     setNewCustomerName(typed);
     setNewCustomer(true);
-    setAddress(''); setInvoiceAddress(''); setTown('');
+    changeAddress(''); setInvoiceAddress(''); setTown('');
   }
 
   function onCustomerChange(id: string) {
     setCustomerId(id);
     const c = customers.find((x) => x.id === id);
-    setAddress(c?.address ?? '');
+    changeAddress(c?.address ?? '');
     setInvoiceAddress(accountAddress(c));
     setTown(c?.town ?? '');
   }
@@ -385,13 +394,30 @@ export function NewOrderForm({
               <p className="hint">Which yard raises, produces and loads this order.</p>
             </div>
             <div>
-              <label className="label" htmlFor="town">Delivery location</label>
+              <label className="label" htmlFor="boardPostcode">Delivery board postcode</label>
+              <input id="boardPostcode" name="boardPostcode" value={boardPostcode} maxLength={10} autoComplete="off"
+                     onChange={(e) => { postcodeTyped.current = true; setBoardPostcode(e.target.value); }}
+                     className="input uppercase" placeholder="e.g. WF7 7JY" />
+              <p className="hint">Shown first on the delivery board. Filled in from the delivery address when it has one.</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="town">Delivery board location</label>
               <input id="town" name="town" list="town-options" value={town} maxLength={60} autoComplete="off"
                      onChange={(e) => setTown(e.target.value)} className="input" placeholder="e.g. Ackworth or LANCS" />
               <datalist id="town-options">
                 {towns.map((t) => <option key={t} value={t} />)}
               </datalist>
-              <p className="hint">Shown on the delivery board under the customer&apos;s name — type anything, or pick a town.</p>
+              <p className="hint">Shown after the postcode — type anything, or pick a town.</p>
+            </div>
+            <div>
+              <BoardColourPicker defaultValue="BLUE" />
+              <p className="hint">The colour of this delivery&apos;s box on the board.</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="boardExtraTonnes">Extra weight for the delivery board (tonnes)</label>
+              <input id="boardExtraTonnes" name="boardExtraTonnes" type="number" step="0.001" min="0" inputMode="decimal"
+                     className="input max-w-[160px]" placeholder="e.g. 0.45" />
+              <p className="hint">Mesh or anything else going with the bar — added to this order&apos;s weight on the board only.</p>
             </div>
             <div>
               <label className="label" htmlFor="invoiceAddress">Invoice address</label>
@@ -402,7 +428,7 @@ export function NewOrderForm({
             <div>
               <label className="label" htmlFor="address">Delivery address</label>
               <textarea id="address" name="address" rows={4} required={isFender} value={address}
-                        onChange={(e) => setAddress(e.target.value)} className="input" placeholder="Site name, road, town, contact and phone, postcode" />
+                        onChange={(e) => changeAddress(e.target.value)} className="input" placeholder="Site name, road, town, contact and phone, postcode" />
               <p className="hint">Prefilled from the account — change it for site deliveries.</p>
             </div>
             <div>
