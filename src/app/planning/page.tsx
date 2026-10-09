@@ -118,6 +118,7 @@ export default async function PlanningPage({
       detail: [o.boardPostcode, o.town].filter(Boolean).join(' · '),
       colour: o.boardColour ?? undefined,
       weightKg: kg > 0 ? kg : undefined,
+      hiab: o.boardHiab,
       group: 'Deliveries',
       href: canOpen ? `/orders/${o.id}` : undefined,
       town: o.town,

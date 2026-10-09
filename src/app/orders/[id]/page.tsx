@@ -16,6 +16,7 @@ import { TICKET_COLOUR_MAX, ticketSwatch } from '@/lib/ticketColours';
 import { deliveryNoteNo } from '@/lib/deliveryNote';
 import { SubmitButton } from '@/components/SubmitButton';
 import { BoardColourPicker } from '@/components/BoardColourPicker';
+import { HiabBadge } from '@/app/planning/HiabBadge';
 import { DELIVERY_COLOUR_LABEL, DELIVERY_COLOUR_SWATCH } from '@/lib/deliveryColours';
 
 export default async function OrderPage({ params }: { params: { id: string } }) {
@@ -320,7 +321,7 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
               <dd>
                 {can(user, 'orders.edit') ? (
                   // How this order shows on the delivery board: postcode first, then the location, in its colour.
-                  <form key={`${order.boardPostcode}-${order.town}-${order.boardColour}-${order.boardExtraKg}`} action={setDeliveryBoard} className="space-y-2">
+                  <form key={`${order.boardPostcode}-${order.town}-${order.boardColour}-${order.boardExtraKg}-${order.boardHiab}`} action={setDeliveryBoard} className="space-y-2">
                     <input type="hidden" name="orderId" value={order.id} />
                     <div className="grid grid-cols-[7rem_1fr] gap-2">
                       <input name="boardPostcode" defaultValue={order.boardPostcode} maxLength={10} autoComplete="off" placeholder="Postcode"
@@ -334,6 +335,10 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
                              defaultValue={Number(order.boardExtraKg) > 0 ? Number(order.boardExtraKg) / 1000 : ''} className="input py-1 w-24" />
                       <span>t, e.g. mesh</span>
                     </label>
+                    <label className="flex items-center gap-2 font-medium">
+                      <input type="checkbox" name="boardHiab" defaultChecked={order.boardHiab} className="h-4 w-4 accent-brand" />
+                      Needs a hiab <HiabBadge />
+                    </label>
                     <div className="flex items-center justify-between gap-3">
                       <BoardColourPicker small defaultValue={order.boardColour} />
                       <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">Save</SubmitButton>
@@ -344,6 +349,7 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
                     {order.boardColour && <span className="h-3 w-3 rounded-full" style={{ backgroundColor: DELIVERY_COLOUR_SWATCH[order.boardColour] }} aria-label={DELIVERY_COLOUR_LABEL[order.boardColour]} />}
                     {[order.boardPostcode, order.town].filter(Boolean).join(' · ') || '—'}
                     {Number(order.boardExtraKg) > 0 && <span className="font-normal text-ink-muted">+ {tonnes(order.boardExtraKg)} extra</span>}
+                    {order.boardHiab && <HiabBadge />}
                   </span>
                 )}
               </dd>

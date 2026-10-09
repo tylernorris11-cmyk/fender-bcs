@@ -339,32 +339,35 @@ function boardFields(formData: FormData) {
     boardPostcode: tidyPostcode(String(formData.get('boardPostcode') ?? '')),
     boardColour: isDeliveryColour(colour) ? colour : null,
     boardExtraKg: Math.round(extraKg * 1000) / 1000,
+    boardHiab: formData.get('boardHiab') === 'on',
   };
 }
 
 /**
  * How an order shows on the delivery board, changed from the order page:
  * the postcode first, then the location under the customer's name, in the
- * colour picked for its box, with any extra weight added to its weight.
+ * colour picked for its box, with any extra weight added to its weight and
+ * the yellow H when it needs a hiab.
  */
 export async function setDeliveryBoard(formData: FormData) {
   const user = await assertPermission('orders.edit');
   const orderId = String(formData.get('orderId'));
   const order = await db.order.findUniqueOrThrow({
-    where: { id: orderId }, select: { company: true, town: true, boardPostcode: true, boardColour: true, boardExtraKg: true },
+    where: { id: orderId }, select: { company: true, town: true, boardPostcode: true, boardColour: true, boardExtraKg: true, boardHiab: true },
   });
   assertCompanyAccess(user, order.company);
   const town = String(formData.get('town') ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
-  const { boardPostcode, boardColour, boardExtraKg } = boardFields(formData);
+  const { boardPostcode, boardColour, boardExtraKg, boardHiab } = boardFields(formData);
   const extraBefore = Number(order.boardExtraKg);
   const changes = [
     ...(boardPostcode !== order.boardPostcode ? [`postcode ${order.boardPostcode || 'none'} → ${boardPostcode || 'none'}`] : []),
     ...(town !== order.town ? [`location ${order.town || 'none'} → ${town || 'none'}`] : []),
     ...(boardColour !== order.boardColour ? [`colour ${boardColour ? DELIVERY_COLOUR_LABEL[boardColour] : 'none'}`] : []),
     ...(Math.abs(boardExtraKg - extraBefore) > 0.0005 ? [`extra weight ${extraBefore / 1000} t → ${boardExtraKg / 1000} t`] : []),
+    ...(boardHiab !== order.boardHiab ? [boardHiab ? 'needs a hiab' : 'no hiab needed'] : []),
   ];
   if (changes.length === 0) return;
-  await db.order.update({ where: { id: orderId }, data: { town, boardPostcode, boardColour, boardExtraKg } });
+  await db.order.update({ where: { id: orderId }, data: { town, boardPostcode, boardColour, boardExtraKg, boardHiab } });
   await logActivity('Order', orderId, 'Delivery board', changes.join(', '), user.id);
   revalidatePath(`/orders/${orderId}`);
   revalidatePath('/planning');

@@ -8,6 +8,7 @@ import { ScheduleImport } from './ScheduleImport';
 import { TICKET_COLOUR_MAX } from '@/lib/ticketColours';
 import { postcodeIn } from '@/lib/deliveryColours';
 import { BoardColourPicker } from '@/components/BoardColourPicker';
+import { HiabBadge } from '@/app/planning/HiabBadge';
 import { CustomerPicker } from '@/components/CustomerPicker';
 
 type Customer = { id: string; name: string; code: string; address: string; town: string; postcode: string; creditLimit: string; used: number };
@@ -419,6 +420,10 @@ export function NewOrderForm({
                      className="input max-w-[160px]" placeholder="e.g. 0.45" />
               <p className="hint">Mesh or anything else going with the bar — added to this order&apos;s weight on the board only.</p>
             </div>
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" name="boardHiab" className="h-4 w-4 accent-brand" />
+              Needs a hiab to unload <HiabBadge />
+            </label>
             <div>
               <label className="label" htmlFor="invoiceAddress">Invoice address</label>
               <textarea id="invoiceAddress" name="invoiceAddress" rows={4} required={isFender} value={invoiceAddress}

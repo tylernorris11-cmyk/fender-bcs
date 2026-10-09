@@ -512,6 +512,7 @@ model Order {
   boardPostcode   String          @default("") // shown first on the delivery board, before the location (town)
   boardColour     DeliveryColour? // the order's colour on the delivery board; none = the board's plain green
   boardExtraKg    Decimal         @default(0) @db.Decimal(12, 3) // extra weight on the delivery board only — mesh and the like going with the bar
+  boardHiab       Boolean         @default(false) // needs a hiab (lorry crane) to unload — the yellow H on the delivery board
   deliveryNoteSeq Int? // Fender's own delivery note number, shown as FS0001 — given when the order is created
   yardNotes       String          @default("")
   depot           String          @default("Scunthorpe") // which yard is raising and dispatching this order
