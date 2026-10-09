@@ -57,6 +57,10 @@ export function NewOrderForm({
   const [address, setAddress] = useState('');
   const [invoiceAddress, setInvoiceAddress] = useState('');
   const [town, setTown] = useState('');
+  // The name on the delivery board follows the customer until someone types their own.
+  const [boardName, setBoardName] = useState('');
+  const boardNameTyped = useRef(false);
+  const followCustomer = (name: string) => { if (!boardNameTyped.current) setBoardName(name); };
   // Filled in from the delivery address until someone types their own.
   const [boardPostcode, setBoardPostcode] = useState('');
   const postcodeTyped = useRef(false);
@@ -92,12 +96,14 @@ export function NewOrderForm({
   function startNewCustomer(typed: string) {
     setNewCustomerName(typed);
     setNewCustomer(true);
+    followCustomer(typed);
     changeAddress(''); setInvoiceAddress(''); setTown('');
   }
 
   function onCustomerChange(id: string) {
     setCustomerId(id);
     const c = customers.find((x) => x.id === id);
+    followCustomer(c?.name ?? '');
     changeAddress(c?.address ?? '');
     setInvoiceAddress(accountAddress(c));
     setTown(c?.town ?? '');
@@ -139,7 +145,7 @@ export function NewOrderForm({
             <div>
               <label className="label" htmlFor="newCustomerName">Customer name</label>
               <input id="newCustomerName" name="newCustomerName" required className="input" placeholder="Who the order is for"
-                     defaultValue={newCustomerName} autoFocus={!!newCustomerName} />
+                     defaultValue={newCustomerName} autoFocus={!!newCustomerName} onChange={(e) => followCustomer(e.target.value)} />
               <p className="hint">
                 A customer account is opened for them when the order&apos;s saved.
                 {customers.length > 0 && (
@@ -393,6 +399,13 @@ export function NewOrderForm({
                 {locations.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
               <p className="hint">Which yard raises, produces and loads this order.</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="boardName">Delivery board name</label>
+              <input id="boardName" name="boardName" value={boardName} maxLength={80} autoComplete="off"
+                     onChange={(e) => { boardNameTyped.current = true; setBoardName(e.target.value); }}
+                     className="input" placeholder="Who the delivery's for" />
+              <p className="hint">Who the delivery board says it&apos;s for. Filled in with the customer — change it if it&apos;s going to someone else.</p>
             </div>
             <div>
               <label className="label" htmlFor="boardPostcode">Delivery board postcode</label>

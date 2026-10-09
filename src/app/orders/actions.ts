@@ -115,6 +115,7 @@ export async function createOrder(formData: FormData) {
         depot: String(formData.get('depot') ?? 'Scunthorpe'),
         town: String(formData.get('town') ?? '').trim().slice(0, 60),
         ...boardFields(formData),
+        boardName: boardNameFrom(formData, customer.name),
         address: String(formData.get('address') ?? ''),
         poNumber: String(formData.get('poNumber') ?? ''),
         ticketColour,
@@ -324,6 +325,12 @@ export async function setTicketColour(formData: FormData) {
   revalidatePath(`/orders/${orderId}`);
 }
 
+/** Who the delivery board says an order's for: blank when it's just the customer's own name, so a renamed account carries through. */
+function boardNameFrom(formData: FormData, customerName: string) {
+  const name = String(formData.get('boardName') ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  return name.toLowerCase() === customerName.trim().toLowerCase() ? '' : name;
+}
+
 /**
  * The delivery board fields off a form: the postcode, the colour (none
  * picked leaves the board's plain green) and any extra weight in tonnes —
@@ -345,7 +352,8 @@ function boardFields(formData: FormData) {
 
 /**
  * How an order shows on the delivery board, changed from the order page:
- * the postcode first, then the location under the customer's name, in the
+ * the name it's for (the customer's unless changed), the postcode first,
+ * then the location under it, in the
  * colour picked for its box, with any extra weight added to its weight and
  * the yellow H when it needs a hiab.
  */
@@ -353,13 +361,16 @@ export async function setDeliveryBoard(formData: FormData) {
   const user = await assertPermission('orders.edit');
   const orderId = String(formData.get('orderId'));
   const order = await db.order.findUniqueOrThrow({
-    where: { id: orderId }, select: { company: true, town: true, boardPostcode: true, boardColour: true, boardExtraKg: true, boardHiab: true },
+    where: { id: orderId },
+    select: { company: true, town: true, boardName: true, boardPostcode: true, boardColour: true, boardExtraKg: true, boardHiab: true, customer: { select: { name: true } } },
   });
   assertCompanyAccess(user, order.company);
   const town = String(formData.get('town') ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
   const { boardPostcode, boardColour, boardExtraKg, boardHiab } = boardFields(formData);
+  const boardName = boardNameFrom(formData, order.customer.name);
   const extraBefore = Number(order.boardExtraKg);
   const changes = [
+    ...(boardName !== order.boardName ? [`name ${order.boardName || order.customer.name} → ${boardName || order.customer.name}`] : []),
     ...(boardPostcode !== order.boardPostcode ? [`postcode ${order.boardPostcode || 'none'} → ${boardPostcode || 'none'}`] : []),
     ...(town !== order.town ? [`location ${order.town || 'none'} → ${town || 'none'}`] : []),
     ...(boardColour !== order.boardColour ? [`colour ${boardColour ? DELIVERY_COLOUR_LABEL[boardColour] : 'none'}`] : []),
@@ -367,7 +378,7 @@ export async function setDeliveryBoard(formData: FormData) {
     ...(boardHiab !== order.boardHiab ? [boardHiab ? 'needs a hiab' : 'no hiab needed'] : []),
   ];
   if (changes.length === 0) return;
-  await db.order.update({ where: { id: orderId }, data: { town, boardPostcode, boardColour, boardExtraKg, boardHiab } });
+  await db.order.update({ where: { id: orderId }, data: { town, boardName, boardPostcode, boardColour, boardExtraKg, boardHiab } });
   await logActivity('Order', orderId, 'Delivery board', changes.join(', '), user.id);
   revalidatePath(`/orders/${orderId}`);
   revalidatePath('/planning');

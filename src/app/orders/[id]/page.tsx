@@ -321,8 +321,10 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
               <dd>
                 {can(user, 'orders.edit') ? (
                   // How this order shows on the delivery board: postcode first, then the location, in its colour.
-                  <form key={`${order.boardPostcode}-${order.town}-${order.boardColour}-${order.boardExtraKg}-${order.boardHiab}`} action={setDeliveryBoard} className="space-y-2">
+                  <form key={`${order.boardName}-${order.boardPostcode}-${order.town}-${order.boardColour}-${order.boardExtraKg}-${order.boardHiab}`} action={setDeliveryBoard} className="space-y-2">
                     <input type="hidden" name="orderId" value={order.id} />
+                    <input name="boardName" defaultValue={order.boardName || order.customer.name} maxLength={80} autoComplete="off" required
+                           className="input py-1" aria-label="Delivery board name" title="Who the delivery board says this is for" />
                     <div className="grid grid-cols-[7rem_1fr] gap-2">
                       <input name="boardPostcode" defaultValue={order.boardPostcode} maxLength={10} autoComplete="off" placeholder="Postcode"
                              className="input py-1 uppercase" aria-label="Delivery board postcode" />
@@ -345,7 +347,8 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
                     </div>
                   </form>
                 ) : (
-                  <span className="font-semibold inline-flex items-center gap-1.5">
+                  <span className="font-semibold inline-flex flex-wrap items-center gap-1.5">
+                    {order.boardName && <span>{order.boardName} ·</span>}
                     {order.boardColour && <span className="h-3 w-3 rounded-full" style={{ backgroundColor: DELIVERY_COLOUR_SWATCH[order.boardColour] }} aria-label={DELIVERY_COLOUR_LABEL[order.boardColour]} />}
                     {[order.boardPostcode, order.town].filter(Boolean).join(' · ') || '—'}
                     {Number(order.boardExtraKg) > 0 && <span className="font-normal text-ink-muted">+ {tonnes(order.boardExtraKg)} extra</span>}

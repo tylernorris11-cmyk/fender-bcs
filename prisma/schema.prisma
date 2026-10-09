@@ -509,6 +509,7 @@ model Order {
   poNumber        String          @default("")
   ticketColour    String          @default("") // colour of the tally ticket stock used for this job — printed on the delivery note
   invoiceAddress  String          @default("") // as asked for on the order; blank = the customer account's address
+  boardName       String          @default("") // who the delivery board says it's for; blank = the customer's name
   boardPostcode   String          @default("") // shown first on the delivery board, before the location (town)
   boardColour     DeliveryColour? // the order's colour on the delivery board; none = the board's plain green
   boardExtraKg    Decimal         @default(0) @db.Decimal(12, 3) // extra weight on the delivery board only — mesh and the like going with the bar

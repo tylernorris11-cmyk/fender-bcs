@@ -114,7 +114,7 @@ export default async function PlanningPage({
       id: `order-${o.id}`,
       date: o.deliveryDate!,
       time: clock(o.deliveryDate) === '00:00' ? '' : clock(o.deliveryDate),
-      title: o.customer.name,
+      title: o.boardName || o.customer.name,
       detail: [o.boardPostcode, o.town].filter(Boolean).join(' · '),
       colour: o.boardColour ?? undefined,
       weightKg: kg > 0 ? kg : undefined,
