@@ -107,11 +107,18 @@ export async function updateDelivery(formData: FormData) {
   const moved = dateRaw !== isoDateUk(event.startsAt);
   const hiab = formData.get('hiab') === 'on';
 
-  await db.planningEvent.update({ where: { id: eventId }, data: { driverId, startsAt, hiab } });
+  // Same rule as adding one: every delivery has a weight, typed in tonnes.
+  const weightRaw = String(formData.get('weightTonnes') ?? '').trim();
+  const weightKg = Number(weightRaw) * 1000;
+  if (!weightRaw || !Number.isFinite(weightKg) || weightKg <= 0) throw new Error('Enter the weight in tonnes, e.g. 2.4. Every delivery needs one.');
+  const reweighed = event.weightKg == null || Math.abs(Number(event.weightKg) - weightKg) > 0.0005;
+
+  await db.planningEvent.update({ where: { id: eventId }, data: { driverId, startsAt, hiab, weightKg } });
   const changes = [
     ...(moved ? [`moved from ${shortDate(event.startsAt)} to ${shortDate(startsAt)}`] : []),
     ...(driverId !== event.driverId ? [`driver ${driverName}`] : []),
     ...(hiab !== event.hiab ? [hiab ? 'needs a hiab' : 'no hiab needed'] : []),
+    ...(reweighed ? [`weight ${event.weightKg != null ? `${Number(event.weightKg) / 1000} t → ` : ''}${weightKg / 1000} t`] : []),
   ];
   if (changes.length) await logActivity('PlanningEvent', eventId, 'Delivery updated', `${event.title} — ${changes.join(', ')}`, user.id);
   revalidatePath('/planning');

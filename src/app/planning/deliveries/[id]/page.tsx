@@ -15,10 +15,9 @@ import { HiabBadge } from '../../HiabBadge';
 import { DeleteDeliveryButton } from './DeleteDeliveryButton';
 
 /** A stand-alone delivery's own page — reached by clicking it on the board.
- * Deliberately narrow: everything but the driver is set once when it's
- * added (see planning/new) and shown here read-only for context; the
- * driver is the one thing that's often not known yet at that point. A real
- * Order's delivery still opens the order itself, never this page. */
+ * The date, driver, weight and hiab can be changed here; the rest is set
+ * once when it's added (see planning/new) and shown read-only for context.
+ * A real Order's delivery still opens the order itself, never this page. */
 export default async function DeliveryDetailPage({ params }: { params: { id: string } }) {
   const user = await requirePermission('planning.view');
   const alerts = await getAlerts(user);
@@ -70,11 +69,18 @@ export default async function DeliveryDetailPage({ params }: { params: { id: str
         )}
 
         {canEdit ? (
-          <form key={`${event.startsAt.toISOString()}-${event.driverId}-${event.hiab}`} action={updateDelivery} className="flex flex-wrap items-end gap-3">
+          <form key={`${event.startsAt.toISOString()}-${event.driverId}-${event.hiab}-${event.weightKg}`} action={updateDelivery} className="flex flex-wrap items-end gap-3">
             <input type="hidden" name="eventId" value={event.id} />
             <div>
               <label className="label" htmlFor="date">Date</label>
               <input id="date" name="date" type="date" required defaultValue={isoDateUk(event.startsAt)} className="input w-44" />
+            </div>
+            <div>
+              <label className="label" htmlFor="weightTonnes">Weight (tonnes)</label>
+              <input
+                id="weightTonnes" name="weightTonnes" type="number" step="0.001" min="0.001" required inputMode="decimal"
+                defaultValue={event.weightKg != null ? Number(event.weightKg) / 1000 : ''} className="input w-32" placeholder="2.4"
+              />
             </div>
             <div className="flex-1 min-w-[180px] max-w-xs">
               <label className="label" htmlFor="driverId">Driver</label>
