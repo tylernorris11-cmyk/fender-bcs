@@ -63,10 +63,12 @@ export async function nextNcrRef(): Promise<string> {
 
 /**
  * What the yard is allowed to do next. Stages only ever move forwards, except
- * that an admin can send an order back to draft to fix a mistake.
+ * that an admin can send an order back to draft to fix a mistake. Submitting
+ * a draft goes with writing orders (the office), not moving them through the
+ * yard; approving it still needs orders.approve.
  */
-export const NEXT_STAGE: Partial<Record<OrderStage, { to: OrderStage; label: string; perm: 'orders.approve' | 'orders.progress' }>> = {
-  DRAFT: { to: 'PENDING_APPROVAL', label: 'Submit for approval', perm: 'orders.progress' },
+export const NEXT_STAGE: Partial<Record<OrderStage, { to: OrderStage; label: string; perm: 'orders.edit' | 'orders.approve' | 'orders.progress' }>> = {
+  DRAFT: { to: 'PENDING_APPROVAL', label: 'Submit for approval', perm: 'orders.edit' },
   PENDING_APPROVAL: { to: 'APPROVED', label: 'Approve order', perm: 'orders.approve' },
   APPROVED: { to: 'IN_PRODUCTION', label: 'Start production', perm: 'orders.progress' },
   IN_PRODUCTION: { to: 'READY_FOR_DELIVERY', label: 'Mark ready for delivery', perm: 'orders.progress' },
