@@ -112,7 +112,7 @@ export async function createOrder(formData: FormData) {
         stage: 'DRAFT',
         deliveryDate: deliveryDateRaw ? new Date(deliveryDateRaw) : null,
         depot: String(formData.get('depot') ?? 'Scunthorpe'),
-        town: String(formData.get('town') ?? ''),
+        town: String(formData.get('town') ?? '').trim().slice(0, 60),
         address: String(formData.get('address') ?? ''),
         poNumber: String(formData.get('poNumber') ?? ''),
         ticketColour,
@@ -320,6 +320,20 @@ export async function setTicketColour(formData: FormData) {
   await db.order.update({ where: { id: orderId }, data: { ticketColour } });
   await logActivity('Order', orderId, 'Ticket colour', `${order.ticketColour || 'none'} → ${ticketColour || 'none'}`, user.id);
   revalidatePath(`/orders/${orderId}`);
+}
+
+/** Where an order's going, as shown on the delivery board under the customer's name. */
+export async function setDeliveryLocation(formData: FormData) {
+  const user = await assertPermission('orders.edit');
+  const orderId = String(formData.get('orderId'));
+  const order = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: { company: true, town: true } });
+  assertCompanyAccess(user, order.company);
+  const town = String(formData.get('town') ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (town === order.town) return;
+  await db.order.update({ where: { id: orderId }, data: { town } });
+  await logActivity('Order', orderId, 'Delivery location', `${order.town || 'none'} → ${town || 'none'}`, user.id);
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath('/planning');
 }
 
 export async function updateDelivery(formData: FormData) {

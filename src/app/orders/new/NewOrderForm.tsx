@@ -385,12 +385,13 @@ export function NewOrderForm({
               <p className="hint">Which yard raises, produces and loads this order.</p>
             </div>
             <div>
-              <label className="label" htmlFor="town">Town / city</label>
-              <select id="town" name="town" value={town} onChange={(e) => setTown(e.target.value)} className="input">
-                <option value="">—</option>
-                {towns.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <p className="hint">Used by Deliveries to group runs going the same way.</p>
+              <label className="label" htmlFor="town">Delivery location</label>
+              <input id="town" name="town" list="town-options" value={town} maxLength={60} autoComplete="off"
+                     onChange={(e) => setTown(e.target.value)} className="input" placeholder="e.g. Ackworth or LANCS" />
+              <datalist id="town-options">
+                {towns.map((t) => <option key={t} value={t} />)}
+              </datalist>
+              <p className="hint">Shown on the delivery board under the customer&apos;s name — type anything, or pick a town.</p>
             </div>
             <div>
               <label className="label" htmlFor="invoiceAddress">Invoice address</label>

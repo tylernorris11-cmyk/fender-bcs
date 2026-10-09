@@ -5,7 +5,6 @@ import { requirePermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getAlerts } from '@/lib/alerts';
 import { can } from '@/lib/rbac';
-import { COMPANY_LABEL } from '@/lib/company';
 import { clock, shortDate } from '@/lib/format';
 import { bankHolidayName, eachDayInclusive, isoDay, utcDay } from '@/lib/holidays';
 import { DELIVERY_COLOUR_BOARD } from '@/lib/deliveryColours';
@@ -26,6 +25,7 @@ type Entry = {
   // Only ever set on a stand-alone delivery (a PlanningEvent, not a real
   // Order) — an order-derived delivery keeps the plain green board styling.
   colour?: DeliveryColour;
+  // A stand-alone delivery's typed weight, or an order's bar marks and lines added up.
   weightKg?: number;
   driverBadge?: { name: string; colour: string; tick?: DriverTick };
   hiab?: boolean;
@@ -78,7 +78,7 @@ export default async function PlanningPage({
         archived: false, deliveryDate: { gte: from, lt: to }, stage: { notIn: ['CANCELLED', 'DRAFT'] },
         ...(depot ? { depot } : {}),
       },
-      include: { customer: true },
+      include: { customer: true, barMarks: { select: { weightKg: true } }, lines: { select: { weightKg: true } } },
     }),
     db.planningEvent.findMany({
       where: { startsAt: { gte: from, lt: to } },
@@ -102,18 +102,22 @@ export default async function PlanningPage({
   const canMarkDelivered = can(user, 'orders.progress') || can(user, 'planning.edit');
 
   for (const o of orders) {
-    // Both companies share this board because they share lorries — but a
-    // viewer without access to the OTHER company, or without orders.view at
-    // all, only gets the logistics (day, town), never the customer or order detail.
-    const visible = user.companies.includes(o.company) && can(user, 'orders.view');
+    // Both companies share this board because they share lorries, so everyone
+    // sees who each delivery is for, how heavy and where it's going (the
+    // delivery location typed on the order) — shown like a stand-alone
+    // delivery. Opening the order itself stays with people who have access to
+    // that company's orders.
+    const canOpen = user.companies.includes(o.company) && can(user, 'orders.view');
+    const kg = o.barMarks.reduce((n, b) => n + Number(b.weightKg), 0) + o.lines.reduce((n, l) => n + Number(l.weightKg), 0);
     entries.push({
       id: `order-${o.id}`,
       date: o.deliveryDate!,
       time: clock(o.deliveryDate) === '00:00' ? '' : clock(o.deliveryDate),
-      title: visible ? `${o.number} — ${o.customer.name}` : `${COMPANY_LABEL[o.company]} delivery`,
-      detail: visible ? `${o.customer.contactName} · ${o.town}` : (o.town || ''),
+      title: o.customer.name,
+      detail: o.town,
+      weightKg: kg > 0 ? kg : undefined,
       group: 'Deliveries',
-      href: visible ? `/orders/${o.id}` : undefined,
+      href: canOpen ? `/orders/${o.id}` : undefined,
       town: o.town,
       delivered: o.stage === 'DELIVERED' || o.stage === 'COMPLETED',
     });
@@ -136,10 +140,12 @@ export default async function PlanningPage({
     const eventDepot = e.order?.depot ?? e.asset?.depot;
     if (depot && eventDepot && eventDepot !== depot) continue;
 
+    // As with orders above: everyone sees what's on the board, but only
+    // someone with access to an order's company can open it or tick it off.
     const orderCompany = e.order?.company;
     const visible = !orderCompany || (user.companies.includes(orderCompany) && can(user, 'orders.view'));
     const group: Entry['group'] = e.type === 'INSPECTION' || e.type === 'SERVICE' ? 'Vehicles & machinery' : e.type === 'DELIVERY' ? 'Deliveries' : 'Other';
-    const rawTitle = visible ? e.title : `${COMPANY_LABEL[orderCompany!]} delivery`;
+    const rawTitle = e.title;
     entries.push({
       id: `event-${e.id}`,
       date: e.startsAt,
@@ -148,16 +154,14 @@ export default async function PlanningPage({
       // A stand-alone delivery's destination shows in its own box, not just
       // summarised in the day's town pill up top — e.detail is never set on
       // one of these today, but it's kept ahead of the town in case that changes.
-      detail: visible
-        ? (group === 'Deliveries' && !e.orderId ? [e.detail, e.town].filter(Boolean).join(' · ') || e.assignedTo : (e.detail || e.assignedTo))
-        : (e.town || ''),
+      detail: group === 'Deliveries' && !e.orderId ? [e.detail, e.town].filter(Boolean).join(' · ') || e.assignedTo : (e.detail || e.assignedTo),
       group,
       href: visible
         ? (e.orderId ? `/orders/${e.orderId}` : e.assetId ? `/assets/${e.assetId}` : group === 'Deliveries' ? `/planning/deliveries/${e.id}` : undefined)
         : undefined,
       town: e.town,
       delivered: group === 'Deliveries' ? e.done : undefined,
-      driver: group === 'Deliveries' && visible ? (e.assignedTo || undefined) : undefined,
+      driver: group === 'Deliveries' ? (e.assignedTo || undefined) : undefined,
       colour: group === 'Deliveries' && !e.orderId ? e.colour : undefined,
       weightKg: group === 'Deliveries' && !e.orderId && e.weightKg != null ? Number(e.weightKg) : undefined,
       driverBadge: group === 'Deliveries' && !e.orderId && e.driver

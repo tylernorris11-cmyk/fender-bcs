@@ -10,7 +10,7 @@ import { clock, money, qty, shortDate, tonnes } from '@/lib/format';
 import { NAV, Shell } from '@/components/Shell';
 import { Avatar, PageHeader, Pill, STAGE_FLOW, STAGE_LABEL, StagePill, Table } from '@/components/ui';
 import {
-  addChecklistItem, advanceStage, archiveOrder, markPaid, removeChecklistItem, setTicketColour, toggleChecklistItem,
+  addChecklistItem, advanceStage, archiveOrder, markPaid, removeChecklistItem, setDeliveryLocation, setTicketColour, toggleChecklistItem,
 } from '../actions';
 import { TICKET_COLOUR_MAX, ticketSwatch } from '@/lib/ticketColours';
 import { deliveryNoteNo } from '@/lib/deliveryNote';
@@ -313,7 +313,20 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
             )}
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Date</dt><dd className="font-semibold">{shortDate(order.deliveryDate)}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Depot</dt><dd className="font-semibold">{order.depot}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-ink-muted">Town</dt><dd className="font-semibold">{order.town || '—'}</dd></div>
+            <div className="flex justify-between items-center gap-4">
+              <dt className="text-ink-muted">Delivery location</dt>
+              <dd>
+                {can(user, 'orders.edit') ? (
+                  // What the delivery board shows under the customer's name.
+                  <form key={order.town} action={setDeliveryLocation} className="flex items-center gap-2">
+                    <input type="hidden" name="orderId" value={order.id} />
+                    <input name="town" defaultValue={order.town} maxLength={60} autoComplete="off" placeholder="e.g. Ackworth"
+                           className="input py-1 w-44" aria-label="Delivery location" />
+                    <SubmitButton className="btn-secondary btn-sm" pendingLabel="Saving…">Save</SubmitButton>
+                  </form>
+                ) : <span className="font-semibold">{order.town || '—'}</span>}
+              </dd>
+            </div>
             <div><dt className="text-ink-muted">Delivery address</dt><dd className="font-semibold mt-0.5 whitespace-pre-line">{order.address || '—'}</dd></div>
             {order.invoiceAddress && <div><dt className="text-ink-muted">Invoice address</dt><dd className="font-semibold mt-0.5 whitespace-pre-line">{order.invoiceAddress}</dd></div>}
             <div className="flex justify-between gap-4"><dt className="text-ink-muted">Customer PO</dt><dd className="font-semibold">{order.poNumber || '—'}</dd></div>
